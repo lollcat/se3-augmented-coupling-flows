@@ -42,7 +42,7 @@ def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7):
     chex.assert_trees_all_close(x_and_a_new_rot, rotate_translate_2d(x_and_a_new, theta, translation), rtol=rtol)
 
     chex.assert_trees_all_close(get_pairwise_distances(x_and_a_new_rot),
-                                get_pairwise_distances(x_and_a_new))
+                                get_pairwise_distances(x_and_a_new), rtol=rtol)
 
 
 def test_fn_is_invariant(invariante_fn, key, n_nodes=7):
@@ -68,7 +68,6 @@ def test_fn_is_invariant(invariante_fn, key, n_nodes=7):
     else:
         rtol = 1e-3
     chex.assert_trees_all_close(out, out_rot, rtol=rtol)
-
 
 
 

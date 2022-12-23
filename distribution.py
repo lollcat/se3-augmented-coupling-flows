@@ -3,7 +3,7 @@ import haiku as hk
 import jax.random
 
 from base import CentreGravityGaussian
-from bijector_with_proj import make_se_equivariant_split_coupling
+from bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 
 
 def make_equivariant_augmented_flow_dist(dim, nodes, n_layers):
@@ -11,7 +11,7 @@ def make_equivariant_augmented_flow_dist(dim, nodes, n_layers):
 
     bijectors = []
     for i in range(n_layers):
-        bijector = make_se_equivariant_split_coupling(dim, swap=i % 2 == 0)
+        bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=i % 2 == 0)
         bijectors.append(bijector)
 
     flow = distrax.Chain(bijectors)
