@@ -17,7 +17,7 @@ def rotate_translate_2d(x_and_a, theta, translation):
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7, batch_shape=()):
+def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7):
 
     dim = 2
     # Setup
@@ -40,6 +40,9 @@ def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7, batch_shape=()):
     else:
         rtol = 1e-3
     chex.assert_trees_all_close(x_and_a_new_rot, rotate_translate_2d(x_and_a_new, theta, translation), rtol=rtol)
+
+    chex.assert_trees_all_close(get_pairwise_distances(x_and_a_new_rot),
+                                get_pairwise_distances(x_and_a_new))
 
 
 def test_fn_is_invariant(invariante_fn, key, n_nodes=7):
