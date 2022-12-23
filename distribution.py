@@ -19,8 +19,10 @@ def make_equivariant_augmented_flow_dist(dim, nodes, n_layers):
     return distribution
 
 
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+    from test_utils import test_fn_is_invariant, test_fn_is_equivariant
     dim = 2
     n_nodes = 20
     n_layers = 1
@@ -32,6 +34,13 @@ if __name__ == '__main__':
         distribution = make_equivariant_augmented_flow_dist(dim=dim, nodes=n_nodes, n_layers=n_layers)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
+
+    @hk.without_apply_rng
+    @hk.transform
+    def log_prob_fn(x):
+        distribution = make_equivariant_augmented_flow_dist(dim=dim, nodes=n_nodes, n_layers=n_layers)
+        return distribution.log_prob(x)
+
     # Init params.
     key, subkey = jax.random.split(key)
     params = sample_and_log_prob_fn.init(subkey)
@@ -42,3 +51,10 @@ if __name__ == '__main__':
 
     plt.plot(sample[0, :, 0], sample[0, :, 1], 'o')
     plt.show()
+
+
+    # Test log prob function is invariant.
+    key, subkey = jax.random.split(key)
+    test_fn_is_invariant(lambda x: log_prob_fn.apply(params, x), subkey, n_nodes=n_nodes)
+
+

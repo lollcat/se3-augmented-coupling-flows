@@ -31,17 +31,22 @@ class CentreGravityGaussian(distrax.Distribution):
 
 
 def assert_mean_zero(x: chex.Array):
-    mean = jnp.mean(x, axis=1, keepdims=True)
+    mean = jnp.mean(x, axis=-2, keepdims=True)
     assert jnp.abs(mean).max().item() < 1e-4
 
 def remove_mean(x: chex.Array) -> chex.Array:
-    mean = jnp.mean(x, axis=1, keepdims=True)
+    mean = jnp.mean(x, axis=-2, keepdims=True)
     x = x - mean
     return x
 
 def center_gravity_zero_gaussian_log_likelihood(x: chex.Array) -> chex.Array:
-    chex.assert_rank(x, 3)  # [batch, nodes, x]
-    B, N, D = x.shape
+    try:
+        chex.assert_rank(x, 3)  # [batch, nodes, x]
+    except:
+        chex.assert_rank(x, 2)  # [nodes, x]
+
+    N, D = x.shape[-2:]
+
     assert_mean_zero(x)
 
     # r is invariant to a basis change in the relevant hyperplane.
@@ -59,8 +64,6 @@ def center_gravity_zero_gaussian_log_likelihood(x: chex.Array) -> chex.Array:
 
 
 def sample_center_gravity_zero_gaussian(key: chex.PRNGKey, shape: chex.Shape) -> chex.Array:
-    assert len(shape) == 3  # [batch, nodes, x]
-
     x = jax.random.normal(key, shape)
 
     # This projection only works because Gaussian is rotation invariant around
@@ -92,7 +95,15 @@ if __name__ == '__main__':
     test_fn_is_invariant(lambda x: dist.log_prob(x[None, ...]), key)  # add fake batch dimension.
 
 
+    # Single sample and log prob
+    sample = dist.sample(seed=key)
+    log_prob = dist.log_prob(sample)
+
     # *********** Test raw functions **********************
     samples = sample_center_gravity_zero_gaussian(key, shape)
     log_prob = center_gravity_zero_gaussian_log_likelihood(samples)
     print(log_prob)
+
+
+
+

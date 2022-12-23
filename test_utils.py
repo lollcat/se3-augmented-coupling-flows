@@ -17,7 +17,7 @@ def rotate_translate_2d(x_and_a, theta, translation):
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7):
+def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7, batch_shape=()):
 
     dim = 2
     # Setup

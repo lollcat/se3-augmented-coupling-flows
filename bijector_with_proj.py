@@ -30,7 +30,7 @@ def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin,
 class ProjectedScalarAffine(distrax.Bijector):
     """Following style of `ScalarAffine` distrax Bijector.
 
-    Note: Doesn't need to operatoe on batches, as it gets called with vmap."""
+    Note: Doesn't need to operate on batches, as it gets called with vmap."""
     def __init__(self, change_of_basis_matrix, origin, log_scale, shift):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
         self._change_of_basis_matrix = change_of_basis_matrix
