@@ -8,7 +8,6 @@ import jax.numpy as jnp
 from nets import equivariant_fn, invariant_fn
 
 
-
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
     """Perform affine transformation in the space define by the `origin` and `change_of_basis_matrix`, and then
     go back into the original space."""
@@ -94,16 +93,16 @@ def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn):
 
         # Calculate new basis for the affine transform
         origin = equivariant_fn(x)
-        y_basis_point = equivariant_fn(x)
-        x_basis_point = equivariant_fn(x)
+        y_basis_point = equivariant_fn(x, zero_init=False)*10
+        x_basis_point = equivariant_fn(x, zero_init=False)*10
 
         y_basis_vector = y_basis_point - origin
         x_basis_vector = x_basis_point - origin
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
         # Get scale and shift, initialise to be small.
-        log_scale = invariant_fn(x, dim)*0.001
-        shift = invariant_fn(x, dim) * 0.001
+        log_scale = invariant_fn(x, dim, zero_init=False)
+        shift = invariant_fn(x, dim, zero_init=False)
 
         return change_of_basis_matrix, origin, log_scale, shift
 
