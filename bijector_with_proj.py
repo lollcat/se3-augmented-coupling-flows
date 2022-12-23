@@ -28,7 +28,9 @@ def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin,
 
 
 class ProjectedScalarAffine(distrax.Bijector):
-    """Following style of `ScalarAffine` distrax Bijector."""
+    """Following style of `ScalarAffine` distrax Bijector.
+
+    Note: Doesn't need to operatoe on batches, as it gets called with vmap."""
     def __init__(self, change_of_basis_matrix, origin, log_scale, shift):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
         self._change_of_basis_matrix = change_of_basis_matrix
@@ -112,9 +114,9 @@ def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn):
         x_basis_vector = x_basis_point - origin
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
-        # Get scale and shift
-        log_scale = invariant_fn(x, dim)
-        shift = invariant_fn(x, dim)
+        # Get scale and shift, initialise to be small.
+        log_scale = invariant_fn(x, dim)*0.001
+        shift = invariant_fn(x, dim) * 0.001
 
         return change_of_basis_matrix, origin, log_scale, shift
 
@@ -122,8 +124,6 @@ def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn):
 
 
 def make_se_equivariant_split_coupling(dim, swap):
-    assert dim % 2 == 0
-
 
     def bijector_fn(params):
         change_of_basis_matrix, origin, log_scale, shift = params
@@ -132,7 +132,7 @@ def make_se_equivariant_split_coupling(dim, swap):
 
     conditioner = make_conditioner()
     return distrax.SplitCoupling(
-        split_index=dim / 2,
+        split_index=dim,
         event_ndims=2,  # [nodes, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
@@ -157,14 +157,14 @@ if __name__ == '__main__':
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward(x):
-        bijector = make_se_equivariant_split_coupling(x.shape[-1], swap=False)
+        bijector = make_se_equivariant_split_coupling(dim, swap=False)
         return bijector.forward_and_log_det(x)
 
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_backward(x):
-        bijector = make_se_equivariant_split_coupling(x.shape[-1], swap=False)
+        bijector = make_se_equivariant_split_coupling(dim, swap=False)
         return bijector.inverse_and_log_det(x)
 
     dim = 2
