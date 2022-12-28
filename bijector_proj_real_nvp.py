@@ -13,7 +13,9 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
     go back into the original space."""
     chex.assert_rank(point, 1)
     point_in_new_space = jnp.linalg.inv(change_of_basis_matrix) @ (point - origin)
+    # print(f"point in new space: {point_in_new_space}")
     transformed_point_in_new_space = point_in_new_space * scale + shift
+    # print(f"transformed point in new space: {transformed_point_in_new_space}")
     new_point_original_space = change_of_basis_matrix @ transformed_point_in_new_space + origin
     return new_point_original_space
 

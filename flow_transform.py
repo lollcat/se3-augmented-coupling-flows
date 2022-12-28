@@ -31,7 +31,7 @@ def make_se2_real_nvp():
     def equivariant_fn(x):
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
         norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
-        m = jnp.squeeze(hk.nets.MLP((5, 1), activation=jax.nn.elu)(norms[..., None]), axis=-1) * 3
+        m = jnp.squeeze(hk.nets.MLP((5, 1), activation=jax.nn.elu, activate_final=False)(norms[..., None]), axis=-1) * 3
         return x + jnp.einsum('ijd,ij->id', diff_combos, m)
 
     def invariant_fn(x, n_vals):
@@ -166,5 +166,4 @@ if __name__ == '__main__':
     # Check that if we un-rotate `a_rot_new` then this is equivalent to doing the original transform (no rotation).
     a_unrot_new = jax.vmap(jnp.matmul, in_axes=(None, 0))(jnp.linalg.inv(rotation_matrix), a_rot_new)
     chex.assert_trees_all_close(a_unrot_new, a_new)
-
 
