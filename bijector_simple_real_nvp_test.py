@@ -7,7 +7,7 @@ from test_utils import test_fn_is_equivariant, test_fn_is_invariant
 from bijector_simple_real_nvp import make_se_equivariant_split_coupling_simple
 
 
-def test_bijector_with_proj():
+def test_bijector_with_simple():
     """Test that the bijector is equivariant, and that it's log determinant is invariant."""
 
     USE_64_BIT = True
@@ -69,4 +69,4 @@ def test_bijector_with_proj():
 
 
 if __name__ == '__main__':
-    test_bijector_with_proj()
+    test_bijector_with_simple()

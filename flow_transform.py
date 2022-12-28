@@ -31,7 +31,7 @@ def make_se2_real_nvp():
     def equivariant_fn(x):
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
         norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
-        m = jnp.squeeze(hk.nets.MLP((5, 1), activation=jax.nn.elu, activate_final=False)(norms[..., None]), axis=-1) * 3
+        m = jnp.squeeze(hk.nets.MLP((5, 1), activation=jax.nn.elu)(norms[..., None]), axis=-1) * 3
         return x + jnp.einsum('ijd,ij->id', diff_combos, m)
 
     def invariant_fn(x, n_vals):
@@ -98,6 +98,7 @@ def make_se2_real_nvp():
 
 
 if __name__ == '__main__':
+    from test_utils import test_fn_is_equivariant, test_fn_is_invariant
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
@@ -129,6 +130,7 @@ if __name__ == '__main__':
     # Initialise GNN params.
     key, subkey = jax.random.split(key)
     params = forward_fn.init(subkey, x, a)
+
 
     print(f"*********** do a forward pass ************ \n\n")
     # Perform a forward pass and inverse.
@@ -163,7 +165,8 @@ if __name__ == '__main__':
     norms_after_rot = jnp.linalg.norm(a_rot_new - a_rot_new[:, None], ord=2, axis=-1)
     chex.assert_trees_all_close(norms_original, norms_after_rot, rtol=r_tol)
 
-    # Check that if we un-rotate `a_rot_new` then this is equivalent to doing the original transform (no rotation).
-    a_unrot_new = jax.vmap(jnp.matmul, in_axes=(None, 0))(jnp.linalg.inv(rotation_matrix), a_rot_new)
-    chex.assert_trees_all_close(a_unrot_new, a_new)
+    # Check that if we rotate `a_new` then this is equivalent to doing the original transform (no rotation).
+    a_new_rot = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, a_new)
+    chex.assert_trees_all_close(a_rot_new, a_new_rot)
+
 

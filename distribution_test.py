@@ -77,5 +77,9 @@ def test_flow():
 
 
 if __name__ == '__main__':
-    test_distribution()
+    USE_64_BIT = True
+    if USE_64_BIT:
+        from jax.config import config
+        config.update("jax_enable_x64", True)
     test_flow()
+    test_distribution()

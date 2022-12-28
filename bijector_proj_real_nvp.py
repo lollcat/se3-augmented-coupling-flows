@@ -4,6 +4,7 @@ import distrax
 import chex
 import jax
 import jax.numpy as jnp
+import haiku as hk
 
 from nets import equivariant_fn, invariant_fn
 
@@ -13,6 +14,9 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
     go back into the original space."""
     chex.assert_rank(point, 1)
     point_in_new_space = jnp.linalg.inv(change_of_basis_matrix) @ (point - origin)
+    # print(f"\n\n************************\n\n")
+    # print(f"change_of_basis_matrix: {change_of_basis_matrix}")
+    # print(f"point - origin: {point - origin}")
     # print(f"point in new space: {point_in_new_space}")
     transformed_point_in_new_space = point_in_new_space * scale + shift
     # print(f"transformed point in new space: {transformed_point_in_new_space}")
@@ -88,23 +92,26 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn):
+def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn, identity_init=False):
 
     def conditioner(x):
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
-        origin = equivariant_fn(x)
-        y_basis_point = equivariant_fn(x, zero_init=False)*10
-        x_basis_point = equivariant_fn(x, zero_init=False)*10
+        origin = equivariant_fn(x, zero_init=False)
+        y_basis_point = equivariant_fn(x, zero_init=False)
+        x_basis_point = equivariant_fn(x, zero_init=False)
 
         y_basis_vector = y_basis_point - origin
         x_basis_vector = x_basis_point - origin
+        approx_norm = jnp.mean(jnp.linalg.norm(y_basis_vector, axis=-1))
+        y_basis_vector = y_basis_vector / approx_norm
+        x_basis_vector = x_basis_vector / approx_norm
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
         # Get scale and shift, initialise to be small.
-        log_scale = invariant_fn(x, dim, zero_init=False)
-        shift = invariant_fn(x, dim, zero_init=False)
+        log_scale = invariant_fn(x, dim, zero_init=identity_init) * 0.01
+        shift = invariant_fn(x, dim, zero_init=identity_init) * 0.01
 
         return change_of_basis_matrix, origin, log_scale, shift
 
