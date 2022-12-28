@@ -19,13 +19,13 @@ def rotate_translate_2d(x_and_a, theta, translation):
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, n_nodes=7):
+def test_fn_is_equivariant(equivariant_fn, key, n_nodes=20):
 
     dim = 2
     # Setup
     key1, key2, key3 = jax.random.split(key, 3)
     x_and_a = jnp.zeros((n_nodes, dim * 2))
-    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape) * 0.1
+    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape)
 
     rtol = 1e-6 if x_and_a.dtype == jnp.float64 else 1e-3
 

@@ -12,8 +12,7 @@ def equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(1)])
     m = jnp.squeeze(net(norms[..., None]), axis=-1)
-    return x + jnp.einsum('ijd,ij->id', diff_combos, m)
-    # return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
+    return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
 
 
 def invariant_fn(x, n_vals, zero_init: bool = False):
