@@ -4,7 +4,7 @@ import haiku as hk
 import chex
 
 from test_utils import test_fn_is_equivariant, test_fn_is_invariant
-from bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from bijector_nice import make_se_equivariant_nice
 
 
 def test_bijector_with_proj():
@@ -24,14 +24,14 @@ def test_bijector_with_proj():
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward(x):
-        bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=False, identity_init=False)
+        bijector = make_se_equivariant_nice(dim, swap=False, identity_init=False)
         return bijector.forward_and_log_det(x)
 
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_backward(x):
-        bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=False, identity_init=False)
+        bijector = make_se_equivariant_nice(dim, swap=False, identity_init=False)
         return bijector.inverse_and_log_det(x)
 
     dim = 2

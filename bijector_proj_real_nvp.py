@@ -92,7 +92,9 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn, identity_init=False):
+def make_conditioner(equivariant_fn=equivariant_fn,
+                     invariant_fn=invariant_fn,
+                     identity_init: bool = True):
 
     def conditioner(x):
         dim = x.shape[-1]
@@ -118,14 +120,14 @@ def make_conditioner(equivariant_fn=equivariant_fn, invariant_fn=invariant_fn, i
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(dim, swap):
+def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True):
 
     def bijector_fn(params):
         change_of_basis_matrix, origin, log_scale, shift = params
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
 
-    conditioner = make_conditioner()
+    conditioner = make_conditioner(identity_init=identity_init)
     return distrax.SplitCoupling(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]

@@ -16,18 +16,24 @@ def test_distribution():
     n_layers = 2
     batch_size = 5
     key = jax.random.PRNGKey(0)
+    flow_type = "nice"  # "nice", "proj"
+    identity_init = False
 
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(dim=dim, nodes=n_nodes, n_layers=n_layers)
+        distribution = make_equivariant_augmented_flow_dist(
+            dim=dim, nodes=n_nodes, n_layers=n_layers,
+            flow_identity_init=identity_init, type=flow_type)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
 
     @hk.without_apply_rng
     @hk.transform
     def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(dim=dim, nodes=n_nodes, n_layers=n_layers)
+        distribution = make_equivariant_augmented_flow_dist(
+            dim=dim, nodes=n_nodes, n_layers=n_layers,
+            flow_identity_init=identity_init, type=flow_type)
         return distribution.log_prob(x)
 
 
@@ -52,11 +58,15 @@ def test_flow():
     n_layers = 2
     batch_size = 5
     key = jax.random.PRNGKey(0)
+    flow_type = "nice"
+    identity_init = False
 
     @hk.without_apply_rng
     @hk.transform
     def forward_and_log_det(x):
-        distribution = make_equivariant_augmented_flow_dist(dim=dim, nodes=n_nodes, n_layers=n_layers)
+        distribution = make_equivariant_augmented_flow_dist(
+            dim=dim, nodes=n_nodes, n_layers=n_layers,
+            flow_identity_init=identity_init, type=flow_type)
         return distribution.bijector.forward_and_log_det(x)
 
 
