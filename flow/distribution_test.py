@@ -34,7 +34,7 @@ def test_distribution():
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type)
-        return distribution.log_prob(x)
+        return distribution.log_prob_fn(x)
 
 
     # Init params.
