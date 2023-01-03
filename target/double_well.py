@@ -5,7 +5,7 @@ import blackjax
 
 def get_pairwise_distances(x):
     chex.assert_rank(x, 2)
-    return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
+    return jnp.linalg.norm(x - x[:, None] + 1e-10, ord=2, axis=-1)  # Add 1e-10 to prevent nans
 
 def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
     """Compute energy. Default hyper-parameters from https://arxiv.org/pdf/2006.02425.pdf"""
@@ -23,15 +23,15 @@ def log_prob_fn(x):
         raise Exception
 
 
-def get_sample(key, n_vertices=2, dim=2, n_steps: int = 100):
+def get_samples(key, n_vertices=2, dim=2, n_steps: int = 100, batch_size=128):
     # Build the kernel
     step_size = 1e-3
     inverse_mass_matrix = jnp.ones(n_vertices*dim)
     nuts = blackjax.nuts(log_prob_fn, step_size, inverse_mass_matrix)
 
     # Initialize the state
-    initial_position = jax.random.normal(key, shape=(n_vertices, dim))
-    state = nuts.init(initial_position)
+    initial_position = jax.random.normal(key, shape=(batch_size, n_vertices, dim))
+    state = jax.vmap(nuts.init)(initial_position)
 
     # Iterate
     rng_key = jax.random.PRNGKey(0)
@@ -39,9 +39,14 @@ def get_sample(key, n_vertices=2, dim=2, n_steps: int = 100):
     for _ in range(n_steps):
         print(_)
         _, rng_key = jax.random.split(rng_key)
-        state, _ = jax.jit(nuts.step)(rng_key, state)
+        rng_key_batch = jax.random.split(rng_key, batch_size)
+        state, _ = jax.jit(jax.vmap(nuts.step))(rng_key_batch, state)
         samples.append(state.position)
-    return state
+    return jnp.concatenate(samples, axis=0)
+
+
+def make_dataset(n_vertices=2, dim=2, n_steps: int = int(1e3)):
+    pass
 
 
 if __name__ == '__main__':
@@ -59,16 +64,14 @@ if __name__ == '__main__':
 
     grad_log_prob = jax.jacfwd(log_prob_fn)(x)
     print(grad_log_prob)
-    # TODO: giving weird grad, investigate
 
     plt.plot(d, log_probs)
     plt.show()
 
-    # key = jax.random.PRNGKey(0)
-    # samples = get_sample(key)
-    # d = jnp.linalg.norm(samples[:, 0] - samples[:, 1], axis=-1)
-    # plt.hist(d)
-    # plt.show()
-
+    key = jax.random.PRNGKey(0)
+    samples = get_samples(key)
+    d = jnp.linalg.norm(samples[:, 0, :] - samples[:, 1, :], axis=-1)
+    plt.hist(d, bins=50, density=True)
+    plt.show()
 
 

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from nets import equivariant_fn, invariant_fn
+from nets import se_equivariant_fn, se_invariant_fn
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -92,8 +92,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(equivariant_fn=equivariant_fn,
-                     invariant_fn=invariant_fn,
+def make_conditioner(equivariant_fn=se_equivariant_fn,
+                     invariant_fn=se_invariant_fn,
                      identity_init: bool = True):
 
     def conditioner(x):

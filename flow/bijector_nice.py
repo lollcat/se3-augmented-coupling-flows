@@ -1,10 +1,10 @@
 import distrax
 import jax.numpy as jnp
 
-from nets import equivariant_fn, invariant_fn
+from nets import se_equivariant_fn, se_invariant_fn
 
 
-def make_conditioner(equivariant_fn=equivariant_fn, identity_init: bool = True):
+def make_conditioner(equivariant_fn=se_equivariant_fn, identity_init: bool = True):
     def conditioner(x):
         shift = equivariant_fn(x, zero_init=identity_init) - x
         return shift

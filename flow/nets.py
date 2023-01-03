@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import haiku as hk
 
 
-def equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
+def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
     chex.assert_rank(x, 2)
     diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
     norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
@@ -15,9 +15,9 @@ def equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
     return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
 
 
-def invariant_fn(x, n_vals, zero_init: bool = False):
+def se_invariant_fn(x, n_vals, zero_init: bool = False):
     chex.assert_rank(x, 2)
-    equivariant_x = jnp.stack([equivariant_fn(x, zero_init=zero_init) for _ in range(n_vals)], axis=-1)
+    equivariant_x = jnp.stack([se_equivariant_fn(x, zero_init=zero_init) for _ in range(n_vals)], axis=-1)
     return jnp.linalg.norm(x[..., None] - equivariant_x, ord=2, axis=-2)
 
 
@@ -25,8 +25,8 @@ if __name__ == '__main__':
     from test_utils import test_fn_is_invariant, test_fn_is_equivariant
 
     key = jax.random.PRNGKey(0)
-    equivariant_fn_hk = hk.without_apply_rng(hk.transform(equivariant_fn))
-    invariant_fn_hk = hk.without_apply_rng(hk.transform(invariant_fn))
+    equivariant_fn_hk = hk.without_apply_rng(hk.transform(se_equivariant_fn))
+    invariant_fn_hk = hk.without_apply_rng(hk.transform(se_invariant_fn))
 
     x = jnp.zeros((4, 2))
     key, subkey = jax.random.split(key)
