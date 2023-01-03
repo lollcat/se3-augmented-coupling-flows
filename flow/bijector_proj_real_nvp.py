@@ -4,7 +4,6 @@ import distrax
 import chex
 import jax
 import jax.numpy as jnp
-import haiku as hk
 
 from nets import se_equivariant_fn, se_invariant_fn
 
@@ -121,6 +120,7 @@ def make_conditioner(equivariant_fn=se_equivariant_fn,
 
 
 def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True):
+    assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):
         change_of_basis_matrix, origin, log_scale, shift = params

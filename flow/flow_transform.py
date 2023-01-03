@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import jax
 import haiku as hk
 import chex
-import matplotlib.pyplot as plt
 
 
 def get_pairwise_distances(x):

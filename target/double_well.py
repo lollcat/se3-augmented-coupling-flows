@@ -8,7 +8,8 @@ def get_pairwise_distances(x):
     return jnp.linalg.norm(x - x[:, None] + 1e-10, ord=2, axis=-1)  # Add 1e-10 to prevent nans
 
 def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
-    """Compute energy. Default hyper-parameters from https://arxiv.org/pdf/2006.02425.pdf"""
+    """Compute energy. Default hyper-parameters from https://arxiv.org/pdf/2006.02425.pdf.
+    If we want to add conditioning info we could condition on the parameters a,b,c,d,tau. """
     differences = get_pairwise_distances(x)
     diff_minus_d0 = differences - d0
     return jnp.sum(a*diff_minus_d0 + b*diff_minus_d0**2 + c*diff_minus_d0**4, axis=(-1, -2)) / tau / 2
@@ -23,7 +24,7 @@ def log_prob_fn(x):
         raise Exception
 
 
-def get_samples(key, n_vertices=2, dim=2, n_steps: int = 64, batch_size=32, burn_in=10):
+def get_samples(key, n_vertices: int = 2, dim: int = 2, n_steps: int = 64, batch_size: int = 32, burn_in: int = 10):
     # Build the kernel
     step_size = 1e-3
     inverse_mass_matrix = jnp.ones(n_vertices*dim)
@@ -46,8 +47,11 @@ def get_samples(key, n_vertices=2, dim=2, n_steps: int = 64, batch_size=32, burn
     return jnp.concatenate(samples, axis=0)
 
 
-def make_dataset(n_vertices=2, dim=2, n_steps: int = int(1e3)):
-    pass
+def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 512):
+    batch_size = 32
+    key = jax.random.PRNGKey(seed)
+    samples = get_samples(key, n_vertices, dim, n_samples // batch_size, batch_size)
+    jnp.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.jnpy", samples)
 
 
 if __name__ == '__main__':
@@ -70,9 +74,11 @@ if __name__ == '__main__':
     plt.show()
 
     key = jax.random.PRNGKey(0)
-    samples = get_samples(key)
+    samples = get_samples(key, n_steps=10, batch_size=32)
     d = jnp.linalg.norm(samples[:, 0, :] - samples[:, 1, :], axis=-1)
     plt.hist(d, bins=50, density=True)
     plt.show()
+
+    make_dataset()
 
 

@@ -1,2 +1,5 @@
 dm-haiku
 blackjax
+distrax
+chex
+matplotlib

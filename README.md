@@ -1,4 +1,5 @@
 # Equivariant Augmented Normalizing Flows
+Exploring whether the idea works
 
 ## Flows
 - Perform equivariant shift (like in the NICE paper). See `bijector_nice.py`
@@ -23,8 +24,13 @@ Currently implemented in 2D.
 
 
 ## TODO
- - Make proper SE(n) net. 
- - Test on simple target function (DW / LJ). 
- - Test jacobian determinant (test normalizing constant using IS?)
- - Think of how to make projected flow stable
+First `bijector_nice.py` is super simple, so is best for sanity checking the augmented flow idea
+- Test on simple target function (`target.double_well.py`). Does it train? Further checks that the resultant flow is equivariant. 
+
+
+Then
+ - Make proper SE(n) net.
  - For NICE flow we will need some scaling transforms. This could be done with a scaling layer applied to the base distribution. 
+ - Test jacobian determinant (test normalizing constant using IS?)
+ - Think of how to make projected flow stable (can we projection axis to be orthogonal unit vectors?)
+ - Generalise projected flow to more than 2D
