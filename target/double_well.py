@@ -39,7 +39,7 @@ def get_samples(key, n_vertices: int = 2, dim: int = 2, n_steps: int = 64, batch
     rng_key = jax.random.PRNGKey(0)
     samples = []
     for i in range(int(n_steps + burn_in)):
-        print(i)
+        print(f"{i} out of {n_steps + burn_in}")
         _, rng_key = jax.random.split(rng_key)
         rng_key_batch = jax.random.split(rng_key, batch_size)
         state, _ = jax.jit(jax.vmap(nuts.step))(rng_key_batch, state)
@@ -48,8 +48,8 @@ def get_samples(key, n_vertices: int = 2, dim: int = 2, n_steps: int = 64, batch
     return jnp.concatenate(samples, axis=0)
 
 
-def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 512):
-    batch_size = 32
+def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 2048):
+    batch_size = 64
     key = jax.random.PRNGKey(seed)
     samples = get_samples(key, n_vertices, dim, n_samples // batch_size, batch_size)
     np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
@@ -58,7 +58,6 @@ def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 512):
 if __name__ == '__main__':
 
     make_dataset()
-
 
     # Visualise 2D energy fn as a function of distance
     import matplotlib.pyplot as plt

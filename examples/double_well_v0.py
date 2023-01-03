@@ -56,13 +56,13 @@ def plot_sample_hist(samples, ax):
 
 
 def train():
-    n_epoch = int(3000)
+    n_epoch = int(1000)
     dim = 2
-    lr = 5e-4
+    lr = 4e-4
     n_nodes = 2
-    n_layers = 8
-    batch_size = 16
-    mlp_units = (256, 256)
+    n_layers = 16
+    batch_size = 32
+    mlp_units = (64, 64)
     key = jax.random.PRNGKey(0)
     flow_type = "nice"  # "nice", "proj"
     identity_init = True
@@ -110,7 +110,7 @@ def train():
 
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)
-        if i % 300 == 0:
+        if i % (n_epoch // 10) == 0:
             plot()
 
 
@@ -121,13 +121,11 @@ def train():
 
 
 
-
-
 if __name__ == '__main__':
     from utils.plotting import plot_history
     import matplotlib.pyplot as plt
 
-    USE_64_BIT = True
+    USE_64_BIT = False
     if USE_64_BIT:
         from jax.config import config
         config.update("jax_enable_x64", True)
