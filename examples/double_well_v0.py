@@ -8,6 +8,7 @@ from tqdm import tqdm
 from functools import partial
 
 from flow.distribution import make_equivariant_augmented_flow_dist
+from target import double_well as dw
 from utils.loggers import ListLogger
 
 
@@ -30,6 +31,13 @@ def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
     test_set = test_set[:-(test_set.shape[0] % batch_size)]
     return train_set, test_set
 
+
+@partial(jax.jit, static_argnums=(2,))
+def eval(params, x, log_prob_fn,):
+    log_prob = log_prob_fn.apply(params, x)
+    info = {"eval_log_lik": jnp.mean(log_prob),
+            "eval_kl": jnp.mean(dw.log_prob_fn(x) - log_prob)}
+    return info
 
 
 def loss_fn(params, x, log_prob_fn):
@@ -60,9 +68,9 @@ def train():
     dim = 2
     lr = 4e-4
     n_nodes = 2
-    n_layers = 16
+    n_layers = 10
     batch_size = 32
-    mlp_units = (64, 64)
+    mlp_units = (128, 128)
     key = jax.random.PRNGKey(0)
     flow_type = "nice"  # "nice", "proj"
     identity_init = True
@@ -112,6 +120,8 @@ def train():
         train_data = jax.random.permutation(subkey, train_data, axis=0)
         if i % (n_epoch // 10) == 0:
             plot()
+            eval_info = eval(params, test_data, log_prob_fn)
+            logger.write(eval_info)
 
 
     plot_history(logger.history)
