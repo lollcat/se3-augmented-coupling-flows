@@ -16,10 +16,14 @@ Currently implemented in 2D.
 
 ## Further notes
 **need tricks for stability for the projected flow** 
+- most major instability comes from y axis and x axis being close together, which makes the projection and inverse work poorly. 
 - If we use zero init, then the flow is the identity transform which is fine.
 - But for tests we don't use zero init, in which case we have to 
 (1) use 64 bit, and 
 (2) make the scale and shift very small to prevent massive changes to the initial points.
+(3) unstable if se(n) net has relu activations?
+
+
 
 
 

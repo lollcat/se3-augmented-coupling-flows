@@ -66,8 +66,14 @@ class ProjectedScalarAffine(distrax.Bijector):
 
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
-        return jax.vmap(affine_transform_in_new_space)(x, self._change_of_basis_matrix, self._origin, self._scale,
+        if len(x.shape) == 2:
+            return jax.vmap(affine_transform_in_new_space)(x, self._change_of_basis_matrix, self._origin, self._scale,
                                                        self._shift)
+        elif len(x.shape) == 3:
+            return jax.vmap(jax.vmap(affine_transform_in_new_space))(x, self._change_of_basis_matrix, self._origin, self._scale,
+                                                           self._shift)
+        else:
+            raise Exception
 
     def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
         """Computes log|det J(f)(x)|."""
@@ -79,8 +85,14 @@ class ProjectedScalarAffine(distrax.Bijector):
 
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
-        return jax.vmap(inverse_affine_transform_in_new_space)(y, self._change_of_basis_matrix, self._origin, self._scale,
-                                                self._shift)
+        if len(y.shape) == 2:
+            return jax.vmap(inverse_affine_transform_in_new_space)(y, self._change_of_basis_matrix, self._origin, self._scale,
+                                                    self._shift)
+        elif len(y.shape) == 3:
+            return jax.vmap(jax.vmap(inverse_affine_transform_in_new_space))(
+                y, self._change_of_basis_matrix, self._origin, self._scale, self._shift)
+        else:
+            raise Exception
 
     def inverse_log_det_jacobian(self, y: chex.Array) -> chex.Array:
         """Computes log|det J(f^{-1})(y)|."""
@@ -120,7 +132,7 @@ def make_conditioner(equivariant_fn=se_equivariant_fn,
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True, mlp_units=(5,5)):
+def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True, mlp_units=(5,5) ):
     assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):
@@ -128,7 +140,7 @@ def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init:
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
 
-    conditioner = make_conditioner(identity_init=identity_init)
+    conditioner = make_conditioner(identity_init=identity_init, mlp_units=mlp_units)
     return distrax.SplitCoupling(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]

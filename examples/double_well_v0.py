@@ -64,11 +64,11 @@ def plot_sample_hist(samples, ax):
 
 
 def train():
-    n_epoch = int(1000)
+    n_epoch = int(500)
     dim = 2
     lr = 4e-4
     n_nodes = 2
-    n_layers = 10
+    n_layers = 5
     batch_size = 32
     mlp_units = (128, 128)
     key = jax.random.PRNGKey(0)

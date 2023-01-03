@@ -9,11 +9,12 @@ def _se_equivariant_fn(x, mlp_units, zero_init):
     # Need to add 1e-10 to prevent nan grads
     diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
     norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
-    net = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
+    net = hk.Sequential([hk.nets.MLP(mlp_units, activation=jax.nn.elu, activate_final=True),
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(1)])
     m = jnp.squeeze(net(norms[..., None]), axis=-1)
-    return x + jnp.einsum('ijd,ij->id', diff_combos, m)  #  / (norms + 1)[..., None], m)
+    return x + jnp.einsum('ijd,ij->id', diff_combos, m)
+    # return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
 
 
 def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
