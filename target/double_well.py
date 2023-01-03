@@ -23,7 +23,7 @@ def log_prob_fn(x):
         raise Exception
 
 
-def get_samples(key, n_vertices=2, dim=2, n_steps: int = 100, batch_size=128):
+def get_samples(key, n_vertices=2, dim=2, n_steps: int = 64, batch_size=32, burn_in=10):
     # Build the kernel
     step_size = 1e-3
     inverse_mass_matrix = jnp.ones(n_vertices*dim)
@@ -36,12 +36,13 @@ def get_samples(key, n_vertices=2, dim=2, n_steps: int = 100, batch_size=128):
     # Iterate
     rng_key = jax.random.PRNGKey(0)
     samples = []
-    for _ in range(n_steps):
-        print(_)
+    for i in range(int(n_steps + burn_in)):
+        print(i)
         _, rng_key = jax.random.split(rng_key)
         rng_key_batch = jax.random.split(rng_key, batch_size)
         state, _ = jax.jit(jax.vmap(nuts.step))(rng_key_batch, state)
-        samples.append(state.position)
+        if i >= burn_in:
+            samples.append(state.position)
     return jnp.concatenate(samples, axis=0)
 
 

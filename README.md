@@ -14,7 +14,7 @@ Currently implemented in 2D.
 
 
 ## Further notes
-**need tricks for stability** 
+**need tricks for stability for the projected flow** 
 - If we use zero init, then the flow is the identity transform which is fine.
 - But for tests we don't use zero init, in which case we have to 
 (1) use 64 bit, and 
@@ -24,5 +24,7 @@ Currently implemented in 2D.
 
 ## TODO
  - Make proper SE(n) net. 
- - Test on simple target function. 
+ - Test on simple target function (DW / LJ). 
  - Test jacobian determinant (test normalizing constant using IS?)
+ - Think of how to make projected flow stable
+ - For NICE flow we will need some scaling transforms. This could be done with a scaling layer applied to the base distribution. 
