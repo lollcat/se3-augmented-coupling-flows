@@ -16,7 +16,7 @@ def test_distribution():
     n_layers = 2
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    flow_type = "nice"  # "nice", "proj"
+    flow_type = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
     identity_init = False
 
 
@@ -58,7 +58,7 @@ def test_flow():
     n_layers = 2
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    flow_type = "nice"
+    flow_type = "vector_scale_shift"
     identity_init = False
 
     @hk.without_apply_rng

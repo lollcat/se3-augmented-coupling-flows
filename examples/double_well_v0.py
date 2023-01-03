@@ -64,16 +64,16 @@ def plot_sample_hist(samples, ax):
 
 
 def train():
-    n_epoch = int(500)
+    n_epoch = int(1e3)
     dim = 2
     lr = 4e-4
     n_nodes = 2
-    n_layers = 5
+    n_layers = 8
     batch_size = 32
     mlp_units = (128, 128)
     key = jax.random.PRNGKey(0)
-    flow_type = "nice"  # "nice", "proj"
-    identity_init = True
+    flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
+    identity_init = False if flow_type == "vector_scale_shift" else True
 
     logger = ListLogger()
 
@@ -115,6 +115,8 @@ def train():
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
             logger.write(info)
+        if jnp.isnan(info["grad_norm"]):
+            raise Exception("nan grad encountered")
 
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)

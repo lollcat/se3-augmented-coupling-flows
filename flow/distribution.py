@@ -3,6 +3,7 @@ import distrax
 from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijector_nice import make_se_equivariant_nice
+from flow.bijector_scale_and_shift_along_vector import make_se_equivariant_vector_scale_shift
 
 
 def make_equivariant_augmented_flow_dist(dim,
@@ -22,6 +23,9 @@ def make_equivariant_augmented_flow_dist(dim,
                                                                           mlp_units=mlp_units)
         elif type == "nice":
             bijector = make_se_equivariant_nice(dim, swap=swap, identity_init=flow_identity_init, mlp_units=mlp_units)
+        elif type == "vector_scale_shift":
+            bijector = make_se_equivariant_vector_scale_shift(dim, swap=swap, identity_init=flow_identity_init,
+                                                              mlp_units=mlp_units)
         else:
             raise NotImplemented
         bijectors.append(bijector)
