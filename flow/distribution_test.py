@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from test_utils import test_fn_is_invariant, test_fn_is_equivariant
-from distribution import make_equivariant_augmented_flow_dist
+from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant
+from flow.distribution import make_equivariant_augmented_flow_dist
 
 
 def test_distribution():
@@ -34,7 +34,7 @@ def test_distribution():
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type)
-        return distribution.log_prob_fn(x)
+        return distribution.log_prob(x)
 
 
     # Init params.

@@ -1,8 +1,8 @@
 import chex
 import jax
 
-from base import CentreGravityGaussian, assert_mean_zero
-from test_utils import test_fn_is_invariant
+from flow.base import CentreGravityGaussian, assert_mean_zero
+from flow.test_utils import test_fn_is_invariant
 
 
 def test_base_distribution():

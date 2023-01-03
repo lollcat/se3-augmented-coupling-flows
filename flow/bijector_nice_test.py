@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import haiku as hk
 import chex
 
-from test_utils import test_fn_is_equivariant, test_fn_is_invariant
-from bijector_nice import make_se_equivariant_nice
+from flow.test_utils import test_fn_is_equivariant, test_fn_is_invariant
+from flow.bijector_nice import make_se_equivariant_nice
 
 
 def test_bijector_with_proj():

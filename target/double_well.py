@@ -1,5 +1,6 @@
 import chex
 import jax.numpy as jnp
+import numpy as np
 import jax
 import blackjax
 
@@ -51,10 +52,14 @@ def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 512):
     batch_size = 32
     key = jax.random.PRNGKey(seed)
     samples = get_samples(key, n_vertices, dim, n_samples // batch_size, batch_size)
-    jnp.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.jnpy", samples)
+    np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
 
 
 if __name__ == '__main__':
+
+    make_dataset()
+
+
     # Visualise 2D energy fn as a function of distance
     import matplotlib.pyplot as plt
 
@@ -79,6 +84,6 @@ if __name__ == '__main__':
     plt.hist(d, bins=50, density=True)
     plt.show()
 
-    make_dataset()
+
 
 

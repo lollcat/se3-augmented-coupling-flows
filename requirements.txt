@@ -3,3 +3,6 @@ blackjax
 distrax
 chex
 matplotlib
+optax
+tqdm
+pandas

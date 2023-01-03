@@ -5,7 +5,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from nets import se_equivariant_fn, se_invariant_fn
+from flow.nets import se_equivariant_fn, se_invariant_fn
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -93,15 +93,16 @@ class ProjectedScalarAffine(distrax.Bijector):
 
 def make_conditioner(equivariant_fn=se_equivariant_fn,
                      invariant_fn=se_invariant_fn,
-                     identity_init: bool = True):
+                     identity_init: bool = True,
+                     mlp_units = (5,5)):
 
     def conditioner(x):
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
-        origin = equivariant_fn(x, zero_init=False)
-        y_basis_point = equivariant_fn(x, zero_init=False)
-        x_basis_point = equivariant_fn(x, zero_init=False)
+        origin = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
+        y_basis_point = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
+        x_basis_point = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
 
         y_basis_vector = y_basis_point - origin
         x_basis_vector = x_basis_point - origin
@@ -111,15 +112,15 @@ def make_conditioner(equivariant_fn=se_equivariant_fn,
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
         # Get scale and shift, initialise to be small.
-        log_scale = invariant_fn(x, dim, zero_init=identity_init) * 0.001
-        shift = invariant_fn(x, dim, zero_init=identity_init) * 0.001
+        log_scale = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * 0.001
+        shift = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * 0.001
 
         return change_of_basis_matrix, origin, log_scale, shift
 
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True):
+def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True, mlp_units=(5,5)):
     assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):

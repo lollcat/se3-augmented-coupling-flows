@@ -24,6 +24,8 @@ Currently implemented in 2D.
 
 
 ## TODO
+- make bijectors work nicely for batched and unbatched data, and add to tests
+
 First `bijector_nice.py` is super simple, so is best for sanity checking the augmented flow idea
 - Test on simple target function (`target.double_well.py`). Does it train? Further checks that the resultant flow is equivariant. 
 

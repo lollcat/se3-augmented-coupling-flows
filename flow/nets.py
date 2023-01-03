@@ -4,9 +4,10 @@ import jax.numpy as jnp
 import haiku as hk
 
 
-def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
+def _se_equivariant_fn(x, mlp_units, zero_init):
     chex.assert_rank(x, 2)
-    diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
+    # Need to add 1e-10 to prevent nan grads
+    diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
     norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
     net = hk.Sequential([hk.nets.MLP((mlp_units), activation=jax.nn.elu, activate_final=True),
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
@@ -15,9 +16,17 @@ def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
     return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
 
 
-def se_invariant_fn(x, n_vals, zero_init: bool = False):
-    chex.assert_rank(x, 2)
-    equivariant_x = jnp.stack([se_equivariant_fn(x, zero_init=zero_init) for _ in range(n_vals)], axis=-1)
+def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
+    if len(x.shape) == 2:
+        return _se_equivariant_fn(x, mlp_units, zero_init)
+    else:
+        return jax.vmap(_se_equivariant_fn, in_axes=(0, None, None))(x, mlp_units, zero_init)
+
+
+def se_invariant_fn(x, n_vals, zero_init: bool = False, mlp_units=(5,5)):
+    # chex.assert_rank(x, 2)
+    equivariant_x = jnp.stack([se_equivariant_fn(x, zero_init=zero_init,
+                                                 mlp_units=mlp_units) for _ in range(n_vals)], axis=-1)
     return jnp.linalg.norm(x[..., None] - equivariant_x, ord=2, axis=-2)
 
 

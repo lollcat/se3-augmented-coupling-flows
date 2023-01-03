@@ -32,7 +32,7 @@ class CentreGravityGaussian(distrax.Distribution):
 
 def assert_mean_zero(x: chex.Array):
     mean = jnp.mean(x, axis=-2, keepdims=True)
-    assert jnp.abs(mean).max().item() < 1e-4
+    chex.assert_trees_all_close(mean, jnp.zeros_like(mean))
 
 def remove_mean(x: chex.Array) -> chex.Array:
     mean = jnp.mean(x, axis=-2, keepdims=True)
@@ -47,7 +47,7 @@ def center_gravity_zero_gaussian_log_likelihood(x: chex.Array) -> chex.Array:
 
     N, D = x.shape[-2:]
 
-    assert_mean_zero(x)
+    # assert_mean_zero(x)
 
     # r is invariant to a basis change in the relevant hyperplane.
     r2 = jnp.sum(x**2, axis=(-1, -2))

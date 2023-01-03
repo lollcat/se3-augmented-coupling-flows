@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import haiku as hk
 import chex
 
-from test_utils import test_fn_is_equivariant, test_fn_is_invariant
-from bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.test_utils import test_fn_is_equivariant, test_fn_is_invariant
+from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 
 
 def test_bijector_with_proj():
