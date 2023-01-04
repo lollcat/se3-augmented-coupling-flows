@@ -68,13 +68,13 @@ def train():
     dim = 2
     lr = 4e-4
     n_nodes = 2
-    n_layers = 8
+    n_layers = 16
     batch_size = 32
     max_global_norm = 100.0
     mlp_units = (128, 128)
     key = jax.random.PRNGKey(0)
     flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
-    identity_init = False if flow_type == "vector_scale_shift" else True
+    identity_init = True  # False if flow_type == "vector_scale_shift" else True
 
     logger = ListLogger()
 

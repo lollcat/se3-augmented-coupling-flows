@@ -11,7 +11,7 @@ def make_conditioner(equivariant_fn=se_equivariant_fn, invariant_fn=se_invariant
         log_scale_param = invariant_fn(x, 1, zero_init=False)  # Nan's for 0 init?
         scale = 1 + jax.nn.softplus(log_scale_param)*1e-3
         reference_vector = equivariant_fn(x, mlp_units=mlp_units, zero_init=False)
-        equivariant_shift = (equivariant_fn(x, zero_init=identity_init, mlp_units=mlp_units) - x)*1e-3
+        equivariant_shift = (equivariant_fn(x, zero_init=identity_init, mlp_units=mlp_units) - x)
         shift = - reference_vector * (scale - 1) + equivariant_shift
         return scale, shift
     return conditioner
