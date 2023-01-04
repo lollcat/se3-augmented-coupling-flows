@@ -64,12 +64,13 @@ def plot_sample_hist(samples, ax):
 
 
 def train():
-    n_epoch = int(1e3)
+    n_epoch = int(5e3)
     dim = 2
     lr = 4e-4
     n_nodes = 2
     n_layers = 8
     batch_size = 32
+    max_global_norm = 100.0
     mlp_units = (128, 128)
     key = jax.random.PRNGKey(0)
     flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
@@ -96,7 +97,7 @@ def train():
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
 
-    optimizer = optax.adam(lr)
+    optimizer = optax.chain(optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
     train_data, test_data = load_dataset(batch_size)

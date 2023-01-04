@@ -1,5 +1,6 @@
 # Equivariant Augmented Normalizing Flows
-Exploring whether the idea works
+Exploring whether the idea works.
+See `examples` for a training run on the (equivariant) double well problem. 
 
 ## Flows
 - Perform equivariant shift (like in the NICE paper). See `bijector_nice.py`
