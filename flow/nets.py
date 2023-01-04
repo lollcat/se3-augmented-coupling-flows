@@ -2,14 +2,16 @@ import chex
 import jax
 import jax.numpy as jnp
 import haiku as hk
+from utils.nets import LayerNormMLP
 
 
-def _se_equivariant_fn(x, mlp_units, zero_init):
+def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = True):
+    mlp = LayerNormMLP if layer_norm else hk.nets.MLP
     chex.assert_rank(x, 2)
     # Need to add 1e-10 to prevent nan grads
     diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
     norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
-    net = hk.Sequential([hk.nets.MLP(mlp_units, activation=jax.nn.elu, activate_final=True),
+    net = hk.Sequential([mlp(mlp_units, activate_final=True),
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(1)])
     m = jnp.squeeze(net(norms[..., None]), axis=-1)
