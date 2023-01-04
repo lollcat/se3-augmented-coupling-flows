@@ -68,7 +68,7 @@ def train():
     dim = 2
     lr = 4e-4
     n_nodes = 2
-    n_layers = 16
+    n_layers = 4
     batch_size = 32
     max_global_norm = 100.0
     mlp_units = (128, 128)
