@@ -97,30 +97,34 @@ def train():
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
 
-    optimizer = optax.chain(optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
+    optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
     train_data, test_data = load_dataset(batch_size)
 
-    def plot():
-        fig, ax = plt.subplots()
-        samples = sample_and_log_prob_fn.apply(params, jax.random.PRNGKey(0), (512,))[0]
-        plot_sample_hist(samples, ax)
-        plot_sample_hist(train_data, ax)
+    def plot(n_samples=512):
+        fig, axs = plt.subplots(2)
+        samples = \
+        jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
+        plot_sample_hist(samples, axs[0])
+        plot_sample_hist(train_data, axs[0])
+        plot_sample_hist(samples[..., 2:], axs[1])
+        plot_sample_hist(train_data[..., 2:], axs[1])
         plt.show()
 
     plot()
 
     pbar = tqdm(range(n_epoch))
     for i in pbar:
+        key, subkey = jax.random.split(key)
+        train_data = jax.random.permutation(subkey, train_data, axis=0)
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
             logger.write(info)
         if jnp.isnan(info["grad_norm"]):
-            raise Exception("nan grad encountered")
+            print("nan grad")
+            # raise Exception("nan grad encountered")
 
-        key, subkey = jax.random.split(key)
-        train_data = jax.random.permutation(subkey, train_data, axis=0)
         if i % (n_epoch // 10) == 0:
             plot()
             eval_info = eval(params, test_data, log_prob_fn)
