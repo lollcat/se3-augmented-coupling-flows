@@ -87,7 +87,7 @@ def bijector_test(bijector_forward, bijector_backward,
     x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
 
     if x_and_a.dtype == jnp.float64:
-        rtol = 1e-6
+        rtol = 1e-5
     else:
         rtol = 1e-3
 

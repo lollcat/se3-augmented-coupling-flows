@@ -70,7 +70,7 @@ class se_invariant_net(hk.Module):
         norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
         norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
 
-        net = hk.Sequential([mlp(mlp_units, activate_final=True),
+        net = hk.Sequential([mlp(self.mlp_units, activate_final=True),
                              hk.Linear(self.n_vals, w_init=jnp.zeros, b_init=jnp.zeros) if self.zero_init else
                              hk.Linear(self.n_vals)])
         net_out = net(norms[..., None])

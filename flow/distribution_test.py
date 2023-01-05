@@ -9,7 +9,7 @@ from flow.distribution import make_equivariant_augmented_flow_dist
 
 
 _N_FLOW_LAYERS = 8
-_FLOW_TYPE = "nice"  # "nice", "proj", 'vector_scale_shift'
+_FLOW_TYPE = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
 
 
 def test_distribution():

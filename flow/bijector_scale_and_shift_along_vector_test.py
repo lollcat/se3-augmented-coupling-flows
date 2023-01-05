@@ -5,13 +5,13 @@ from flow.test_utils import bijector_test
 from flow.bijector_scale_and_shift_along_vector import make_se_equivariant_vector_scale_shift
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
+def test_bijector_with_proj(dim: int = 2, n_layers: int = 8):
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_se_equivariant_vector_scale_shift(dim, swap=swap, identity_init=False)
+            bijector = make_se_equivariant_vector_scale_shift(layer_number=i, dim=dim, swap=swap, identity_init=False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -32,7 +32,6 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
 
 
 if __name__ == '__main__':
-    # Passing with 1 layer but not more?
 
 
     USE_64_BIT = True
