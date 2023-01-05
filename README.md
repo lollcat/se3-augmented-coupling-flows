@@ -28,6 +28,8 @@ Currently implemented in 2D.
 (3) unstable if se(n) net has relu activations?
 
 
+NB: Need to be super careful with distrax + haiku + forward vs reverse of flow.
+
 
 
 

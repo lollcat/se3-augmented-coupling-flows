@@ -8,7 +8,7 @@ from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant, biject
 from flow.distribution import make_equivariant_augmented_flow_dist
 
 
-_N_FLOW_LAYERS = 2
+_N_FLOW_LAYERS = 8
 _FLOW_TYPE = "nice"  # "nice", "proj", 'vector_scale_shift'
 
 

@@ -7,11 +7,11 @@ from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_
 
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 1):
+def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
     def make_flow():
         bijectors = []
         for i in range(n_layers):
-            swap = False  # i % 2 == 0
+            swap = i % 2 == 0
             bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=swap, identity_init=False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

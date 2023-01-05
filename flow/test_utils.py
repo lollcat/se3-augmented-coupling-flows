@@ -132,6 +132,8 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_trees_all_close(x_and_a_new[0], x_and_a_new_0, rtol=rtol)
     chex.assert_trees_all_close(x_and_a_old[0], x_and_a_old_0, rtol=rtol)
 
-    # Test we can take grad log log prob
+    # Test we can take grad log prob
     grad = jax.grad(lambda params, x_and_a: bijector_forward.apply(params, x_and_a)[1])(params, x_and_a[0])
     chex.assert_tree_all_finite(grad)
+
+

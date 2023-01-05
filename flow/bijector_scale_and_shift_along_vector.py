@@ -2,10 +2,10 @@ import distrax
 import jax.nn
 import jax.numpy as jnp
 
-from flow.nets import se_equivariant_fn, se_invariant_fn
+from flow.nets import se_invariant_net, se_equivariant_net
 
 
-def make_conditioner(equivariant_fn=se_equivariant_fn, invariant_fn=se_invariant_fn,
+def make_conditioner(equivariant_fn, invariant_fn,
                      identity_init: bool = True, mlp_units=(5, 5)):
     def conditioner(x):
         log_scale_param = invariant_fn(x, 1, mlp_units=mlp_units, zero_init=identity_init)

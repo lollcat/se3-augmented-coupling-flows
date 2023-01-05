@@ -20,11 +20,13 @@ def make_equivariant_augmented_flow_dist(dim,
     for i in range(n_layers):
         swap = i % 2 == 0
         if type == "proj":
-            bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=swap,
+            bijector = make_se_equivariant_split_coupling_with_projection(dim=dim, swap=swap,
                                                                           identity_init=flow_identity_init,
                                                                           mlp_units=mlp_units)
         elif type == "nice":
-            bijector = make_se_equivariant_nice(dim, swap=swap, identity_init=flow_identity_init, mlp_units=mlp_units)
+            bijector = make_se_equivariant_nice(layer_number=i,
+                                                dim=dim, swap=swap, identity_init=flow_identity_init,
+                                                mlp_units=mlp_units)
         elif type == "vector_scale_shift":
             bijector = make_se_equivariant_vector_scale_shift(dim, swap=swap, identity_init=flow_identity_init,
                                                               mlp_units=mlp_units)
@@ -35,3 +37,4 @@ def make_equivariant_augmented_flow_dist(dim,
     flow = distrax.Chain(bijectors)
     distribution = distrax.Transformed(base, flow)
     return distribution
+

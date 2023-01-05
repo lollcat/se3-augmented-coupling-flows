@@ -5,7 +5,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from flow.nets import se_equivariant_fn, se_invariant_fn
+from flow.nets import se_equivariant_net, se_invariant_net
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -103,8 +103,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(equivariant_fn=se_equivariant_fn,
-                     invariant_fn=se_invariant_fn,
+def make_conditioner(equivariant_fn,
+                     invariant_fn,
                      identity_init: bool = True,
                      mlp_units = (5,5)):
 
