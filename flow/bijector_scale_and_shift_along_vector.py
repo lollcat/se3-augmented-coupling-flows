@@ -8,8 +8,8 @@ from flow.nets import se_equivariant_fn, se_invariant_fn
 def make_conditioner(equivariant_fn=se_equivariant_fn, invariant_fn=se_invariant_fn,
                      identity_init: bool = True, mlp_units=(5, 5)):
     def conditioner(x):
-        log_scale_param = invariant_fn(x, 1, mlp_units=mlp_units, zero_init=False)  # Nan's for 0 init?
-        scale = 1 + jax.nn.softplus(log_scale_param)*1e-3
+        log_scale_param = invariant_fn(x, 1, mlp_units=mlp_units, zero_init=False)*1e-3  # Nan's for 0 init?
+        scale = jax.nn.softplus(log_scale_param)
         reference_vector = equivariant_fn(x, mlp_units=mlp_units, zero_init=False)
         equivariant_shift = (equivariant_fn(x, zero_init=identity_init, mlp_units=mlp_units) - x)
         shift = - reference_vector * (scale - 1) + equivariant_shift
