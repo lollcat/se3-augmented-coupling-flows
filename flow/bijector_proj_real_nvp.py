@@ -124,8 +124,8 @@ def make_conditioner(equivariant_fn=se_equivariant_fn,
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
         # Get scale and shift, initialise to be small.
-        log_scale = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * 0.001
-        shift = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * 0.001
+        log_scale = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * (1 if identity_init else 0.001)
+        shift = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units)
 
         return change_of_basis_matrix, origin, log_scale, shift
 

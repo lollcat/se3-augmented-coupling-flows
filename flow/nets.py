@@ -26,11 +26,24 @@ def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
         return jax.vmap(_se_equivariant_fn, in_axes=(0, None, None))(x, mlp_units, zero_init)
 
 
-def se_invariant_fn(x, n_vals, zero_init: bool = False, mlp_units=(5,5)):
-    # chex.assert_rank(x, 2)
-    equivariant_x = jnp.stack([se_equivariant_fn(x, zero_init=zero_init,
-                                                 mlp_units=mlp_units) for _ in range(n_vals)], axis=-1)
-    return jnp.linalg.norm(x[..., None] - equivariant_x, ord=2, axis=-2)
+def _se_invariant_fn(x, n_vals, mlp_units, zero_init, layer_norm: bool = True):
+    chex.assert_rank(x, 2)
+    mlp = LayerNormMLP if layer_norm else hk.nets.MLP
+    # Need to add 1e-10 to prevent nan grads
+    diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
+    norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
+    net = hk.Sequential([mlp(mlp_units, activate_final=True),
+                         hk.Linear(n_vals, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
+                         hk.Linear(n_vals)])
+    net_out = net(norms[..., None])
+    return jnp.sum(net_out, axis=-2)
+
+
+def se_invariant_fn(x, n_vals, zero_init: bool = False, mlp_units=(5, 5)):
+    if len(x.shape) == 2:
+        return _se_invariant_fn(x, n_vals, mlp_units, zero_init)
+    else:
+        return jax.vmap(_se_invariant_fn, in_axes=(0, None, None, None))(x, n_vals, mlp_units, zero_init)
 
 
 if __name__ == '__main__':
