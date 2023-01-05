@@ -1,4 +1,7 @@
 # Equivariant Augmented Normalizing Flows
+Current status: There are bugs which I am squishing
+
+
 Exploring whether the idea works.
 See `examples` for a training run on the (equivariant) double well problem. 
 

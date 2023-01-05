@@ -73,3 +73,65 @@ def test_fn_is_invariant(invariante_fn, key, n_nodes=7):
 
 
 
+def bijector_test(bijector_forward, bijector_backward,
+                  dim: int, n_nodes: int):
+    """Test that the bijector is equivariant, and that it's log determinant is invariant.
+    Assumes bijectors are haiku transforms."""
+    assert dim == 2
+
+    key = jax.random.PRNGKey(0)
+    key, subkey = jax.random.split(key)
+
+    # Create dummy x and a.
+    x_and_a = jnp.zeros((n_nodes, dim*2))
+    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+
+    if x_and_a.dtype == jnp.float64:
+        rtol = 1e-6
+    else:
+        rtol = 1e-3
+
+    # Initialise bijector parameters.
+    params = bijector_forward.init(key, x_and_a)
+
+    # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
+    x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
+    x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
+
+    # Check inverse gives original `x_and_a`
+    chex.assert_shape(log_det_fwd, ())
+    chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
+    chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
+
+    # Test the transformation is equivariant.
+    key, subkey = jax.random.split(key)
+    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey)
+    key, subkey = jax.random.split(key)
+    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey)
+
+    # Check the change to the log det is invariant.
+    key, subkey = jax.random.split(key)
+    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey)
+    key, subkey = jax.random.split(key)
+    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey)
+
+
+
+    # Forward reverse test but with a batch.
+    batch_size = 11
+    x_and_a = jnp.zeros((batch_size, n_nodes, dim*2))
+    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+    x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
+    x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
+    chex.assert_shape(log_det_fwd, (batch_size,))
+    chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
+    chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
+    # Check single sample and batch behavior is the same
+    x_and_a_new_0, log_det_fwd_0 = bijector_forward.apply(params, x_and_a[0])
+    x_and_a_old_0, log_det_rev_0 = bijector_backward.apply(params, x_and_a_new[0])
+    chex.assert_trees_all_close(x_and_a_new[0], x_and_a_new_0, rtol=rtol)
+    chex.assert_trees_all_close(x_and_a_old[0], x_and_a_old_0, rtol=rtol)
+
+    # Test we can take grad log log prob
+    grad = jax.grad(lambda params, x_and_a: bijector_forward.apply(params, x_and_a)[1])(params, x_and_a[0])
+    chex.assert_tree_all_finite(grad)

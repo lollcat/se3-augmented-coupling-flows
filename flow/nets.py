@@ -6,7 +6,7 @@ from utils.nets import LayerNormMLP
 
 
 _LAYER_NORM = True
-_EQUI_NORM = True
+_EQUI_NORM = False
 
 
 def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = _LAYER_NORM, equi_norm: bool = _EQUI_NORM

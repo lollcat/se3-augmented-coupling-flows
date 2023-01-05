@@ -1,9 +1,10 @@
+import chex
 import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant
+from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant, bijector_test
 from flow.distribution import make_equivariant_augmented_flow_dist
 
 
@@ -44,6 +45,10 @@ def test_distribution():
     key, subkey = jax.random.split(key)
     sample, log_prob = sample_and_log_prob_fn.apply(params, subkey, (batch_size,))
 
+    log_prob_check = log_prob_fn.apply(params, sample)
+
+    chex.assert_trees_all_close(log_prob, log_prob_check)
+
     plt.plot(sample[0, :, 0], sample[0, :, 1], 'o')
     plt.show()
 
@@ -55,10 +60,10 @@ def test_distribution():
 def test_flow():
     dim = 2
     n_nodes = 20
-    n_layers = 2
+    n_layers = 4
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    flow_type = "vector_scale_shift"
+    flow_type = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
     identity_init = False
 
     @hk.without_apply_rng
@@ -69,20 +74,16 @@ def test_flow():
             flow_identity_init=identity_init, type=flow_type)
         return distribution.bijector.forward_and_log_det(x)
 
+    @hk.without_apply_rng
+    @hk.transform
+    def inverse_and_log_det(x):
+        distribution = make_equivariant_augmented_flow_dist(
+            dim=dim, nodes=n_nodes, n_layers=n_layers,
+            flow_identity_init=identity_init, type=flow_type)
+        return distribution.bijector.inverse_and_log_det(x)
 
-    key, subkey = jax.random.split(key)
-    x_and_a = jnp.zeros((n_nodes, dim*2))
-    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
-    params = forward_and_log_det.init(subkey, x_and_a)
 
-    # Run a forward pass
-    x_and_a_new, log_det = forward_and_log_det.apply(params, x_and_a)
-
-    # Check equivariance of forward, and invariance of log_det
-    key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x: forward_and_log_det.apply(params, x)[0], subkey, n_nodes=n_nodes)
-    key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x: forward_and_log_det.apply(params, x)[1], subkey, n_nodes=n_nodes)
+    bijector_test(forward_and_log_det, inverse_and_log_det, dim=dim, n_nodes=n_nodes)
 
 
 

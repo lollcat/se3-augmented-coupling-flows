@@ -1,3 +1,4 @@
+import jax.numpy as jp
 import distrax
 
 from flow.base import CentreGravityGaussian
@@ -9,12 +10,13 @@ from flow.bijector_scale_and_shift_along_vector import make_se_equivariant_vecto
 def make_equivariant_augmented_flow_dist(dim,
                                          nodes,
                                          n_layers,
-                                         type="proj",
+                                         type="nice",
                                          flow_identity_init: bool = True,
                                          mlp_units = (10, 10)):
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
+    # bijectors.append(distrax.ScalarAffine(scale=jnp.zeros(dim*2)))
     for i in range(n_layers):
         swap = i % 2 == 0
         if type == "proj":

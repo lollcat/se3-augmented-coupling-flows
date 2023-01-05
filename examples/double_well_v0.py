@@ -69,9 +69,9 @@ def plot_sample_hist(samples, ax, dim=(0,1)):
 
 
 def train():
-    n_epoch = int(512)
+    n_epoch = int(128)
     dim = 2
-    lr = 4e-4
+    lr = 1e-3
     n_nodes = 2
     n_layers = 4
     batch_size = 32
@@ -130,7 +130,7 @@ def train():
                 print("nan grad")
                 # raise Exception("nan grad encountered")
 
-        if i % (n_epoch // 10) == 0:
+        if i % (n_epoch // 5) == 0:
             plot()
             eval_info = eval(params, test_data, log_prob_fn)
             logger.write(eval_info)
