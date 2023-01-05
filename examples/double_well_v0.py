@@ -69,12 +69,12 @@ def plot_sample_hist(samples, ax, dim=(0,1)):
 
 
 def train():
-    n_epoch = int(1e3)
+    n_epoch = int(512)
     dim = 2
     lr = 4e-4
     n_nodes = 2
     n_layers = 4
-    batch_size = 128
+    batch_size = 32
     max_global_norm = jnp.inf
     mlp_units = (32,)
     key = jax.random.PRNGKey(0)
@@ -126,9 +126,9 @@ def train():
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
             logger.write(info)
-        if jnp.isnan(info["grad_norm"]):
-            print("nan grad")
-            # raise Exception("nan grad encountered")
+            if jnp.isnan(info["grad_norm"]):
+                print("nan grad")
+                # raise Exception("nan grad encountered")
 
         if i % (n_epoch // 10) == 0:
             plot()

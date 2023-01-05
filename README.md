@@ -38,6 +38,8 @@ First `bijector_nice.py` is super simple, so is best for sanity checking the aug
 -`bijector_scale_and_shift_along_vector.py` identity init is not giving valid grads
 
 Then
+ - Clean codebase, make more modular (e.g. have separate section for making the equivariant function so
+we don't pass these arguments around)
  - Make proper SE(n) net.
  - For NICE flow we will need some scaling transforms. This could be done with a scaling layer applied to the base distribution. 
  - Test jacobian determinant (test normalizing constant using IS?)

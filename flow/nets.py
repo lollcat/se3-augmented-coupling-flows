@@ -5,7 +5,12 @@ import haiku as hk
 from utils.nets import LayerNormMLP
 
 
-def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = True):
+_LAYER_NORM = True
+_EQUI_NORM = True
+
+
+def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = _LAYER_NORM, equi_norm: bool = _EQUI_NORM
+                       ):
     mlp = LayerNormMLP if layer_norm else hk.nets.MLP
     chex.assert_rank(x, 2)
     # Need to add 1e-10 to prevent nan grads
@@ -15,8 +20,10 @@ def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = True):
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(1)])
     m = jnp.squeeze(net(norms[..., None]), axis=-1)
-    return x + jnp.einsum('ijd,ij->id', diff_combos, m)
-    # return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
+    if not equi_norm:
+        return x + jnp.einsum('ijd,ij->id', diff_combos, m)
+    else:
+        return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
 
 
 def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
@@ -26,7 +33,7 @@ def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
         return jax.vmap(_se_equivariant_fn, in_axes=(0, None, None))(x, mlp_units, zero_init)
 
 
-def _se_invariant_fn(x, n_vals, mlp_units, zero_init, layer_norm: bool = True):
+def _se_invariant_fn(x, n_vals, mlp_units, zero_init, layer_norm: bool = _LAYER_NORM):
     chex.assert_rank(x, 2)
     mlp = LayerNormMLP if layer_norm else hk.nets.MLP
     # Need to add 1e-10 to prevent nan grads
