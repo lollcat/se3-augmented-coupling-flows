@@ -20,6 +20,7 @@ def make_equivariant_augmented_flow_dist(dim,
     for i in range(n_layers):
         swap = i % 2 == 0
         if type == "proj":
+            raise NotImplemented  # Still need to fix
             bijector = make_se_equivariant_split_coupling_with_projection(dim=dim, swap=swap,
                                                                           identity_init=flow_identity_init,
                                                                           mlp_units=mlp_units)
@@ -28,7 +29,6 @@ def make_equivariant_augmented_flow_dist(dim,
                                                 dim=dim, swap=swap, identity_init=flow_identity_init,
                                                 mlp_units=mlp_units)
         elif type == "vector_scale_shift":
-            raise NotImplemented # Still need to fix
             bijector = make_se_equivariant_vector_scale_shift(layer_number=i, dim=dim, swap=swap, identity_init=flow_identity_init,
                                                               mlp_units=mlp_units)
         else:
