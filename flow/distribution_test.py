@@ -8,16 +8,20 @@ from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant, biject
 from flow.distribution import make_equivariant_augmented_flow_dist
 
 
+_N_FLOW_LAYERS = 2
+_FLOW_TYPE = "nice"  # "nice", "proj", 'vector_scale_shift'
+
+
 def test_distribution():
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
 
     dim = 2
     n_nodes = 20
-    n_layers = 2
+    n_layers = _N_FLOW_LAYERS
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    flow_type = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
+    flow_type = _FLOW_TYPE
     identity_init = False
 
 
@@ -60,10 +64,9 @@ def test_distribution():
 def test_flow():
     dim = 2
     n_nodes = 20
-    n_layers = 4
-    batch_size = 5
+    n_layers = _N_FLOW_LAYERS
     key = jax.random.PRNGKey(0)
-    flow_type = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
+    flow_type = _FLOW_TYPE
     identity_init = False
 
     @hk.without_apply_rng

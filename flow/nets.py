@@ -13,17 +13,21 @@ def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = _LAYER_NORM, 
                        ):
     mlp = LayerNormMLP if layer_norm else hk.nets.MLP
     chex.assert_rank(x, 2)
-    # Need to add 1e-10 to prevent nan grads
-    diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
-    norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
+
+    diff_combos = x - x[:, None]   # [n_nodes, n_nodes, dim]
+
+    # Need to add 1e-10 to prevent nan grads, but we overwrite this anyway.
+    norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
+    norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
     net = hk.Sequential([mlp(mlp_units, activate_final=True),
                          hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(1)])
     m = jnp.squeeze(net(norms[..., None]), axis=-1)
     if not equi_norm:
-        return x + jnp.einsum('ijd,ij->id', diff_combos, m)
+        equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos, m)
     else:
-        return x + jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
+        equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], m)
+    return x + equivariant_shift
 
 
 def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
@@ -36,9 +40,13 @@ def se_equivariant_fn(x, mlp_units=(5, 5), zero_init: bool = False):
 def _se_invariant_fn(x, n_vals, mlp_units, zero_init, layer_norm: bool = _LAYER_NORM):
     chex.assert_rank(x, 2)
     mlp = LayerNormMLP if layer_norm else hk.nets.MLP
-    # Need to add 1e-10 to prevent nan grads
-    diff_combos = x - x[:, None] + 1e-10  # [n_nodes, n_nodes, dim]
-    norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
+
+    diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
+
+    # Need to add 1e-10 to prevent nan grads, but we overwrite this anyway.
+    norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
+    norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
+
     net = hk.Sequential([mlp(mlp_units, activate_final=True),
                          hk.Linear(n_vals, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                          hk.Linear(n_vals)])
