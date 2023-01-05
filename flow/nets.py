@@ -5,7 +5,7 @@ import haiku as hk
 from utils.nets import LayerNormMLP
 
 
-def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = True):
+def _se_equivariant_fn(x, mlp_units, zero_init, layer_norm: bool = False):
     mlp = LayerNormMLP if layer_norm else hk.nets.MLP
     chex.assert_rank(x, 2)
     # Need to add 1e-10 to prevent nan grads

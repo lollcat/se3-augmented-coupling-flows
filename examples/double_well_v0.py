@@ -12,14 +12,19 @@ from target import double_well as dw
 from utils.loggers import ListLogger
 
 
-def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
+def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0,
+                 independant: bool = True):
     """Load dataset and add augmented dataset N(0, 1). """
     # Make length divisible by batch size also.
 
     dataset = np.load('target/data/dw_data_vertices2_dim2.npy')
 
-    augmented_dataset = jnp.mean(dataset, axis=(1, 2), keepdims=True) + \
-                        jax.random.normal(jax.random.PRNGKey(seed), shape=dataset.shape)
+    if independant:
+        augmented_dataset = jnp.mean(dataset, axis=(1, 2), keepdims=True) + \
+                            jax.random.normal(jax.random.PRNGKey(seed), shape=dataset.shape)
+    else:
+        # p(a, x) = p(x)p(a | x)
+        augmented_dataset = dataset + jax.random.normal(jax.random.PRNGKey(seed), shape=dataset.shape)
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
 
 
@@ -57,8 +62,8 @@ def step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def plot_sample_hist(samples, ax):
-    d = jnp.linalg.norm(samples[:, 0, :] - samples[:, 1, :], axis=-1)
+def plot_sample_hist(samples, ax, dim=(0,1)):
+    d = jnp.linalg.norm(samples[:, 0, dim] - samples[:, 1, dim], axis=-1)
     ax.hist(d, bins=50, density=True, alpha=0.4)
 
 
@@ -106,10 +111,10 @@ def train():
         fig, axs = plt.subplots(2)
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
-        plot_sample_hist(samples, axs[0])
-        plot_sample_hist(train_data, axs[0])
-        plot_sample_hist(samples[..., 2:], axs[1])
-        plot_sample_hist(train_data[..., 2:], axs[1])
+        plot_sample_hist(samples, axs[0], dim=(0, 1))
+        plot_sample_hist(train_data, axs[0], dim=(0, 1))
+        plot_sample_hist(samples, axs[1], dim=(2, 3))
+        plot_sample_hist(train_data, axs[1], dim=(2, 3))
         plt.show()
 
     plot()
