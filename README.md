@@ -1,6 +1,8 @@
 # Equivariant Augmented Normalizing Flows
 Exploring whether the idea works.
-See `examples/dw4_v0.ipynb` for a training run on the double well problem with 4 particles. 
+See `example/dw4_v0.py` for a training run on the double well problem with 4 particles - this can be run locally in under
+a minute to get some prelim results. 
+See `examples/dw4_v0.ipynb` for training a bit longer, I run this on GPU. 
 
 ## Flows
 The below flows are working

@@ -1,3 +1,4 @@
+import distrax
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -12,19 +13,31 @@ from target import double_well as dw
 from utils.loggers import ListLogger
 
 
-def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0,
-                 independant: bool = True):
+
+def get_target_augmented_variables(x_original, key):
+    x_augmented = jnp.mean(x_original, axis=(1, 2), keepdims=True) + \
+    jax.random.normal(key, shape=x_original.shape)
+    return x_augmented
+
+
+def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
+    augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
+    augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
+    augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=augmented_mean),
+                                         reinterpreted_batch_ndims=1)
+    augmented_var, log_p_a = augmented_dist._sample_n_and_log_prob(n=K, key=key)
+    x_original = jnp.stack([x_original]*K, axis=0)
+    log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, augmented_var), axis=-1))
+    return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0)- jnp.log(jnp.array(K)))
+
+
+
+def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
     """Load dataset and add augmented dataset N(0, 1). """
     # Make length divisible by batch size also.
 
     dataset = np.load('target/data/dw_data_vertices4_dim2.npy')
-
-    if independant:
-        augmented_dataset = jnp.mean(dataset, axis=(1, 2), keepdims=True) + \
-                            jax.random.normal(jax.random.PRNGKey(seed), shape=dataset.shape)
-    else:
-        # p(a, x) = p(x)p(a | x)
-        augmented_dataset = dataset + jax.random.normal(jax.random.PRNGKey(seed), shape=dataset.shape)
+    augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
 
 
@@ -38,10 +51,14 @@ def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0,
 
 
 @partial(jax.jit, static_argnums=(2,))
-def eval(params, x, log_prob_fn,):
+def eval(params, x, log_prob_fn, key):
     log_prob = log_prob_fn.apply(params, x)
-    info = {"eval_log_lik": jnp.mean(log_prob),
-            "eval_kl": jnp.mean(dw.log_prob_fn(x) - log_prob)}
+    marginal_log_lik = get_marginal_log_lik(log_prob_fn=lambda x: log_prob_fn.apply(params, x),
+                                            x_original=x[..., :2], key=key)
+    info = {"eval_marginal_log_lik": marginal_log_lik,
+            "eval_log_lik": jnp.mean(log_prob),
+            "eval_kl": jnp.mean(dw.log_prob_fn(x) - log_prob),
+            }
     return info
 
 
@@ -69,7 +86,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
 
 
 def train():
-    n_epoch = int(128)
+    n_epoch = int(32)
     dim = 2
     lr = 1e-3
     n_nodes = 4
@@ -80,6 +97,8 @@ def train():
     key = jax.random.PRNGKey(0)
     flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
     identity_init = True
+
+    n_plots = 3
 
     logger = ListLogger()
 
@@ -137,9 +156,10 @@ def train():
                 print("nan grad")
                 # raise Exception("nan grad encountered")
 
-        if i % (n_epoch // 5) == 0:
+        if i % (n_epoch // n_plots) == 0:
             plot()
-            eval_info = eval(params, test_data, log_prob_fn)
+            key, subkey = jax.random.split(key)
+            eval_info = eval(params, test_data, log_prob_fn, subkey)
             logger.write(eval_info)
 
 
