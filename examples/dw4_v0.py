@@ -20,7 +20,7 @@ def get_target_augmented_variables(x_original, key):
     return x_augmented
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
+def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 50):
     augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
     augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
     augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=augmented_mean),
@@ -28,7 +28,7 @@ def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
     augmented_var, log_p_a = augmented_dist._sample_n_and_log_prob(n=K, key=key)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, augmented_var), axis=-1))
-    return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0)- jnp.log(jnp.array(K)))
+    return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 
 
