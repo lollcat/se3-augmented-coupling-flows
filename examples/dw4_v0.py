@@ -118,8 +118,8 @@ def train():
             plot_sample_hist(samples, axs[i, 1], dim=(2, 3), vertices=(0, i+1), label="flow samples")
             plot_sample_hist(train_data, axs[i, 1], dim=(2, 3), vertices=(0, i+1),
                              label="ground truth samples")
-            axs[i, 0].set_title(f"norm dim0-{i} original coordinates")
-            axs[i, 1].set_title(f"norm dim0-{i} augmented coordinates")
+            axs[i, 0].set_title(f"norm dim0-{i + 1} original coordinates")
+            axs[i, 1].set_title(f"norm dim0-{i + 1} augmented coordinates")
         axs[0, 0].legend()
         plt.tight_layout()
         plt.show()
