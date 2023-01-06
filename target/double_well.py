@@ -55,9 +55,17 @@ def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
     np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
 
 
+
+def plot_sample_hist(samples, ax = None, dim=(0,1)):
+    if ax == None:
+        fig, ax = plt.subplot()
+    d = jnp.linalg.norm(samples[:, 0, dim] - samples[:, 1, dim], axis=-1)
+    ax.hist(d, bins=50, density=True, alpha=0.4)
+
+
 if __name__ == '__main__':
 
-    make_dataset()
+    make_dataset(n_vertices=4)
 
     # Visualise 2D energy fn as a function of distance
     import matplotlib.pyplot as plt
@@ -79,8 +87,7 @@ if __name__ == '__main__':
 
     key = jax.random.PRNGKey(0)
     samples = get_samples(key, n_steps=10, batch_size=32)
-    d = jnp.linalg.norm(samples[:, 0, :] - samples[:, 1, :], axis=-1)
-    plt.hist(d, bins=50, density=True)
+    plot_sample_hist(samples)
     plt.show()
 
 

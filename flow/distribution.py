@@ -1,5 +1,6 @@
-import jax.numpy as jp
+import jax.numpy as jnp
 import distrax
+import haiku as hk
 
 from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
@@ -16,7 +17,8 @@ def make_equivariant_augmented_flow_dist(dim,
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
-    # bijectors.append(distrax.ScalarAffine(scale=jnp.zeros(dim*2)))
+    # bijectors.append(distrax.ScalarAffine(log_scale=hk.get_parameter("base_scale", shape=(), init=jnp.zeros),
+    #                                       shift=jnp.zeros(dim*2)))
     for i in range(n_layers):
         swap = i % 2 == 0
         if type == "proj":
