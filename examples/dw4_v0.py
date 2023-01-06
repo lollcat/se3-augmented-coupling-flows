@@ -62,9 +62,9 @@ def step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def plot_sample_hist(samples, ax, dim=(0,1)):
-    d = jnp.linalg.norm(samples[:, 0, dim] - samples[:, 1, dim], axis=-1)
-    ax.hist(d, bins=50, density=True, alpha=0.4)
+def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
+    d = jnp.linalg.norm(samples[:, vertices[0], dim] - samples[:, vertices[1], dim], axis=-1)
+    ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
 
@@ -108,13 +108,20 @@ def train():
     train_data, test_data = load_dataset(batch_size)
 
     def plot(n_samples=512):
-        fig, axs = plt.subplots(2)
+        fig, axs = plt.subplots(3, 2, figsize=(15, 12))
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
-        plot_sample_hist(samples, axs[0], dim=(0, 1))
-        plot_sample_hist(train_data, axs[0], dim=(0, 1))
-        plot_sample_hist(samples, axs[1], dim=(2, 3))
-        plot_sample_hist(train_data, axs[1], dim=(2, 3))
+
+        for i in range(3):
+            plot_sample_hist(samples, axs[i, 0], dim=(0, 1), vertices=(0, i+1), label="flow samples")
+            plot_sample_hist(train_data, axs[i, 0], dim=(0, 1), vertices=(0, i+1), label="ground truth samples")
+            plot_sample_hist(samples, axs[i, 1], dim=(2, 3), vertices=(0, i+1), label="flow samples")
+            plot_sample_hist(train_data, axs[i, 1], dim=(2, 3), vertices=(0, i+1),
+                             label="ground truth samples")
+            axs[i, 0].set_title(f"norm dim0-{i} original coordinates")
+            axs[i, 1].set_title(f"norm dim0-{i} augmented coordinates")
+        axs[0, 0].legend()
+        plt.tight_layout()
         plt.show()
 
     plot()
