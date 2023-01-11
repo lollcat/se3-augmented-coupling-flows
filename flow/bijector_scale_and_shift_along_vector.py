@@ -10,15 +10,15 @@ def make_conditioner(ref_equivariant_fn, shift_equivariant_fn, invariant_fn):
         log_scale_param = invariant_fn(x)
         log_scale_param = jnp.broadcast_to(log_scale_param, x.shape)
         scale = jax.nn.softplus(log_scale_param)
-        reference_vector = ref_equivariant_fn(x)
+        reference_point = ref_equivariant_fn(x)
         equivariant_shift = shift_equivariant_fn(x) - x
-        shift = - reference_vector * (scale - 1) + equivariant_shift
+        shift = - reference_point * (scale - 1) + equivariant_shift
         return scale, shift
     return conditioner
 
 
 def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, identity_init: bool = True, mlp_units=(5, 5)):
-    """Flow is x + (x - r)*scale + shift where shift is invariant scalar, and r is equivariant reference point"""
+    """Flow is x + (x - r)*scale + shift where scale is an invariant scalar, and r is equivariant reference point"""
 
     ref_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_ref",
                                         zero_init=False,
