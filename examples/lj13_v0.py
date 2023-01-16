@@ -95,13 +95,13 @@ def train(
     batch_size = 32,
     max_global_norm = 100,  # jnp.inf
     mlp_units = (16,),
-    seed = 0
+    seed = 0,
+    flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
+    identity_init = True,
+    n_plots: int = 3,
 ):
     key = jax.random.PRNGKey(seed)
-    flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
-    identity_init = True
 
-    n_plots = 3
 
     logger = ListLogger()
 
