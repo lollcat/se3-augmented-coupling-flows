@@ -20,8 +20,8 @@ def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0
     train_set = dataset[:train_index]
     test_set = dataset[train_index:]
 
-    train_set = train_set[:-(train_set.shape[0] % batch_size)]
-    test_set = test_set[:-(test_set.shape[0] % batch_size)]
+    train_set = train_set[:train_set.shape[0] - (train_set.shape[0] % batch_size)]
+    test_set = test_set[:train_set.shape[0] - (test_set.shape[0] % batch_size)]
     return train_set, test_set
 
 

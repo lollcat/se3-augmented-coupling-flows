@@ -5,12 +5,27 @@ import optax
 from tqdm.autonotebook import tqdm
 from functools import partial
 import matplotlib.pyplot as plt
+import numpy as np
 
 from flow.distribution import make_equivariant_augmented_flow_dist
 from target import double_well as dw
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, load_dataset
+from utils.train_and_eval import eval_fn, get_target_augmented_variables
+
+
+def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 256, seed: int = 0):
+    data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
+    dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
+    dataset = jnp.reshape(dataset, (-1, 4, 2))
+    augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
+    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+
+    train_set = dataset[:train_set_size]
+    test_set = dataset[train_set_size: train_set_size + val_set_size]
+    train_set = train_set[:train_set_size-(train_set.shape[0] % batch_size)]
+    test_set = test_set[:val_set_size-(test_set.shape[0] % batch_size)]
+    return train_set, test_set
 
 
 
@@ -76,7 +91,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset('target/data/dw_data_vertices4_dim2.npy', batch_size)
+    train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=1028, val_set_size=512)
 
     print(f"training data size of {train_data.shape[0]}")
 
