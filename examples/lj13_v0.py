@@ -6,6 +6,7 @@ import numpy as np
 import optax
 from tqdm.autonotebook import tqdm
 from functools import partial
+import matplotlib.pyplot as plt
 
 from flow.distribution import make_equivariant_augmented_flow_dist
 from target import double_well as dw
@@ -184,7 +185,6 @@ def train(
 
 if __name__ == '__main__':
     from utils.plotting import plot_history
-    import matplotlib.pyplot as plt
 
     USE_64_BIT = False
     if USE_64_BIT:
