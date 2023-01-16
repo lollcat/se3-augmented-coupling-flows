@@ -87,16 +87,18 @@ def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
 
 
 
-def train():
-    n_epoch = int(128)
-    dim = 3
-    lr = 1e-3
-    n_nodes = 13
-    n_layers = 4
-    batch_size = 32
-    max_global_norm = 100  # jnp.inf
-    mlp_units = (16,)
-    key = jax.random.PRNGKey(0)
+def train(
+    n_epoch = int(128),
+    dim = 3,
+    lr = 1e-3,
+    n_nodes = 13,
+    n_layers = 4,
+    batch_size = 32,
+    max_global_norm = 100,  # jnp.inf
+    mlp_units = (16,),
+    seed = 0
+):
+    key = jax.random.PRNGKey(seed)
     flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
     identity_init = True
 
