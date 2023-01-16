@@ -1,5 +1,6 @@
 import haiku as hk
 import jax
+import numpy as np
 import jax.numpy as jnp
 import optax
 from tqdm.autonotebook import tqdm
@@ -10,7 +11,23 @@ from flow.distribution import make_equivariant_augmented_flow_dist
 from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
-from utils.train_and_eval import load_dataset, eval_fn
+from utils.train_and_eval import eval_fn, get_target_augmented_variables
+
+
+def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
+    # dataset from https://github.com/vgsatorras/en_flows
+
+    data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
+    dataset = np.load(data_path)
+    dataset = jnp.reshape(dataset, (-1, 13, 3))
+    augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
+    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+
+    train_set = dataset[:train_set_size]
+    test_set = dataset[train_set_size: train_set_size + val_set_size]
+    train_set = train_set[:train_set_size-(train_set.shape[0] % batch_size)]
+    test_set = test_set[:val_set_size-(test_set.shape[0] % batch_size)]
+    return train_set, test_set
 
 
 
@@ -78,7 +95,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset('target/data/lj_data_vertices13_dim3.npy', batch_size)
+    train_data, test_data = load_dataset(batch_size)
 
     print(f"training data size of {train_data.shape[0]}")
 

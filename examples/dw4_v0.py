@@ -14,7 +14,8 @@ from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, get_target_augmented_variables
 
 
-def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 256, seed: int = 0):
+def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
+    # dataset from https://github.com/vgsatorras/en_flows
     data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
     dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
     dataset = jnp.reshape(dataset, (-1, 4, 2))

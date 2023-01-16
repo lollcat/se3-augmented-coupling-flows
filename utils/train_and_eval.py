@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import distrax
 from functools import partial
 
+
 def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0):
     """Load dataset and add augmented dataset N(0, 1). """
     # Make length divisible by batch size also.
