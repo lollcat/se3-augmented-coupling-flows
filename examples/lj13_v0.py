@@ -16,17 +16,24 @@ from utils.train_and_eval import eval_fn, get_target_augmented_variables
 
 def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
     # dataset from https://github.com/vgsatorras/en_flows
+    # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
 
-    data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
-    dataset = np.load(data_path)
+    # Train data
+    data = np.load("target/data/holdout_data_LJ13.npy")
+    idx = np.load("target/data/idx_LJ13.npy")
+    train_set = data[idx[:train_set_size]]
+    train_set = jnp.reshape(train_set, (-1, 13, 3))
+    augmented_dataset_train = get_target_augmented_variables(train_set, jax.random.PRNGKey(seed))
+    train_set = jnp.concatenate((train_set, augmented_dataset_train), axis=-1)
+    train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
+
+    # Test set
+    test_data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
+    dataset = np.load(test_data_path)
     dataset = jnp.reshape(dataset, (-1, 13, 3))
     augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
-
-    train_set = dataset[:train_set_size]
-    test_set = dataset[train_set_size: train_set_size + val_set_size]
-    train_set = train_set[:train_set_size-(train_set.shape[0] % batch_size)]
-    test_set = test_set[:val_set_size-(test_set.shape[0] % batch_size)]
+    test_set = dataset[:val_set_size]
     return train_set, test_set
 
 
