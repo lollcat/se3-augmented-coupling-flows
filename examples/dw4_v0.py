@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import chex
 import optax
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from functools import partial
 
 from flow.distribution import make_equivariant_augmented_flow_dist
@@ -88,20 +88,20 @@ def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
 
 
 
-def train():
-    n_epoch = int(32)
-    dim = 2
-    lr = 1e-3
-    n_nodes = 4
-    n_layers = 4
-    batch_size = 32
-    max_global_norm = 100  # jnp.inf
-    mlp_units = (32,)
-    key = jax.random.PRNGKey(0)
-    flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
-    identity_init = True
-
-    n_plots = 3
+def train(
+    n_epoch = int(32),
+    dim = 2,
+    lr = 1e-3,
+    n_nodes = 4,
+    n_layers = 4,
+    batch_size = 32,
+    max_global_norm = 100,  # jnp.inf
+    mlp_units = (32,),
+    key = jax.random.PRNGKey(0),
+    flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
+    identity_init = True,
+    n_plots = 3,
+):
 
     logger = ListLogger()
 

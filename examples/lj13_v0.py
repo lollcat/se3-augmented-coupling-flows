@@ -3,9 +3,8 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
-import chex
 import optax
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from functools import partial
 
 from flow.distribution import make_equivariant_augmented_flow_dist
@@ -81,7 +80,7 @@ def step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
+def plot_sample_hist(samples, ax, dim=(0, 1, 2), vertices=(0, 1), *args, **kwargs):
     d = jnp.linalg.norm(samples[:, vertices[0], dim] - samples[:, vertices[1], dim], axis=-1)
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
@@ -138,10 +137,10 @@ def train(
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
 
         for i in range(3):
-            plot_sample_hist(samples, axs[i, 0], dim=(0, 1), vertices=(0, i+1), label="flow samples")
-            plot_sample_hist(train_data, axs[i, 0], dim=(0, 1), vertices=(0, i+1), label="ground truth samples")
-            plot_sample_hist(samples, axs[i, 1], dim=(2, 3), vertices=(0, i+1), label="flow samples")
-            plot_sample_hist(train_data, axs[i, 1], dim=(2, 3), vertices=(0, i+1),
+            plot_sample_hist(samples, axs[i, 0], dim=(0, 1, 2), vertices=(0, i+1), label="flow samples")
+            plot_sample_hist(train_data, axs[i, 0], dim=(0, 1, 2), vertices=(0, i+1), label="ground truth samples")
+            plot_sample_hist(samples, axs[i, 1], dim=(3, 4, 5), vertices=(0, i+1), label="flow samples")
+            plot_sample_hist(train_data, axs[i, 1], dim=(3, 4, 5), vertices=(0, i+1),
                              label="ground truth samples")
             axs[i, 0].set_title(f"norm dim0-{i + 1} original coordinates")
             axs[i, 1].set_title(f"norm dim0-{i + 1} augmented coordinates")
