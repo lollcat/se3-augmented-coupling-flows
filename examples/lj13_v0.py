@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from flow.distribution import make_equivariant_augmented_flow_dist
 from target import double_well as dw
 from utils.loggers import ListLogger
+from utils.plotting import plot_history
 
 
 
@@ -184,7 +185,6 @@ def train(
 
 
 if __name__ == '__main__':
-    from utils.plotting import plot_history
 
     USE_64_BIT = False
     if USE_64_BIT:
