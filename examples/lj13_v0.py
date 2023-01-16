@@ -12,6 +12,7 @@ from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, get_target_augmented_variables
+from utils.numerical import get_pairwise_distances
 
 
 def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
@@ -55,8 +56,10 @@ def step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def plot_sample_hist(samples, ax, dim=(0, 1, 2), vertices=(0, 1), *args, **kwargs):
-    d = jnp.linalg.norm(samples[:, vertices[0], dim] - samples[:, vertices[1], dim], axis=-1)
+def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
+    differences = jax.vmap(get_pairwise_distances)(samples[..., dim])
+    d = differences.flatten()
+    d = d[d != 0.0]
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
@@ -107,19 +110,18 @@ def train(
     print(f"training data size of {train_data.shape[0]}")
 
     def plot(n_samples=512):
-        fig, axs = plt.subplots(3, 2, figsize=(15, 12))
+        fig, axs = plt.subplots(1, 2, figsize=(15, 6))
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
 
-        for i in range(3):
-            plot_sample_hist(samples, axs[i, 0], dim=(0, 1, 2), vertices=(0, i+1), label="flow samples")
-            plot_sample_hist(train_data, axs[i, 0], dim=(0, 1, 2), vertices=(0, i+1), label="ground truth samples")
-            plot_sample_hist(samples, axs[i, 1], dim=(3, 4, 5), vertices=(0, i+1), label="flow samples")
-            plot_sample_hist(train_data, axs[i, 1], dim=(3, 4, 5), vertices=(0, i+1),
-                             label="ground truth samples")
-            axs[i, 0].set_title(f"norm dim0-{i + 1} original coordinates")
-            axs[i, 1].set_title(f"norm dim0-{i + 1} augmented coordinates")
-        axs[0, 0].legend()
+        plot_sample_hist(samples, axs[0], dim=(0, 1, 2), label="flow samples")
+        plot_sample_hist(train_data, axs[0], dim=(0, 1, 2), label="ground truth samples")
+        plot_sample_hist(samples, axs[1], dim=(3, 4, 5), label="flow samples")
+        plot_sample_hist(train_data, axs[1], dim=(3, 4, 5),
+                         label="ground truth samples")
+        axs[0].set_title(f"norms between original coordinates")
+        axs[1].set_title(f"norms between augmented coordinates")
+        axs[0].legend()
         plt.tight_layout()
         plt.show()
 
