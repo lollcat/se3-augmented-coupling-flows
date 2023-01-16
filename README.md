@@ -23,6 +23,8 @@ Currently implemented in 2D.
 
 
 ## TODO
+Download test sets from equivariant flows data and benchmark against their models. 
+
  - Get proper metrics on dw4 problem
  - Clean
  - For NICE flow we will need some scaling transforms. This could be done with a scaling layer applied to the base distribution. 

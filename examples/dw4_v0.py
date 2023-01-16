@@ -20,7 +20,7 @@ def get_target_augmented_variables(x_original, key):
     return x_augmented
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 50):
+def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
     augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
     augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
     augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=augmented_mean),
@@ -126,6 +126,8 @@ def train():
 
     train_data, test_data = load_dataset(batch_size)
 
+    print(f"training data size of {train_data.shape[0]}")
+
     def plot(n_samples=512):
         fig, axs = plt.subplots(3, 2, figsize=(15, 12))
         samples = \
@@ -156,10 +158,13 @@ def train():
                 print("nan grad")
                 # raise Exception("nan grad encountered")
 
+
+
         if i % (n_epoch // n_plots) == 0:
             plot()
             key, subkey = jax.random.split(key)
             eval_info = eval(params, test_data, log_prob_fn, subkey)
+            pbar.write(str(eval_info))
             logger.write(eval_info)
 
 

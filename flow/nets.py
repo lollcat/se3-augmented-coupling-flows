@@ -2,8 +2,9 @@ import chex
 import jax
 import jax.numpy as jnp
 import haiku as hk
-from utils.nets import LayerNormMLP
 
+from utils.nets import LayerNormMLP
+from utils.numerical import get_pairwise_distances
 
 _LAYER_NORM = True
 _EQUI_NORM = False
@@ -29,10 +30,11 @@ class se_equivariant_net(hk.Module):
         chex.assert_rank(x, 2)
     
         diff_combos = x - x[:, None]   # [n_nodes, n_nodes, dim]
-    
+
         # Need to add 1e-10 to prevent nan grads, but we overwrite this anyway.
         norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
         norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
+
         net = hk.Sequential([mlp(self.mlp_units, activate_final=True),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if self.zero_init else
                              hk.Linear(1)])

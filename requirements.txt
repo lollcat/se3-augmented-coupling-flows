@@ -1,5 +1,5 @@
 dm-haiku
-blackjax
+blackjax-nightly
 distrax
 chex
 matplotlib

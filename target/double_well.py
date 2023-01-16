@@ -1,12 +1,10 @@
-import chex
 import jax.numpy as jnp
 import numpy as np
 import jax
-import blackjax
+import chex
 
-def get_pairwise_distances(x):
-    chex.assert_rank(x, 2)
-    return jnp.linalg.norm(x - x[:, None] + 1e-10, ord=2, axis=-1)  # Add 1e-10 to prevent nans
+from utils.numerical import get_pairwise_distances, set_diagonal_to_zero
+from utils.mcmc import get_samples_simple
 
 def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
     """Compute energy. Default hyper-parameters from https://arxiv.org/pdf/2006.02425.pdf.
@@ -16,7 +14,7 @@ def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
     return jnp.sum(a*diff_minus_d0 + b*diff_minus_d0**2 + c*diff_minus_d0**4, axis=(-1, -2)) / tau / 2
 
 
-def log_prob_fn(x):
+def log_prob_fn(x: chex.Array):
     if len(x.shape) == 2:
         return - energy(x)
     elif len(x.shape) == 3:
@@ -25,70 +23,60 @@ def log_prob_fn(x):
         raise Exception
 
 
-def get_samples(key, n_vertices: int = 2, dim: int = 2, n_steps: int = 64, batch_size: int = 32, burn_in: int = 10):
-    # Build the kernel
-    step_size = 1e-3
-    inverse_mass_matrix = jnp.ones(n_vertices*dim)
-    nuts = blackjax.nuts(log_prob_fn, step_size, inverse_mass_matrix)
-
-    # Initialize the state
-    initial_position = jax.random.normal(key, shape=(batch_size, n_vertices, dim))
-    state = jax.vmap(nuts.init)(initial_position)
-
-    # Iterate
-    rng_key = jax.random.PRNGKey(0)
-    samples = []
-    for i in range(int(n_steps + burn_in)):
-        print(f"{i} out of {n_steps + burn_in}")
-        _, rng_key = jax.random.split(rng_key)
-        rng_key_batch = jax.random.split(rng_key, batch_size)
-        state, _ = jax.jit(jax.vmap(nuts.step))(rng_key_batch, state)
-        if i >= burn_in:
-            samples.append(state.position)
-    return jnp.concatenate(samples, axis=0)
-
-
 def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
-    batch_size = 128
+    batch_size = 64
+    step_size = 0.5 # from Equivariant normalizing flows paper
     key = jax.random.PRNGKey(seed)
-    samples = get_samples(key, n_vertices, dim, n_samples // batch_size, batch_size)
+    samples = get_samples_simple(log_prob_fn, key, n_vertices, dim, n_samples // batch_size, batch_size,
+                                 step_size=step_size)
     np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
 
 
 
-def plot_sample_hist(samples, ax = None, dim=(0,1)):
+def plot_sample_hist(samples, ax = None, dims=(0,1)):
     if ax == None:
-        fig, ax = plt.subplot()
-    d = jnp.linalg.norm(samples[:, 0, dim] - samples[:, 1, dim], axis=-1)
+        fig, ax = plt.subplots()
+    d = jnp.linalg.norm(samples[:, 0, dims] - samples[:, 1, dims], axis=-1)
     ax.hist(d, bins=50, density=True, alpha=0.4)
 
 
-if __name__ == '__main__':
 
-    make_dataset(n_vertices=4)
+if __name__ == '__main__':
+    USE_64_BIT = False
+    if USE_64_BIT:
+        from jax.config import config
+        config.update("jax_enable_x64", True)
 
     # Visualise 2D energy fn as a function of distance
     import matplotlib.pyplot as plt
 
     dim = 2
-    batch_size = 50
-    x0 = jnp.zeros((batch_size, 2))
-    d = jnp.linspace(0.7, 5, batch_size)
-    x1 = x0 + d[:, None]
+    batch_size = 512
+    x0 = jax.random.normal(jax.random.PRNGKey(0), (batch_size, 2))  #  jnp.zeros((batch_size, 2)) + 0.1
+    d = jnp.linspace(0.7, 7.5, batch_size)
+    x1 = x0 + jnp.sqrt(d**2/2)[:, None]
 
     x = jnp.stack([x0, x1], axis=1)
     log_probs = log_prob_fn(x)
 
     grad_log_prob = jax.jacfwd(log_prob_fn)(x)
-    print(grad_log_prob)
+    # print(grad_log_prob)
+
+    print(jax.grad(log_prob_fn)(x[0]))
 
     plt.plot(d, log_probs)
     plt.show()
 
+    fig, ax = plt.subplots()
+    ax.plot(d, jnp.exp(log_probs + 162))  # approx normalise
+    # plt.show()
+
     key = jax.random.PRNGKey(0)
-    samples = get_samples(key, n_steps=10, batch_size=32)
-    plot_sample_hist(samples)
+    samples = get_samples_simple(log_prob_fn, key, n_steps=1, batch_size=1000, step_size=0.5, n_warmup_steps=1000)
+    plot_sample_hist(samples, ax=ax)
     plt.show()
+
+    # make_dataset(n_vertices=4)
 
 
 
