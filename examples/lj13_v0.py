@@ -54,10 +54,11 @@ def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
 
 
 @partial(jax.jit, static_argnums=(2,))
-def eval(params, x, log_prob_fn, key):
+def eval_fn(params, x, log_prob_fn, key):
+    dim = x.shape[-1] // 2
     log_prob = log_prob_fn.apply(params, x)
     marginal_log_lik = get_marginal_log_lik(log_prob_fn=lambda x: log_prob_fn.apply(params, x),
-                                            x_original=x[..., :2], key=key)
+                                            x_original=x[..., :dim], key=key)
     info = {"eval_marginal_log_lik": marginal_log_lik,
             "eval_log_lik": jnp.mean(log_prob),
             "eval_kl": jnp.mean(dw.log_prob_fn(x) - log_prob),
@@ -89,7 +90,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 2), vertices=(0, 1), *args, **kwarg
 
 
 def train(
-    n_epoch = int(128),
+    n_epoch = int(32),
     dim = 3,
     lr = 1e-3,
     n_nodes = 13,
@@ -98,7 +99,7 @@ def train(
     max_global_norm = 100,  # jnp.inf
     mlp_units = (16,),
     seed = 0,
-    flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
+    flow_type= "nice",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots: int = 3,
 ):
@@ -172,7 +173,7 @@ def train(
         if i % (n_epoch // n_plots) == 0 or i == (n_epoch - 1):
             plot()
             key, subkey = jax.random.split(key)
-            eval_info = eval(params, test_data, log_prob_fn, subkey)
+            eval_info = eval_fn(params, test_data, log_prob_fn, subkey)
             pbar.write(str(eval_info))
             logger.write(eval_info)
 
