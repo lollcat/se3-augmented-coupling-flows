@@ -25,10 +25,9 @@ def log_prob_fn(x: chex.Array):
 
 def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
     batch_size = 64
-    step_size = 0.5 # from Equivariant normalizing flows paper
     key = jax.random.PRNGKey(seed)
     samples = get_samples_simple(log_prob_fn, key, n_vertices, dim, n_samples // batch_size, batch_size,
-                                 step_size=step_size)
+                                 step_size=0.5, n_warmup_steps=1000)
     np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
 
 
@@ -72,11 +71,12 @@ if __name__ == '__main__':
     # plt.show()
 
     key = jax.random.PRNGKey(0)
-    samples = get_samples_simple(log_prob_fn, key, n_steps=1, batch_size=1000, step_size=0.5, n_warmup_steps=1000)
+    samples = get_samples_simple(log_prob_fn, key, n_steps=100, batch_size=128, step_size=0.5, n_warmup_steps=1000,
+                                 init_scale=0.1)
     plot_sample_hist(samples, ax=ax)
     plt.show()
 
-    # make_dataset(n_vertices=4)
+    make_dataset(n_vertices=4)
 
 
 

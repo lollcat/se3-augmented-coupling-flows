@@ -34,7 +34,9 @@ def log_prob_fn(x: chex.Array):
 def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
     batch_size = 128
     key = jax.random.PRNGKey(seed)
-    samples = get_samples_simple(key, n_vertices, dim, n_samples // batch_size, batch_size,
+    samples = get_samples_simple(log_prob_fn=log_prob_fn,
+                                 key=key, n_vertices=n_vertices, dim=dim, n_steps=n_samples // batch_size,
+                                 batch_size=batch_size,
                                  n_warmup_steps=20000,
                                  step_size=0.025)
     np.save(f"data/lj_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
@@ -60,7 +62,7 @@ if __name__ == '__main__':
 
     dim = 2
     batch_size = 512
-    x0 = jax.random.normal(jax.random.PRNGKey(0), (batch_size, 2))  #  jnp.zeros((batch_size, 2)) + 0.1
+    x0 = jax.random.normal(jax.random.PRNGKey(0), (batch_size, 2))   #  jnp.zeros((batch_size, 2)) + 0.1
     d = jnp.linspace(0.8, 10, batch_size)
     x1 = x0 + jnp.sqrt(d**2/2)[:, None]
 
@@ -82,4 +84,4 @@ if __name__ == '__main__':
     plot_sample_hist(samples, ax=ax)
     plt.show()
 
-    # make_dataset(n_vertices=4)
+    make_dataset(dim=3, n_vertices=13)

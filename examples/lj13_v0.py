@@ -37,12 +37,11 @@ def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
     # Make length divisible by batch size also.
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
-    dataset = np.load('target/data/dw_data_vertices4_dim2.npy')
+    dataset = np.load('target/data/lj_data_vertices13_dim3.npy')
     augmented_dataset = get_target_augmented_variables(dataset, key1)
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
 
     dataset = jax.random.permutation(key2, dataset, axis=0)
-
 
     train_index = int(dataset.shape[0] * train_test_split_ratio)
     train_set = dataset[:train_index]
@@ -89,14 +88,14 @@ def plot_sample_hist(samples, ax, dim=(0, 1), vertices=(0, 1), *args, **kwargs):
 
 
 def train():
-    n_epoch = int(32)
-    dim = 2
+    n_epoch = int(128)
+    dim = 3
     lr = 1e-3
-    n_nodes = 4
+    n_nodes = 13
     n_layers = 4
     batch_size = 32
     max_global_norm = 100  # jnp.inf
-    mlp_units = (32,)
+    mlp_units = (16,)
     key = jax.random.PRNGKey(0)
     flow_type = "vector_scale_shift"  # "nice", "proj", "vector_scale_shift"
     identity_init = True
@@ -157,6 +156,7 @@ def train():
     for i in pbar:
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)
+
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
             logger.write(info)
