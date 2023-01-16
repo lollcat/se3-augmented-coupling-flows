@@ -1,69 +1,17 @@
-import distrax
 import haiku as hk
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 from tqdm.autonotebook import tqdm
 from functools import partial
 import matplotlib.pyplot as plt
 
 from flow.distribution import make_equivariant_augmented_flow_dist
-from target import double_well as dw
+from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
+from utils.train_and_eval import load_dataset, eval_fn
 
-
-
-def get_target_augmented_variables(x_original, key):
-    x_augmented = jnp.mean(x_original, axis=(1, 2), keepdims=True) + \
-    jax.random.normal(key, shape=x_original.shape)
-    return x_augmented
-
-
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
-    augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
-    augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
-    augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=augmented_mean),
-                                         reinterpreted_batch_ndims=1)
-    augmented_var, log_p_a = augmented_dist._sample_n_and_log_prob(n=K, key=key)
-    x_original = jnp.stack([x_original]*K, axis=0)
-    log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, augmented_var), axis=-1))
-    return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
-
-
-
-def load_dataset(batch_size, train_test_split_ratio: float = 0.8, seed = 0):
-    """Load dataset and add augmented dataset N(0, 1). """
-    # Make length divisible by batch size also.
-    key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
-
-    dataset = np.load('target/data/lj_data_vertices13_dim3.npy')
-    augmented_dataset = get_target_augmented_variables(dataset, key1)
-    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
-
-    dataset = jax.random.permutation(key2, dataset, axis=0)
-
-    train_index = int(dataset.shape[0] * train_test_split_ratio)
-    train_set = dataset[:train_index]
-    test_set = dataset[train_index:]
-
-    train_set = train_set[:-(train_set.shape[0] % batch_size)]
-    test_set = test_set[:-(test_set.shape[0] % batch_size)]
-    return train_set, test_set
-
-
-@partial(jax.jit, static_argnums=(2,))
-def eval_fn(params, x, log_prob_fn, key):
-    dim = x.shape[-1] // 2
-    log_prob = log_prob_fn.apply(params, x)
-    marginal_log_lik = get_marginal_log_lik(log_prob_fn=lambda x: log_prob_fn.apply(params, x),
-                                            x_original=x[..., :dim], key=key)
-    info = {"eval_marginal_log_lik": marginal_log_lik,
-            "eval_log_lik": jnp.mean(log_prob),
-            "eval_kl": jnp.mean(dw.log_prob_fn(x) - log_prob),
-            }
-    return info
 
 
 def loss_fn(params, x, log_prob_fn):
@@ -130,7 +78,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size)
+    train_data, test_data = load_dataset('target/data/lj_data_vertices13_dim3.npy', batch_size)
 
     print(f"training data size of {train_data.shape[0]}")
 
@@ -173,7 +121,10 @@ def train(
         if i % (n_epoch // n_plots) == 0 or i == (n_epoch - 1):
             plot()
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params, test_data, log_prob_fn, subkey)
+            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
+                                flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
+                                target_log_prob=lj.log_prob_fn,
+                                key=subkey)
             pbar.write(str(eval_info))
             logger.write(eval_info)
 
