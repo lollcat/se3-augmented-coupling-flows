@@ -11,7 +11,7 @@ from flow.distribution import make_equivariant_augmented_flow_dist
 from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, get_target_augmented_variables
+from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
 
 
@@ -24,16 +24,14 @@ def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000
     idx = np.load("target/data/idx_LJ13.npy")
     train_set = data[idx[:train_set_size]]
     train_set = jnp.reshape(train_set, (-1, 13, 3))
-    augmented_dataset_train = get_target_augmented_variables(train_set, jax.random.PRNGKey(seed))
-    train_set = jnp.concatenate((train_set, augmented_dataset_train), axis=-1)
+    train_set = original_dataset_to_joint_dataset(train_set, jax.random.PRNGKey(seed))
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
 
     # Test set
     test_data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
     dataset = np.load(test_data_path)
     dataset = jnp.reshape(dataset, (-1, 13, 3))
-    augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
-    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
     test_set = dataset[:val_set_size]
     return train_set, test_set
 
@@ -77,6 +75,7 @@ def train(
     flow_type= "nice",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots: int = 3,
+    reload_aug_per_epoch: bool = True,
 ):
     key = jax.random.PRNGKey(seed)
 
@@ -134,6 +133,9 @@ def train(
     for i in pbar:
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)
+        if reload_aug_per_epoch:
+            key, subkey = jax.random.split(key)
+            train_data = original_dataset_to_joint_dataset(train_data[..., :dim], subkey)
 
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)

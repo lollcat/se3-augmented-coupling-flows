@@ -11,7 +11,7 @@ from flow.distribution import make_equivariant_augmented_flow_dist
 from target import double_well as dw
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, get_target_augmented_variables
+from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
 
 
@@ -23,8 +23,7 @@ def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 100
     data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
     dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
     dataset = jnp.reshape(dataset, (-1, 4, 2))
-    augmented_dataset = get_target_augmented_variables(dataset, jax.random.PRNGKey(seed))
-    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
 
     train_set = dataset[:train_set_size]
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
@@ -60,11 +59,11 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 
 def train(
-    n_epoch = int(512),
+    n_epoch = int(32),
     dim = 2,
     lr = 1e-3,
     n_nodes = 4,
-    n_layers = 4,
+    n_layers = 8,
     batch_size = 32,
     max_global_norm: int = 100.0,  # 100, jnp.inf
     mlp_units = (32,),
@@ -72,6 +71,7 @@ def train(
     flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots = 3,
+    reload_aug_per_epoch: bool = True,
 ):
 
     logger = ListLogger()
@@ -128,6 +128,9 @@ def train(
     for i in pbar:
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)
+        if reload_aug_per_epoch:
+            key, subkey = jax.random.split(key)
+            train_data = original_dataset_to_joint_dataset(train_data[..., :dim], subkey)
         for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
             params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
             logger.write(info)

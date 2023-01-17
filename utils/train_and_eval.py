@@ -13,8 +13,7 @@ def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
     dataset = np.load(path)
-    augmented_dataset = get_target_augmented_variables(dataset, key1)
-    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+    dataset = original_dataset_to_joint_dataset(dataset, key1)
 
     dataset = jax.random.permutation(key2, dataset, axis=0)
 
@@ -26,6 +25,11 @@ def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0
     test_set = test_set[:train_set.shape[0] - (test_set.shape[0] % batch_size)]
     return train_set, test_set
 
+
+def original_dataset_to_joint_dataset(dataset, key):
+    augmented_dataset = get_target_augmented_variables(dataset, key)
+    dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
+    return dataset
 
 def get_target_augmented_variables(x_original, key):
     B, N, D = x_original.shape
@@ -60,7 +64,7 @@ def get_augmented_log_prob(x_augmented):
     return log_p_a
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
+def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 20):
     x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, key, K)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, x_augmented), axis=-1))
