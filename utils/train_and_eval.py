@@ -6,6 +6,8 @@ import distrax
 from functools import partial
 
 
+AUG_DIST_GLOBAL_MEAN = True  # Augmented dist centred on mean of original coords
+
 def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0):
     """Load dataset and add augmented dataset N(0, 1). """
     # Make length divisible by batch size also.
@@ -27,23 +29,30 @@ def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0
 
 
 def get_target_augmented_variables(x_original, key):
-    x_augmented = jnp.mean(x_original, axis=(1, 2), keepdims=True) + \
-    jax.random.normal(key, shape=x_original.shape)
+    x_augmented = get_augmented_dist(x_original).sample(seed=key)
     return x_augmented
 
-def get_augmented_dist(x_original):
+
+def get_augmented_dist(x_original, scale: float = 1.0):
     chex.assert_rank(x_original, 3)
-    augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
+    if AUG_DIST_GLOBAL_MEAN:
+        augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
+    else:
+        augmented_mean = jnp.mean(x_original, axis=2, keepdims=True)
     augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
-    augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=augmented_mean),
-                                         reinterpreted_batch_ndims=1)
+    scale_vector = jnp.ones_like(augmented_mean) * scale
+    augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(
+        loc=augmented_mean, scale_diag=scale_vector),
+        reinterpreted_batch_ndims=1)
     return augmented_dist
+
 
 def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 10):
     augmented_dist = get_augmented_dist(x_original)
     augmented_var, log_p_a = augmented_dist._sample_n_and_log_prob(n=K, key=key)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, augmented_var), axis=-1))
+    chex.assert_equal_shape((log_p_a, log_q))
     return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 

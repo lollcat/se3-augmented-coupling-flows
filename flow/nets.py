@@ -2,12 +2,13 @@ import chex
 import jax
 import jax.numpy as jnp
 import haiku as hk
+from functools import partial
 
 from utils.nets import LayerNormMLP
-from utils.numerical import get_pairwise_distances
 
-_LAYER_NORM = True
-_EQUI_NORM = False
+# Typically need one of these to be True to stack lots of layers.
+_LAYER_NORM = False
+_EQUI_NORM = True
 
 
 class se_equivariant_net(hk.Module):
@@ -26,19 +27,19 @@ class se_equivariant_net(hk.Module):
             return jax.vmap(self.forward_single)(x)
     
     def forward_single(self, x):
-        mlp = LayerNormMLP if self.layer_norm else hk.nets.MLP
+        mlp = LayerNormMLP if self.layer_norm else partial(hk.nets.MLP, activation=jax.nn.swish)
         chex.assert_rank(x, 2)
     
         diff_combos = x - x[:, None]   # [n_nodes, n_nodes, dim]
-
-        # Need to add 1e-10 to prevent nan grads, but we overwrite this anyway.
-        norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
-        norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
+        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
+        norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
 
         net = hk.Sequential([mlp(self.mlp_units, activate_final=True),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if self.zero_init else
                              hk.Linear(1)])
         m = jnp.squeeze(net(norms[..., None]), axis=-1)
+        m = m.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
+
         if not self.equi_norm:
             equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos, m)
         else:
@@ -67,15 +68,14 @@ class se_invariant_net(hk.Module):
         mlp = LayerNormMLP if self.layer_norm else hk.nets.MLP
 
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-
-        # Need to add 1e-10 to prevent nan grads, but we overwrite this anyway.
-        norms = jnp.linalg.norm(diff_combos + 1e-10, ord=2, axis=-1)
-        norms = norms * (jnp.ones_like(norms) - jnp.eye(norms.shape[0]))
+        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
+        norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
 
         net = hk.Sequential([mlp(self.mlp_units, activate_final=True),
                              hk.Linear(self.n_vals, w_init=jnp.zeros, b_init=jnp.zeros) if self.zero_init else
                              hk.Linear(self.n_vals)])
         net_out = net(norms[..., None])
+        net_out = net_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
         return jnp.sum(net_out, axis=-2)
 
 
