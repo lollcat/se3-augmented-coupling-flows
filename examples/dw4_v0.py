@@ -66,7 +66,7 @@ def train(
     n_nodes = 4,
     n_layers = 4,
     batch_size = 32,
-    max_global_norm = jnp.inf,  # 100, jnp.inf
+    max_global_norm: int = 100.0,  # 100, jnp.inf
     mlp_units = (32,),
     key = jax.random.PRNGKey(0),
     flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
@@ -95,7 +95,7 @@ def train(
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
 
-    optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
+    optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adamw(lr))
     opt_state = optimizer.init(params)
 
     train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=1028, test_set_size=512)
@@ -119,6 +119,7 @@ def train(
         plt.show()
 
     plot()
+
     # key, subkey = jax.random.split(key)
     # eval_info = eval(params, test_data, log_prob_fn, subkey)
     # logger.write(eval_info)

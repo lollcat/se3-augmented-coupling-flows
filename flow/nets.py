@@ -7,8 +7,8 @@ from functools import partial
 from utils.nets import LayerNormMLP
 
 # Typically need one of these to be True to stack lots of layers.
-_LAYER_NORM = False
-_EQUI_NORM = True
+_LAYER_NORM = True
+_EQUI_NORM = False
 
 
 class se_equivariant_net(hk.Module):
@@ -27,7 +27,7 @@ class se_equivariant_net(hk.Module):
             return jax.vmap(self.forward_single)(x)
     
     def forward_single(self, x):
-        mlp = LayerNormMLP if self.layer_norm else partial(hk.nets.MLP, activation=jax.nn.swish)
+        mlp = LayerNormMLP if self.layer_norm else partial(hk.nets.MLP, activation=jax.nn.elu)
         chex.assert_rank(x, 2)
     
         diff_combos = x - x[:, None]   # [n_nodes, n_nodes, dim]
