@@ -54,12 +54,11 @@ dim = n_dims * n_particles  # system dimensionality
 
 
 
-
 if __name__ == "__main__":
     # Retrieve QM9 dataloaders
     datasets, charge_scale = dataset.retrieve_dataloaders(args.batch_size, args.num_workers,
                                                           filter_n_atoms=n_particles)
-    pass
+    print("data has been downloaded for QM9 positional")
 
 
 

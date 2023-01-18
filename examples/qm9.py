@@ -77,6 +77,8 @@ def train(
     identity_init = True,
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
+    train_data_n_points = 1000,  # set to None to use full set
+    test_data_n_poins = 1000,  # set to None to use full set
 ):
     key = jax.random.PRNGKey(seed)
 
@@ -105,7 +107,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size, train_data_n_points=1000, test_data_n_points=1000)
+    train_data, test_data = load_dataset(batch_size, train_data_n_points=train_data_n_points, test_data_n_points=test_data_n_poins)
 
     print(f"training data size of {train_data.shape[0]}")
 
