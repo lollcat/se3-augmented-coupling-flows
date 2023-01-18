@@ -4,7 +4,6 @@ import numpy as np
 import jax.numpy as jnp
 import optax
 from tqdm.autonotebook import tqdm
-from functools import partial
 import matplotlib.pyplot as plt
 
 from flow.distribution import make_equivariant_augmented_flow_dist
@@ -73,7 +72,7 @@ def train(
     n_layers: int = 4,
     batch_size: int = 4,
     max_global_norm: float = jnp.inf,  # jnp.inf
-    mlp_units = (8,),
+    mlp_units = (2,),
     seed: int = 0,
     flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
@@ -163,8 +162,8 @@ def train(
             key, subkey = jax.random.split(key)
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
-                                target_log_prob=lambda x: jnp.ones(x.shape[:-2])*jnp.nan,
-                                key=subkey)
+                                key=subkey,
+                                batch_size=max(100, batch_size))
             pbar.write(str(eval_info))
             logger.write(eval_info)
 

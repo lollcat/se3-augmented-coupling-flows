@@ -8,7 +8,7 @@ from utils.nets import LayerNormMLP
 
 # Typically need one of these to be True to stack lots of layers.
 _LAYER_NORM = True
-_EQUI_NORM = False
+_EQUI_NORM = True
 
 
 class se_equivariant_net(hk.Module):

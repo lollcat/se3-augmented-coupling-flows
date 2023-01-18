@@ -70,7 +70,7 @@ def train(
     n_layers = 4,
     batch_size = 32,
     max_global_norm = 100,  # jnp.inf
-    mlp_units = (16,),
+    mlp_units = (3, 16),
     seed = 0,
     flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
@@ -152,7 +152,8 @@ def train(
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
                                 target_log_prob=lj.log_prob_fn,
-                                key=subkey)
+                                key=subkey,
+                                batch_size=max(100, batch_size))
             pbar.write(str(eval_info))
             logger.write(eval_info)
 

@@ -72,24 +72,46 @@ def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 20):
     return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5))
-def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob):
+@partial(jax.jit, static_argnums=(3, 4, 5, 6))
+def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob = None, batch_size=None):
+    if batch_size is None:
+        batch_size = x.shape[0]
+    else:
+        batch_size = min(batch_size, x.shape[0])
+        x = x[:x.shape[0] - x.shape[0] % batch_size]
+
+
     dim = x.shape[-1] // 2
     key1, key2 = jax.random.split(key)
 
-    log_prob = flow_log_prob_fn.apply(params, x)
-    marginal_log_lik = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x),
-                                            x_original=x[..., :dim], key=key1)
+    def scan_fn(carry, xs):
+        x_batch, key = xs
+        log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
+        marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
+                                                      x_original=x_batch[..., :dim], key=key)
 
-    # Calculate ESS
-    x_flow, log_prob_flow = flow_sample_and_log_prob_fn.apply(params, key2, (x.shape[0]))
-    x_flow_original, x_flow_aug = jnp.split(x_flow, axis=-1, indices_or_sections=2)
-    log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_aug) - log_prob_flow
-    ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
+        return None, (log_prob_batch, marginal_log_lik_batch)
+
+    x_batched = jnp.reshape(x, (-1, batch_size, *x.shape[1:]))
+    _, (log_probs, marginal_log_liks) = jax.lax.scan(
+        scan_fn, None, (x_batched, jax.random.split(key1, x_batched.shape[0])))
+
+    marginal_log_lik = jnp.mean(marginal_log_liks)
+    log_prob = log_probs.flatten()
 
     info = {"eval_marginal_log_lik": marginal_log_lik,
             "eval_log_lik": jnp.mean(log_prob),
-            "eval_kl": jnp.mean(target_log_prob(x) - log_prob),
-            "ess": ess
             }
+
+
+    if target_log_prob is not None:
+        # Calculate ESS
+        x_flow, log_prob_flow = flow_sample_and_log_prob_fn.apply(params, key2, (batch_size, ))
+        x_flow_original, x_flow_aug = jnp.split(x_flow, axis=-1, indices_or_sections=2)
+        log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_aug) - log_prob_flow
+        ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
+        info.update(
+            {"eval_kl": jnp.mean(target_log_prob(x) - log_prob),
+             "ess": ess}
+        )
     return info

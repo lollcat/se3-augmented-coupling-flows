@@ -5,11 +5,11 @@ import jax.numpy as jnp
 from flow.nets import se_invariant_net, se_equivariant_net
 
 
-def make_conditioner(ref_equivariant_fn, shift_equivariant_fn, invariant_fn):
+def make_conditioner(ref_equivariant_fn, shift_equivariant_fn, invariant_fn, activation_fn = jax.nn.softplus):
     def conditioner(x):
         log_scale_param = invariant_fn(x)
         log_scale_param = jnp.broadcast_to(log_scale_param, x.shape)
-        scale = jax.nn.softplus(log_scale_param)
+        scale = activation_fn(log_scale_param)
         reference_point = ref_equivariant_fn(x)
         equivariant_shift = shift_equivariant_fn(x) - x
         shift = - reference_point * (scale - 1) + equivariant_shift
