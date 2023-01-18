@@ -1,5 +1,6 @@
 import argparse
 from qm9 import dataset_ as dataset
+import numpy as np
 
 
 parser = argparse.ArgumentParser(description='SE3')
@@ -59,6 +60,21 @@ if __name__ == "__main__":
     datasets, charge_scale = dataset.retrieve_dataloaders(args.batch_size, args.num_workers,
                                                           filter_n_atoms=n_particles)
     print("data has been downloaded for QM9 positional")
+
+
+    train = datasets['train'].data['positions']
+    np.save('target/data/qm9_train.npy', train)
+
+    test = datasets['test'].data['positions']
+    np.save('target/data/qm9_test.npy', train)
+
+    valid = datasets['valid'].data['positions']
+    np.save('target/data/qm9_valid.npy', valid)
+
+    print("data saved to target/data")
+
+
+
 
 
 

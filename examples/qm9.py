@@ -18,10 +18,10 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
     # First need to run `qm9.download_data`
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
-    data_dir = "qm9/temp/qm9/"
-    train_data = np.load(data_dir + "train.npz")['positions']
-    test_data = np.load(data_dir + "test.npz")['positions']
-    valid_data = np.load(data_dir + "valid.npz")['positions']
+    data_dir = "target/data/qm9_"
+    train_data = np.load(data_dir + "train.npy")
+    test_data = np.load(data_dir + "test.npy")
+    valid_data = np.load(data_dir + "valid.npy")
 
     if train_data_n_points is not None:
         train_data = train_data[:train_data_n_points]
@@ -64,7 +64,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
 
 
 def train(
-    n_epoch = int(32),
+    n_epoch = int(10),
     dim: int = 3,
     lr: float = 1e-4,
     n_nodes: int = 29,
