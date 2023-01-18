@@ -45,7 +45,7 @@ def loss_fn(params, x, log_prob_fn):
 
 
 
-@partial(jax.jit, static_argnums=(3, 4))
+# @partial(jax.jit, static_argnums=(3, 4))
 def step(params, x, opt_state, log_prob_fn, optimizer):
     grad, info = jax.grad(loss_fn, has_aux=True)(params, x, log_prob_fn)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
@@ -54,8 +54,10 @@ def step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
-    differences = jax.vmap(get_pairwise_distances)(samples[..., dim])
+def plot_sample_hist(samples, ax, dim=(0, 1, 3), n_vertices = 5, *args, **kwargs):
+    """n_vertices argument allows us to look at pairwise distances for subset of vertices,
+    to prevent plotting taking too long"""
+    differences = jax.vmap(get_pairwise_distances)(samples[:, :n_vertices, dim])
     d = differences.flatten()
     d = d[d != 0.0]
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
@@ -111,15 +113,21 @@ def train(
 
     print(f"training data size of {train_data.shape[0]}")
 
+    def scan_fn(carry, xs):
+        params, opt_state = carry
+        x = xs
+        params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
+        return (params, opt_state), info
+
     def plot(n_samples=512):
         fig, axs = plt.subplots(1, 2, figsize=(15, 6))
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
 
         plot_sample_hist(samples, axs[0], dim=(0, 1, 2), label="flow samples")
-        plot_sample_hist(train_data, axs[0], dim=(0, 1, 2), label="ground truth samples")
+        plot_sample_hist(train_data[:n_samples], axs[0], dim=(0, 1, 2), label="ground truth samples")
         plot_sample_hist(samples, axs[1], dim=(3, 4, 5), label="flow samples")
-        plot_sample_hist(train_data, axs[1], dim=(3, 4, 5),
+        plot_sample_hist(train_data[:n_samples], axs[1], dim=(3, 4, 5),
                          label="ground truth samples")
         axs[0].set_title(f"norms between original coordinates")
         axs[1].set_title(f"norms between augmented coordinates")
@@ -140,13 +148,14 @@ def train(
             key, subkey = jax.random.split(key)
             train_data = original_dataset_to_joint_dataset(train_data[..., :dim], subkey)
 
-        for x in jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:])):
-            params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
+        batched_data = jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:]))
+        (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=2)
+
+        for batch_index in range(batched_data.shape[0]):
+            info = jax.tree_map(lambda x: x[batch_index], infos)
             logger.write(info)
             if jnp.isnan(info["grad_norm"]):
                 print("nan grad")
-                # raise Exception("nan grad encountered")
-
 
 
         if i % (n_epoch // n_plots) == 0 or i == (n_epoch - 1):
