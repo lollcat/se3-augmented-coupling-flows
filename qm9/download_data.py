@@ -66,7 +66,7 @@ if __name__ == "__main__":
     np.save('target/data/qm9_train.npy', train)
 
     test = datasets['test'].data['positions']
-    np.save('target/data/qm9_test.npy', train)
+    np.save('target/data/qm9_test.npy', test)
 
     valid = datasets['valid'].data['positions']
     np.save('target/data/qm9_valid.npy', valid)
