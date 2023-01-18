@@ -8,32 +8,32 @@ from functools import partial
 import matplotlib.pyplot as plt
 
 from flow.distribution import make_equivariant_augmented_flow_dist
-from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
 
 
-def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
-    # dataset from https://github.com/vgsatorras/en_flows
-    # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
+def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
+    # First need to run `qm9.download_data`
+    key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
-    # Train data
-    data = np.load("target/data/holdout_data_LJ13.npy")
-    idx = np.load("target/data/idx_LJ13.npy")
-    train_set = data[idx[:train_set_size]]
-    train_set = jnp.reshape(train_set, (-1, 13, 3))
-    train_set = original_dataset_to_joint_dataset(train_set, jax.random.PRNGKey(seed))
-    train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
+    data_dir = "qm9/temp/qm9/"
+    train_data = np.load(data_dir + "train.npz")['positions']
+    test_data = np.load(data_dir + "test.npz")['positions']
+    valid_data = np.load(data_dir + "valid.npz")['positions']
 
-    # Test set
-    test_data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
-    dataset = np.load(test_data_path)
-    dataset = jnp.reshape(dataset, (-1, 13, 3))
-    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
-    test_set = dataset[:val_set_size]
-    return train_set, test_set
+    if train_data_n_points is not None:
+        train_data = train_data[:train_data_n_points]
+    if test_data_n_points is not None:
+        test_data = test_data[:test_data_n_points]
+
+    train_data = train_data[:train_data.shape[0] - (train_data.shape[0] % batch_size)]
+
+    train_data = original_dataset_to_joint_dataset(train_data, key1)
+    test_data = original_dataset_to_joint_dataset(test_data, key2)
+
+    return train_data, test_data
 
 
 
@@ -62,16 +62,17 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
 
 
 
+
 def train(
     n_epoch = int(32),
-    dim = 3,
-    lr = 1e-3,
-    n_nodes = 13,
-    n_layers = 4,
-    batch_size = 32,
-    max_global_norm = 100,  # jnp.inf
-    mlp_units = (16,),
-    seed = 0,
+    dim: int = 3,
+    lr: float = 1e-4,
+    n_nodes: int = 29,
+    n_layers: int = 4,
+    batch_size: int = 4,
+    max_global_norm: float = jnp.inf,  # jnp.inf
+    mlp_units = (8,),
+    seed: int = 0,
     flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots: int = 3,
@@ -104,7 +105,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size)
+    train_data, test_data = load_dataset(batch_size, train_data_n_points=1000, test_data_n_points=1000)
 
     print(f"training data size of {train_data.shape[0]}")
 
@@ -151,7 +152,7 @@ def train(
             key, subkey = jax.random.split(key)
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
-                                target_log_prob=lj.log_prob_fn,
+                                target_log_prob=lambda x: jnp.ones(x.shape[:-2])*jnp.nan,
                                 key=subkey)
             pbar.write(str(eval_info))
             logger.write(eval_info)
@@ -172,8 +173,5 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
     logger, params, log_prob_fn, sample_and_log_prob_fn = train()
-
-
-
 
 

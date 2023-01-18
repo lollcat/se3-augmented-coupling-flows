@@ -24,7 +24,7 @@ Currently implemented in 2D.
 
 
 ## TODO
- - Improve flow expresiveness
+ - Improve flow expresiveness: more augmented coordinates, transformer in EGNN
  - For NICE flow we will need some scaling transforms. This could be done with a scaling layer applied to the base distribution. 
  - Test jacobian determinant (test normalizing constant using IS?)
  - Add equivariant ActNorm type layers
