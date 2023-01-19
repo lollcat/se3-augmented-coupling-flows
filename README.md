@@ -1,4 +1,7 @@
 # Equivariant Augmented Normalizing Flows
+Currently TODO: Big update to networks to make them more expressive (following equivariant flow paper more closely)
+
+
 Exploring whether the idea works.
 See `example/dw4_v0.py` for a training run on the double well problem with 4 particles - this can be run locally in under
 a minute to get some prelim results. 

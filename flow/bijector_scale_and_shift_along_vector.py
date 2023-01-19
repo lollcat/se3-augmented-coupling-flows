@@ -24,11 +24,11 @@ def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, identity_ini
                                         zero_init=False,
                                         mlp_units=mlp_units)
 
-    shift_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_ref",
+    shift_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_shift",
                                             zero_init=identity_init,
                                             mlp_units=mlp_units)
 
-    invariant_fn = se_invariant_net(name=f"layer_{layer_number}",
+    invariant_fn = se_invariant_net(name=f"layer_{layer_number}_invariant_fn",
                                     n_vals=1,
                                     zero_init=identity_init,
                                     mlp_units=mlp_units)

@@ -116,7 +116,6 @@ def bijector_test(bijector_forward, bijector_backward,
     test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey)
 
 
-
     # Forward reverse test but with a batch.
     batch_size = 11
     x_and_a = jnp.zeros((batch_size, n_nodes, dim*2))
@@ -126,11 +125,13 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_shape(log_det_fwd, (batch_size,))
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
+
     # Check single sample and batch behavior is the same
-    x_and_a_new_0, log_det_fwd_0 = bijector_forward.apply(params, x_and_a[0])
-    x_and_a_old_0, log_det_rev_0 = bijector_backward.apply(params, x_and_a_new[0])
-    chex.assert_trees_all_close(x_and_a_new[0], x_and_a_new_0, rtol=rtol)
-    chex.assert_trees_all_close(x_and_a_old[0], x_and_a_old_0, rtol=rtol)
+    i = 4
+    x_and_a_new_0, log_det_fwd_0 = bijector_forward.apply(params, x_and_a[i])
+    x_and_a_old_0, log_det_rev_0 = bijector_backward.apply(params, x_and_a_new[i])
+    chex.assert_trees_all_close(x_and_a_new[i], x_and_a_new_0, rtol=rtol)
+    chex.assert_trees_all_close(x_and_a_old[i], x_and_a_old_0, rtol=rtol)
 
     # Test we can take grad log prob
     grad = jax.grad(lambda params, x_and_a: bijector_forward.apply(params, x_and_a)[1])(params, x_and_a[0])

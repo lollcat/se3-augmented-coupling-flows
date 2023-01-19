@@ -1,14 +1,14 @@
 import chex
 import matplotlib.pyplot as plt
 import jax
-import jax.numpy as jnp
 import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant, bijector_test
 from flow.distribution import make_equivariant_augmented_flow_dist
 
 
-_N_FLOW_LAYERS = 8
+_N_FLOW_LAYERS = 4
+_N_NODES = 16
 _FLOW_TYPE = "vector_scale_shift"  # "nice", "proj", 'vector_scale_shift'
 
 
@@ -17,7 +17,7 @@ def test_distribution():
     translation and rotation."""
 
     dim = 2
-    n_nodes = 20
+    n_nodes = _N_NODES
     n_layers = _N_FLOW_LAYERS
     batch_size = 5
     key = jax.random.PRNGKey(0)
@@ -63,7 +63,7 @@ def test_distribution():
 
 def test_flow():
     dim = 2
-    n_nodes = 20
+    n_nodes = _N_NODES
     n_layers = _N_FLOW_LAYERS
     key = jax.random.PRNGKey(0)
     flow_type = _FLOW_TYPE
@@ -95,5 +95,7 @@ if __name__ == '__main__':
     if USE_64_BIT:
         from jax.config import config
         config.update("jax_enable_x64", True)
+
     test_flow()
     test_distribution()
+

@@ -4,6 +4,7 @@ import distrax
 import chex
 import jax
 import jax.numpy as jnp
+import haiku as hk
 
 from flow.nets import se_equivariant_net, se_invariant_net
 
@@ -12,6 +13,7 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
     """Perform affine transformation in the space define by the `origin` and `change_of_basis_matrix`, and then
     go back into the original space."""
     chex.assert_rank(point, 1)
+    chex.assert_equal_shape((point, scale, shift))
     point_in_new_space = jnp.linalg.inv(change_of_basis_matrix) @ (point - origin)
     # print(f"\n\n************************\n\n")
     # print(f"change_of_basis_matrix: {change_of_basis_matrix}")
@@ -103,36 +105,46 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(equivariant_fn,
-                     invariant_fn,
-                     identity_init: bool = True,
-                     mlp_units = (5,5)):
-
-    def conditioner(x):
+def make_conditioner(origin_equivariant_fn,
+                     y_equivariant_fn,
+                     x_equivariant_fn,
+                     invariant_fn):
+    def _conditioner(x):
+        chex.assert_rank(x, 2)
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
-        origin = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
-        y_basis_point = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
-        x_basis_point = equivariant_fn(x, zero_init=False, mlp_units=mlp_units)
+        origin = origin_equivariant_fn(x)
+        y_basis_point = y_equivariant_fn(x)
+        x_basis_point = x_equivariant_fn(x)
 
         y_basis_vector = y_basis_point - origin
-        x_basis_vector = x_basis_point - origin
-        approx_norm = jnp.mean(jnp.linalg.norm(y_basis_vector, axis=-1))
-        y_basis_vector = y_basis_vector / approx_norm
-        x_basis_vector = x_basis_vector / approx_norm
+        # x_basis_vector = x_basis_point - origin
+        theta = jnp.pi*0.4
+        rotation_matrix = jnp.array(
+            [[jnp.cos(theta), -jnp.sin(theta)],
+             [jnp.sin(theta), jnp.cos(theta)]]
+        )
+        x_basis_vector = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, y_basis_vector)
+
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
-        # Get scale and shift, initialise to be small.
-        log_scale = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units) * (1 if identity_init else 0.001)
-        shift = invariant_fn(x, dim, zero_init=identity_init, mlp_units=mlp_units)
+        log_scale, shift = jnp.split(invariant_fn(x), axis=-1, indices_or_sections=2)
+        log_scale = log_scale
 
         return change_of_basis_matrix, origin, log_scale, shift
+
+    def conditioner(x):
+        if len(x.shape) == 2:
+            return _conditioner(x)
+        else:
+            assert len(x.shape) == 3
+            return jax.vmap(_conditioner)(x)
 
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init: bool = True, mlp_units=(5,5) ):
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, identity_init: bool = True, mlp_units=(5, 5)):
     assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):
@@ -140,7 +152,30 @@ def make_se_equivariant_split_coupling_with_projection(dim, swap, identity_init:
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
 
-    conditioner = make_conditioner(identity_init=identity_init, mlp_units=mlp_units)
+    origin_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_origin",
+                                        zero_init=False,
+                                        mlp_units=mlp_units)
+
+    y_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_y_axis",
+                                            zero_init=False,
+                                            mlp_units=mlp_units)
+
+    x_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_x_axis",
+                                            zero_init=False,
+                                            mlp_units=mlp_units)
+
+    invariant_fn = se_invariant_net(name=f"layer_{layer_number}",
+                                    n_vals=dim*2,
+                                    zero_init=identity_init,
+                                    mlp_units=mlp_units)
+
+
+    conditioner = make_conditioner(
+        origin_equivariant_fn,
+        y_equivariant_fn,
+        x_equivariant_fn,
+        invariant_fn)
+
     return distrax.SplitCoupling(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]

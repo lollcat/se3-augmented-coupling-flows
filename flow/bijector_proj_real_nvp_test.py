@@ -12,7 +12,7 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_se_equivariant_split_coupling_with_projection(dim, swap=swap, identity_init=False)
+            bijector = make_se_equivariant_split_coupling_with_projection(i, dim, swap, False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow

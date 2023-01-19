@@ -1,2 +1,6 @@
 *__pychache*
 */.ipynb_checkpoints
+/qm9/temp/
+/target/data/qm9_valid.npy
+/target/data/qm9_train.npy
+/target/data/qm9_test.npy

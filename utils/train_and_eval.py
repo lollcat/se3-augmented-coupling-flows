@@ -64,7 +64,7 @@ def get_augmented_log_prob(x_augmented):
     return log_p_a
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 20):
+def get_marginal_log_lik(log_prob_fn, x_original, key, K: int):
     x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, key, K)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, x_augmented), axis=-1))
@@ -72,8 +72,9 @@ def get_marginal_log_lik(log_prob_fn, x_original, key, K: int = 20):
     return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5, 6))
-def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob = None, batch_size=None):
+@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
+def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob = None, batch_size=None,
+            K: int = 20):
     if batch_size is None:
         batch_size = x.shape[0]
     else:
@@ -88,7 +89,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
         x_batch, key = xs
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
         marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
-                                                      x_original=x_batch[..., :dim], key=key)
+                                                      x_original=x_batch[..., :dim], key=key, K=K)
 
         return None, (log_prob_batch, marginal_log_lik_batch)
 

@@ -59,18 +59,18 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 
 def train(
-    n_epoch = int(64),
+    n_epoch = int(32),
     dim = 2,
-    lr = 1e-3,
+    lr = 5e-4,
     n_nodes = 4,
-    n_layers = 8,
-    batch_size = 32,
+    n_layers = 4,
+    batch_size = 16,
     max_global_norm: int = 100.0,  # 100, jnp.inf
-    mlp_units = (2, 16),
+    mlp_units = (4,4),
     key = jax.random.PRNGKey(0),
     flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
-    n_plots = 3,
+    n_plots = 4,
     reload_aug_per_epoch: bool = True,
 ):
 
@@ -98,7 +98,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adamw(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=1028, test_set_size=512)
+    train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=1028, test_set_size=128)
 
     print(f"training data size of {train_data.shape[0]}")
 
@@ -146,7 +146,8 @@ def train(
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
                                 target_log_prob=dw.log_prob_fn,
-                                key=subkey, batch_size=max(100, batch_size))
+                                key=subkey, batch_size=max(16, batch_size),
+                                K=2)
             pbar.write(str(eval_info))
             logger.write(eval_info)
 
