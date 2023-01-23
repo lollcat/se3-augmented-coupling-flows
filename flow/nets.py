@@ -18,7 +18,7 @@ _EGNN_N_LAYERS = 2
 
 class EGNN(hk.Module):
     # Following notation of E(n) normalizing flows paper: https://arxiv.org/pdf/2105.09016.pdf
-    def __init__(self, name, mlp_units, zero_init, layer_norm: bool, equi_norm: bool):
+    def __init__(self, name, mlp_units, zero_init, layer_norm: bool, equi_norm: bool, h_embedding_dim):
         super().__init__(name=name + "equivariant")
         mlp = LayerNormMLP if layer_norm else partial(hk.nets.MLP, activation=jax.nn.elu)
         self.phi_e = mlp(mlp_units)
@@ -28,11 +28,12 @@ class EGNN(hk.Module):
                              hk.Linear(1)])
         self.equi_norm = equi_norm
         self.phi_h = mlp(mlp_units)
+        self.h_embedding_dim = h_embedding_dim
 
     def __call__(self, x, h = None):
         if h is None:
-            h_embedding_dim = 3
-            h = jnp.ones((*x.shape[:-1], h_embedding_dim))
+
+            h = jnp.ones((*x.shape[:-1], self.h_embedding_dim))
         if len(x.shape) == 2:
             return self.forward_single(x, h)
         else:
@@ -77,9 +78,13 @@ class EGNN(hk.Module):
 
 
 class se_equivariant_net(hk.Module):
-    def __init__(self, name, mlp_units, zero_init, n_layers=_EGNN_N_LAYERS, layer_norm: bool = _LAYER_NORM, equi_norm: bool = _EQUI_NORM):
+    def __init__(self, name, mlp_units, zero_init, n_layers=_EGNN_N_LAYERS, layer_norm: bool = _LAYER_NORM,
+                 equi_norm: bool = _EQUI_NORM, h_embedding_dim=3, h_out=False, h_out_dim = 1):
         super().__init__(name=name + "equivariant")
-        self.egnn_layers = [EGNN(name + f"_{i}", mlp_units, zero_init, layer_norm, equi_norm) for i in range(n_layers)]
+        self.egnn_layers = [EGNN(name + f"_{i}", mlp_units, zero_init, layer_norm, equi_norm,
+                                 h_embedding_dim) for i in range(n_layers)]
+        self.h_out = h_out
+        self.h_out_dim = h_out_dim
 
 
     def __call__(self, x):
@@ -92,37 +97,13 @@ class se_equivariant_net(hk.Module):
         x, h = self.egnn_layers[0](x)
         for layer in self.egnn_layers[1:]:
             x, h = layer(x, h)
-        return x
-
-
-
-class se_invariant_net(hk.Module):
-    def __init__(self, name, n_vals, mlp_units, zero_init, n_layers=_EGNN_N_LAYERS, layer_norm: bool = _LAYER_NORM, equi_norm: bool = _EQUI_NORM):
-        super().__init__(name=name + "invariant_net")
-        self.egnn_layers = [EGNN(name + f"_{i}", mlp_units, zero_init, layer_norm, equi_norm) for i in range(n_layers)]
-        self.final_mlp = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
-                             hk.Linear(n_vals, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
-                             hk.Linear(n_vals)])
-
-    def __call__(self, x):
-        if len(x.shape) == 2:
-            return self.forward_single(x)
+        if self.h_out:
+            h_out = hk.Linear(self.h_out_dim)(h)
+            return x, h_out
         else:
-            return hk.vmap(self.forward_single, split_rng=False)(x)
+            return x
 
-    def forward_single(self, x):
-        chex.assert_rank(x, 2)
-        x, h = self.egnn_layers[0](x)
-        for layer in self.egnn_layers[1:]:
-            x, h = layer(x, h)
 
-        diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
-
-        net_out = self.final_mlp(norms[..., None])
-        net_out = net_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
-        return jnp.mean(net_out, axis=-2)
 
 
 if __name__ == '__main__':
@@ -134,9 +115,6 @@ if __name__ == '__main__':
 
     key = jax.random.PRNGKey(0)
     equivariant_fn_hk = hk.without_apply_rng(hk.transform(lambda x: se_equivariant_net(name, mlp_units, zero_init)(x)))
-    invariant_fn_hk = hk.without_apply_rng(hk.transform(lambda x: se_invariant_net(name, n_vals=2,
-                                                                                   mlp_units=mlp_units,
-                                                                                   zero_init=zero_init)(x)))
 
     x = jnp.zeros((5, 4, 2))
     key, subkey = jax.random.split(key)

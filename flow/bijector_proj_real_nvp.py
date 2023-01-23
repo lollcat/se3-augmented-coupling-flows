@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from flow.nets import se_equivariant_net, se_invariant_net
+from flow.nets import se_equivariant_net
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
