@@ -59,7 +59,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 
 def train(
-    n_epoch = int(32),
+    n_epoch = int(64),
     dim = 2,
     lr = 5e-4,
     n_nodes = 4,

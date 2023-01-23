@@ -8,9 +8,9 @@ from utils.nets import LayerNormMLP
 
 
 # Typically need one of these to be True (esp layer norm) to stack lots of layers.
-_LAYER_NORM = True
-_EQUI_NORM = True
-_EGNN_N_LAYERS = 2
+_LAYER_NORM = False
+_EQUI_NORM = False
+_EGNN_N_LAYERS = 3
 
 
 # TODO: Can use h for invariant features. Can clump h and x for scale and shift into a single NN architecture.
