@@ -73,6 +73,7 @@ def train(
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
     n_egnn_layers: int = 1,
+    h_embedding_dim: int = 2,
 ):
 
     logger = ListLogger()
@@ -84,7 +85,8 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units,
-            n_egnn_layers=n_egnn_layers
+            n_egnn_layers=n_egnn_layers,
+            h_embedding_dim=h_embedding_dim
         )
         return distribution.log_prob(x)
 
@@ -93,7 +95,8 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units,
-            n_egnn_layers=n_egnn_layers
+            n_egnn_layers=n_egnn_layers,
+            h_embedding_dim=h_embedding_dim
         )
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 

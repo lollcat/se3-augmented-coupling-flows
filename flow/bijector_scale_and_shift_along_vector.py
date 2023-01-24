@@ -17,7 +17,7 @@ def make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn, activat
 
 
 def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, identity_init: bool = True, mlp_units=(5, 5),
-                                           n_egnn_layers=3):
+                                           n_egnn_layers=3, h_embedding_dim=3):
     """Flow is x + (x - r)*scale + shift where scale is an invariant scalar, and r is equivariant reference point"""
 
     ref_and_scale_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_ref",
@@ -25,13 +25,16 @@ def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, identity_ini
                                         identity_init_x=False,
                                         mlp_units=mlp_units,
                                         h_out=identity_init, h_out_dim=1,
-                                        n_layers=n_egnn_layers)
+                                        n_layers=n_egnn_layers,
+                                        h_embedding_dim=h_embedding_dim)
 
     shift_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_shift",
                                             identity_init_x=identity_init,
                                             mlp_units=mlp_units,
                                             h_out=False,
-                                            n_layers=n_egnn_layers)
+                                            n_layers=n_egnn_layers,
+                                            h_embedding_dim=h_embedding_dim
+                                            )
 
     def bijector_fn(params):
         scale, shift = params
