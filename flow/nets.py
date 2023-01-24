@@ -10,14 +10,13 @@ import haiku as hk
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name, mlp_units, identity_init_x, identity_init_h):
+    def __init__(self, name, mlp_units, identity_init_x):
         """
 
         Args:
             name: Layer name
             mlp_units: MLP units for phi_e, phi_x and phi_h.
             identity_init_x: Whether to initialise the transform of x to the identity function.
-            identity_init_h: Whether to initialise the transform of h to the identity function.
         """
         super().__init__(name=name + "equivariant")
         self.phi_e = hk.nets.MLP(mlp_units)
@@ -26,7 +25,6 @@ class EGCL(hk.Module):
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True)
-        self.identity_init_h = identity_init_h
 
     def __call__(self, x, h):
         if len(x.shape) == 2:
@@ -64,7 +62,7 @@ class EGCL(hk.Module):
         phi_h = hk.Sequential([self.phi_h_mlp,
                                hk.Linear(h.shape[-1], w_init=jnp.zeros, b_init=jnp.zeros) if self.identity_init_h
                                else hk.Linear(h.shape[-1])])
-        h_new = phi_h(jnp.concatenate([m_i, h], axis=-1)) + h
+        h_new = phi_h(jnp.concatenate([m_i, h], axis=-1))
 
         return x + equivariant_shift, h_new
 
@@ -76,9 +74,8 @@ class se_equivariant_net(hk.Module):
                  n_layers=3,
                  h_embedding_dim=3, h_out=False, h_out_dim: int = 1):
         super().__init__(name=name + "equivariant")
-        identity_init_h = False
         self.h_embedding_dim = h_embedding_dim
-        self.egnn_layer_fn = lambda x, h: EGCL(name, mlp_units, identity_init_x, identity_init_h)(x, h)
+        self.egnn_layer_fn = lambda x, h: EGCL(name, mlp_units, identity_init_x)(x, h)
         self.n_layers = n_layers
         self.h_out = h_out
         if h_out:
