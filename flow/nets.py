@@ -10,7 +10,7 @@ import haiku as hk
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name, mlp_units, identity_init_x, identity_init_h, h_embedding_dim):
+    def __init__(self, name, mlp_units, identity_init_x, identity_init_h):
         """
 
         Args:
@@ -18,8 +18,6 @@ class EGCL(hk.Module):
             mlp_units: MLP units for phi_e, phi_x and phi_h.
             identity_init_x: Whether to initialise the transform of x to the identity function.
             identity_init_h: Whether to initialise the transform of h to the identity function.
-            h_embedding_dim: Size of h embedding. Currently there are no node features, so in the first layer
-                h is initialised to zeros.
         """
         super().__init__(name=name + "equivariant")
         self.phi_e = hk.nets.MLP(mlp_units)
@@ -27,14 +25,10 @@ class EGCL(hk.Module):
         self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
-        self.phi_h = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
-                             hk.Linear(h_embedding_dim, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_h else
-                             hk.Linear(h_embedding_dim)])
-        self.h_embedding_dim = h_embedding_dim
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True)
+        self.identity_init_h = identity_init_h
 
-    def __call__(self, x, h = None):
-        if h is None:
-            h = jnp.ones((*x.shape[:-1], self.h_embedding_dim))
+    def __call__(self, x, h):
         if len(x.shape) == 2:
             return self.forward_single(x, h)
         else:
@@ -67,7 +61,10 @@ class EGCL(hk.Module):
         equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
 
         # Get updated h
-        h_new = self.phi_h(jnp.concatenate([m_i, h], axis=-1)) + h
+        phi_h = hk.Sequential([self.phi_h_mlp,
+                               hk.Linear(h.shape[-1], w_init=jnp.zeros, b_init=jnp.zeros) if self.identity_init_h
+                               else hk.Linear(h.shape[-1])])
+        h_new = phi_h(jnp.concatenate([m_i, h], axis=-1)) + h
 
         return x + equivariant_shift, h_new
 
@@ -80,12 +77,13 @@ class se_equivariant_net(hk.Module):
                  h_embedding_dim=3, h_out=False, h_out_dim: int = 1):
         super().__init__(name=name + "equivariant")
         identity_init_h = False
-        self.egnn_layers = [EGCL(name + f"_{i}", mlp_units, identity_init_x, identity_init_h, h_embedding_dim) for i in range(n_layers)]
+        self.h_embedding_dim = h_embedding_dim
+        self.egnn_layer_fn = lambda x, h: EGCL(name, mlp_units, identity_init_x, identity_init_h)(x, h)
+        self.n_layers = n_layers
         self.h_out = h_out
         if h_out:
             self.h_final_layer = hk.Linear(h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init_h \
                 else hk.Linear(1)
-
 
     def __call__(self, x):
         if len(x.shape) == 2:
@@ -94,15 +92,14 @@ class se_equivariant_net(hk.Module):
             return hk.vmap(self.forward_single, split_rng=False)(x)
     
     def forward_single(self, x):
-        x, h = self.egnn_layers[0](x)
-        for layer in self.egnn_layers[1:]:
-            x, h = layer(x, h)
+        h = jnp.zeros((*x.shape[0:-1], self.h_embedding_dim))
+        stack = hk.experimental.layer_stack(self.n_layers, with_per_layer_inputs=False)
+        x, y = stack(self.egnn_layer_fn)(x, h)
         if self.h_out:
             h_out = self.h_final_layer(h)
             return x, h_out
         else:
             return x
-
 
 
 
