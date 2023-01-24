@@ -94,7 +94,7 @@ class se_equivariant_net(hk.Module):
     def forward_single(self, x):
         h = jnp.zeros((*x.shape[0:-1], self.h_embedding_dim))
         stack = hk.experimental.layer_stack(self.n_layers, with_per_layer_inputs=False)
-        x, y = stack(self.egnn_layer_fn)(x, h)
+        x, h = stack(self.egnn_layer_fn)(x, h)
         if self.h_out:
             h_out = self.h_final_layer(h)
             return x, h_out
