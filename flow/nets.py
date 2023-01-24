@@ -18,7 +18,8 @@ class EGCL(hk.Module):
             mlp_units: MLP units for phi_e, phi_x and phi_h.
             identity_init_x: Whether to initialise the transform of x to the identity function.
             identity_init_h: Whether to initialise the transform of h to the identity function.
-            h_embedding_dim:
+            h_embedding_dim: Size of h embedding. Currently there are no node features, so in the first layer
+                h is initialised to zeros.
         """
         super().__init__(name=name + "equivariant")
         self.phi_e = hk.nets.MLP(mlp_units)
