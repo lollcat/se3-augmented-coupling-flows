@@ -13,7 +13,8 @@ def make_equivariant_augmented_flow_dist(dim,
                                          n_layers,
                                          type="nice",
                                          flow_identity_init: bool = True,
-                                         mlp_units = (10, 10)):
+                                         mlp_units = (10, 10),
+                                         n_egnn_layers = 3):
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
@@ -32,7 +33,7 @@ def make_equivariant_augmented_flow_dist(dim,
                                                 mlp_units=mlp_units)
         elif type == "vector_scale_shift":
             bijector = make_se_equivariant_vector_scale_shift(layer_number=i, dim=dim, swap=swap, identity_init=flow_identity_init,
-                                                              mlp_units=mlp_units)
+                                                              mlp_units=mlp_units, n_egnn_layers=n_egnn_layers)
         else:
             raise NotImplemented
         bijectors.append(bijector)

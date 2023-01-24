@@ -2,33 +2,32 @@ import chex
 import jax
 import jax.numpy as jnp
 import haiku as hk
-from functools import partial
-
-from utils.nets import LayerNormMLP
-
-
-# Typically need one of these to be True (esp layer norm) to stack lots of layers.
-_LAYER_NORM = True
-_EQUI_NORM = True
-_EGNN_N_LAYERS = 3
 
 
 # TODO: need to be careful of mean if number of nodes is varying? Could normalisation a parameter function of
 #  the number of nodes?
 
-class EGNN(hk.Module):
-    # Following notation of E(n) normalizing flows paper: https://arxiv.org/pdf/2105.09016.pdf
-    def __init__(self, name, mlp_units, zero_init, layer_norm: bool, equi_norm: bool, h_embedding_dim):
+class EGCL(hk.Module):
+    """Single layer of Equivariant Graph Convolutional layer.
+    Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
+    def __init__(self, name, mlp_units, identity_init_x, identity_init_h, h_embedding_dim):
+        """
+
+        Args:
+            name: Layer name
+            mlp_units: MLP units for phi_e, phi_x and phi_h.
+            identity_init_x: Whether to initialise the transform of x to the identity function.
+            identity_init_h: Whether to initialise the transform of h to the identity function.
+            h_embedding_dim:
+        """
         super().__init__(name=name + "equivariant")
-        mlp = LayerNormMLP if layer_norm else partial(hk.nets.MLP, activation=jax.nn.elu)
-        self.phi_e = mlp(mlp_units)
+        self.phi_e = hk.nets.MLP(mlp_units)
         self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
-        self.phi_x = hk.Sequential([mlp(mlp_units, activate_final=True),
-                             hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
+        self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
+                             hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
-        self.equi_norm = equi_norm
-        self.phi_h = hk.Sequential([mlp(mlp_units, activate_final=True),
-                             hk.Linear(h_embedding_dim, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
+        self.phi_h = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
+                             hk.Linear(h_embedding_dim, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_h else
                              hk.Linear(h_embedding_dim)])
         self.h_embedding_dim = h_embedding_dim
 
@@ -64,27 +63,27 @@ class EGNN(hk.Module):
 
         # Get updated x.
         C = x.shape[0] - 1
-        if not self.equi_norm:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos, phi_x_out) / C
-        else:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
+        equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
 
         # Get updated h
-        h = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h)
-        h_new = self.phi_h(jnp.concatenate([m_i, h], axis=-1))
+        h_new = self.phi_h(jnp.concatenate([m_i, h], axis=-1)) + h
 
         return x + equivariant_shift, h_new
 
 
 
 class se_equivariant_net(hk.Module):
-    def __init__(self, name, mlp_units, zero_init, n_layers=_EGNN_N_LAYERS, layer_norm: bool = _LAYER_NORM,
-                 equi_norm: bool = _EQUI_NORM, h_embedding_dim=3, h_out=False, h_out_dim = 1):
+    def __init__(self, name, mlp_units, identity_init_x,
+                 zero_init_h = False,
+                 n_layers=3,
+                 h_embedding_dim=3, h_out=False, h_out_dim: int = 1):
         super().__init__(name=name + "equivariant")
-        self.egnn_layers = [EGNN(name + f"_{i}", mlp_units, zero_init, layer_norm, equi_norm,
-                                 h_embedding_dim) for i in range(n_layers)]
+        identity_init_h = False
+        self.egnn_layers = [EGCL(name + f"_{i}", mlp_units, identity_init_x, identity_init_h, h_embedding_dim) for i in range(n_layers)]
         self.h_out = h_out
-        self.h_out_dim = h_out_dim
+        if h_out:
+            self.h_final_layer = hk.Linear(h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init_h \
+                else hk.Linear(1)
 
 
     def __call__(self, x):
@@ -98,7 +97,7 @@ class se_equivariant_net(hk.Module):
         for layer in self.egnn_layers[1:]:
             x, h = layer(x, h)
         if self.h_out:
-            h_out = hk.Linear(self.h_out_dim)(h)
+            h_out = self.h_final_layer(h)
             return x, h_out
         else:
             return x
