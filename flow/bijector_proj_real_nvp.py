@@ -9,6 +9,9 @@ import haiku as hk
 from flow.nets import se_equivariant_net
 
 
+# TODO: need to figure out how to push all transforms into a single NN, instead of having multiple.
+
+
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
     """Perform affine transformation in the space define by the `origin` and `change_of_basis_matrix`, and then
     go back into the original space."""
@@ -164,17 +167,12 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
                                             zero_init=False,
                                             mlp_units=mlp_units)
 
-    invariant_fn = se_invariant_net(name=f"layer_{layer_number}",
-                                    n_vals=dim*2,
-                                    zero_init=identity_init,
-                                    mlp_units=mlp_units)
 
 
     conditioner = make_conditioner(
         origin_equivariant_fn,
         y_equivariant_fn,
-        x_equivariant_fn,
-        invariant_fn)
+        x_equivariant_fn)
 
     return distrax.SplitCoupling(
         split_index=dim,

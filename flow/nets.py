@@ -13,8 +13,8 @@ _EQUI_NORM = True
 _EGNN_N_LAYERS = 3
 
 
-# TODO: Can use h for invariant features. Can clump h and x for scale and shift into a single NN architecture.
-# TODO: is mean instead of sum okay? Could make it a parameter fn of the number of nodes.
+# TODO: need to be careful of mean if number of nodes is varying? Could normalisation a parameter function of
+#  the number of nodes?
 
 class EGNN(hk.Module):
     # Following notation of E(n) normalizing flows paper: https://arxiv.org/pdf/2105.09016.pdf
@@ -27,12 +27,13 @@ class EGNN(hk.Module):
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
                              hk.Linear(1)])
         self.equi_norm = equi_norm
-        self.phi_h = mlp(mlp_units)
+        self.phi_h = hk.Sequential([mlp(mlp_units, activate_final=True),
+                             hk.Linear(h_embedding_dim, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init else
+                             hk.Linear(h_embedding_dim)])
         self.h_embedding_dim = h_embedding_dim
 
     def __call__(self, x, h = None):
         if h is None:
-
             h = jnp.ones((*x.shape[:-1], self.h_embedding_dim))
         if len(x.shape) == 2:
             return self.forward_single(x, h)
@@ -42,7 +43,6 @@ class EGNN(hk.Module):
     def forward_single(self, x, h):
         chex.assert_rank(x, 2)
         chex.assert_rank(h, 2)
-        h_dim = h.shape[-1]
 
 
         h_combos = jnp.concatenate([jnp.repeat(h[None, ...], h.shape[0], axis=0),
@@ -50,9 +50,9 @@ class EGNN(hk.Module):
 
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
+        sq_norms = jnp.sum(diff_combos**2, axis=-1)
 
-        m_ij = self.phi_e(jnp.concatenate([norms[..., None], h_combos], axis=-1))
+        m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
         e = self.phi_inf(m_ij)
@@ -67,11 +67,11 @@ class EGNN(hk.Module):
         if not self.equi_norm:
             equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos, phi_x_out) / C
         else:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (norms + 1)[..., None], phi_x_out) / C
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
 
         # Get updated h
+        h = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h)
         h_new = self.phi_h(jnp.concatenate([m_i, h], axis=-1))
-        h_new = hk.Linear(h_dim)(h_new)
 
         return x + equivariant_shift, h_new
 
