@@ -59,9 +59,7 @@ class EGCL(hk.Module):
         equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
 
         # Get updated h
-        phi_h = hk.Sequential([self.phi_h_mlp,
-                               hk.Linear(h.shape[-1], w_init=jnp.zeros, b_init=jnp.zeros) if self.identity_init_h
-                               else hk.Linear(h.shape[-1])])
+        phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
         h_new = phi_h(jnp.concatenate([m_i, h], axis=-1))
 
         return x + equivariant_shift, h_new
