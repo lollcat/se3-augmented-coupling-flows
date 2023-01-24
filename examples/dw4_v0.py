@@ -13,6 +13,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
+from flow.nets import EgnnConfig
 
 
 
@@ -66,14 +67,13 @@ def train(
     n_layers = 8,
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
-    mlp_units = (16,),
     key = jax.random.PRNGKey(0),
     flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
-    n_egnn_layers: int = 1,
-    h_embedding_dim: int = 2,
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_embedding_dim=3,
+                                         share_h=False)
 ):
 
     logger = ListLogger()
@@ -84,9 +84,8 @@ def train(
     def log_prob_fn(x):
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units,
-            n_egnn_layers=n_egnn_layers,
-            h_embedding_dim=h_embedding_dim
+            flow_identity_init=identity_init, type=flow_type,
+            egnn_conifg=egnn_config
         )
         return distribution.log_prob(x)
 
@@ -94,9 +93,8 @@ def train(
     def sample_and_log_prob_fn(sample_shape=()):
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units,
-            n_egnn_layers=n_egnn_layers,
-            h_embedding_dim=h_embedding_dim
+            flow_identity_init=identity_init, type=flow_type,
+            egnn_conifg=egnn_config
         )
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 

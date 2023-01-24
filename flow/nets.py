@@ -1,3 +1,5 @@
+from typing import NamedTuple, Sequence
+
 import chex
 import jax
 import jax.numpy as jnp
@@ -66,19 +68,30 @@ class EGCL(hk.Module):
 
 
 
+class EgnnConfig(NamedTuple):
+    name: str
+    mlp_units: Sequence[int] = (3,)
+    identity_init_x: bool = False
+    zero_init_h: int = False
+    n_layers: int = 3
+    h_embedding_dim: int = 3
+    h_out: bool = False
+    h_out_dim: int = 1
+    share_h: bool = False
+
+
+
 class se_equivariant_net(hk.Module):
-    def __init__(self, name, mlp_units, identity_init_x,
-                 zero_init_h = False,
-                 n_layers=3,
-                 h_embedding_dim=3, h_out=False, h_out_dim: int = 1):
-        super().__init__(name=name + "equivariant")
-        self.h_embedding_dim = h_embedding_dim
-        self.egnn_layer_fn = lambda x, h: EGCL(name, mlp_units, identity_init_x)(x, h)
-        self.n_layers = n_layers
-        self.h_out = h_out
-        if h_out:
-            self.h_final_layer = hk.Linear(h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if zero_init_h \
+    def __init__(self, config: EgnnConfig):
+        super().__init__(name=config.name + "_egnn")
+        self.h_embedding_dim = config.h_embedding_dim
+        self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x)(x, h)
+        self.n_layers = config.n_layers
+        self.h_out = config.h_out
+        if config.h_out:
+            self.h_final_layer = hk.Linear(config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
                 else hk.Linear(1)
+        self.share_h = config.share_h
 
     def __call__(self, x):
         if len(x.shape) == 2:
@@ -89,9 +102,9 @@ class se_equivariant_net(hk.Module):
     def forward_single(self, x):
         h = jnp.zeros((*x.shape[0:-1], self.h_embedding_dim))
         stack = hk.experimental.layer_stack(self.n_layers, with_per_layer_inputs=False)
-        x, h = stack(self.egnn_layer_fn)(x, h)
+        x, h_processed = stack(self.egnn_layer_fn)(x, h)
         if self.h_out:
-            h_out = self.h_final_layer(h)
+            h_out = self.h_final_layer(h_processed if self.share_h else h)
             return x, h_out
         else:
             return x
