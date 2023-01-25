@@ -100,7 +100,7 @@ def train(
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
 
-    optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adamw(lr))
+    optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
     train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=1028, test_set_size=128)
