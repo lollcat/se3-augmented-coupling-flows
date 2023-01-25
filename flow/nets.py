@@ -12,7 +12,7 @@ import haiku as hk
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name, mlp_units, identity_init_x):
+    def __init__(self, name, mlp_units, identity_init_x, recurrent_h = True):
         """
 
         Args:
@@ -27,6 +27,7 @@ class EGCL(hk.Module):
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True)
+        self.recurrent_h = recurrent_h
 
     def __call__(self, x, h):
         if len(x.shape) == 2:
@@ -62,7 +63,10 @@ class EGCL(hk.Module):
 
         # Get updated h
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
-        h_new = phi_h(jnp.concatenate([m_i, h], axis=-1))
+        phi_h_in = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(jnp.concatenate([m_i, h], axis=-1))
+        h_new = phi_h(phi_h_in)
+        if self.recurrent_h:
+            h_new = h + h_new
 
         return x + equivariant_shift, h_new
 
