@@ -75,7 +75,7 @@ def train(
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True))
+        layer_norm=False, linear_softmax=True, share_h=True))
 ):
 
     logger = ListLogger()

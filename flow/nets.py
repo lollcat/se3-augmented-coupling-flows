@@ -26,7 +26,7 @@ class EGCL(hk.Module):
         self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
         self.recurrent_h = recurrent_h
 
     def __call__(self, x, h):
@@ -140,11 +140,15 @@ class se_equivariant_net(hk.Module):
             else:
                 mlp_in = sq_norms
 
-            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim))(mlp_in)
+            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim),
+                                  activate_final=True)(mlp_in)
             h_out = jnp.mean(mlp_out, axis=(-2))
 
             if self.config.h_config.share_h:
-                h_egnn = jax.nn.tanh(h_egnn)
+                if self.config.h_config.layer_norm:
+                    h_egnn = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)(h_egnn)
+                if self.config.h_config.linear_softmax:
+                    h_egnn = jax.nn.softmax(h_egnn)
                 h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
             h_out = self.h_final_layer(h_out)
