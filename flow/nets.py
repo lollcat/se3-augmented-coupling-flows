@@ -12,7 +12,7 @@ import haiku as hk
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name, mlp_units, identity_init_x, recurrent_h = True):
+    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True):
         """
 
         Args:
@@ -104,6 +104,7 @@ class se_equivariant_net(hk.Module):
         h = jnp.zeros((*x.shape[0:-1], self.config.h_embedding_dim))
         stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False)
         x_out, h_processed = stack(self.egnn_layer_fn)(x, h)
+
         if self.config.h_out:
             # x features
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
@@ -113,7 +114,7 @@ class se_equivariant_net(hk.Module):
             sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
 
             # x out features.
-            diff_combos_x_out = x_out - x_out[:, None]  # [n_nodes, n_nodes, dim]
+            diff_combos_x_out = jax.lax.stop_gradient(x_out - x_out[:, None])  # [n_nodes, n_nodes, dim]
             diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
             sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
             # Need layer-norm here for stability.
@@ -123,16 +124,8 @@ class se_equivariant_net(hk.Module):
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(mlp_in)
             h_out = jnp.mean(mlp_out, axis=(-2))
 
-            # x & x-out features
-            # sq_norms_x_xout = jnp.sum((x - x_out)**2, axis=-1)
-            # sq_norms_x_xout = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_xout)
-            #
-            # h_out = jnp.concatenate([h_out, sq_norms_x_xout[..., None]], axis=-1)
-            # # Process concatenated features.
-            # h_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(h_out)
-
             if self.config.share_h:
-                h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
+                h_processed = jax.nn.tanh(h_processed)
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
 
             h_out = self.h_final_layer(h_out)
