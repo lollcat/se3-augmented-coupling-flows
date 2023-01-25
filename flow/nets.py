@@ -47,9 +47,6 @@ class EGCL(hk.Module):
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
         sq_norms = jnp.sum(diff_combos**2, axis=-1)
 
-        # Layer norm here helps improve stability.
-        sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
-
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
