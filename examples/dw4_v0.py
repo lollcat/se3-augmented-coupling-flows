@@ -60,7 +60,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 
 def train(
-    n_epoch = int(100),
+    n_epoch = int(200),
     dim = 2,
     lr = 5e-4,
     n_nodes = 4,
@@ -68,7 +68,7 @@ def train(
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),
-    flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
+    flow_type = "proj",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots = 4,
     reload_aug_per_epoch: bool = True,

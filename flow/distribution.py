@@ -28,10 +28,11 @@ def make_equivariant_augmented_flow_dist(dim,
             bijector = make_se_equivariant_vector_scale_shift(layer_number=i, dim=dim, swap=swap,
                                                               identity_init=flow_identity_init,
                                                               egnn_config=egnn_conifg)
-        # elif type == "proj":
-        #     assert dim == 2
-        #     bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i,
-        #                                         dim=dim, swap=swap, egnn_conifg=egnn_conifg)
+        elif type == "proj":
+            assert dim == 2
+            bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
+                                                              identity_init=flow_identity_init,
+                                                              egnn_config=egnn_conifg)
         # elif type == "nice":
         #     bijector = make_se_equivariant_nice(layer_number=i,
         #                                         dim=dim, swap=swap, egnn_conifg)

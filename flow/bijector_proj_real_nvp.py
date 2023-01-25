@@ -147,7 +147,8 @@ def make_conditioner(origin_equivariant_fn,
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config, identity_init: bool = True):
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config,
+                                                       identity_init: bool = True):
     assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):
