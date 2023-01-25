@@ -111,15 +111,16 @@ class se_equivariant_net(hk.Module):
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
             sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
+
             # Need layer-norm here for stability.
-            sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
+            sq_norms = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms)
 
             # x out features.
             diff_combos_x_out = jax.lax.stop_gradient(x_out - x_out[:, None])  # [n_nodes, n_nodes, dim]
             diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
             sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
             # Need layer-norm here for stability.
-            sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_out)
+            sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms_x_out)
 
             mlp_in = jnp.stack([sq_norms, sq_norms_x_out], axis=-1)
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(mlp_in)

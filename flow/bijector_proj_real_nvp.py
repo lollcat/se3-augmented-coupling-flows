@@ -156,12 +156,12 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
 
 
     origin_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_shift",
+        egnn_config._replace(name=f"layer_{layer_number}_origin",
                            identity_init_x=identity_init,
                            h_out=False))
 
     y_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_ref",
+        egnn_config._replace(name=f"layer_{layer_number}_y",
                            identity_init_x=False,
                            zero_init_h=identity_init,
                            h_out_dim=1,
@@ -170,7 +170,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
 
 
     x_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_ref",
+        egnn_config._replace(name=f"layer_{layer_number}_x",
                            identity_init_x=False,
                            zero_init_h=identity_init,
                            h_out_dim=1,
