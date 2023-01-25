@@ -112,6 +112,7 @@ class se_equivariant_net(hk.Module):
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms[..., None])
             h_out = jnp.mean(mlp_out, axis=(-2))
             if self.config.share_h:
+                h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
