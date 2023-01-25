@@ -72,6 +72,15 @@ class EGCL(hk.Module):
         return x + equivariant_shift, h_new
 
 
+class HConfig(NamedTuple):
+    h_embedding_dim: int = 3
+    h_out: bool = False
+    h_out_dim: int = 1
+    share_h: bool = False
+    layer_norm: bool = False
+    stop_gradient_x_out: bool = False
+    use_x_out: bool = False
+
 
 class EgnnConfig(NamedTuple):
     name: str
@@ -79,10 +88,8 @@ class EgnnConfig(NamedTuple):
     identity_init_x: bool = False
     zero_init_h: int = False
     n_layers: int = 3
-    h_embedding_dim: int = 3
-    h_out: bool = False
-    h_out_dim: int = 1
-    share_h: bool = False
+    h_config: HConfig = HConfig()
+
 
 
 
@@ -90,8 +97,8 @@ class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
         self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x)(x, h)
-        if config.h_out:
-            self.h_final_layer = hk.Linear(config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
+        if config.h_config.h_out:
+            self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
                 else hk.Linear(1)
         self.config = config
 
@@ -102,33 +109,37 @@ class se_equivariant_net(hk.Module):
             return hk.vmap(self.forward_single, split_rng=False)(x)
     
     def forward_single(self, x):
-        h = jnp.zeros((*x.shape[0:-1], self.config.h_embedding_dim))
+        h = jnp.zeros((*x.shape[0:-1], self.config.h_config.h_embedding_dim))
         stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False)
-        x_out, h_processed = stack(self.egnn_layer_fn)(x, h)
+        x_out, h_egnn = stack(self.egnn_layer_fn)(x, h)
 
-        if self.config.h_out:
+        if self.config.h_config.h_out:
             # x features
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
             sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
 
-            # Need layer-norm here for stability.
-            sq_norms = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms)
+            if self.config.h_config.layer_norm:
+                # Option for stability.
+                sq_norms = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms)
 
-            # x out features.
-            diff_combos_x_out = jax.lax.stop_gradient(x_out - x_out[:, None])  # [n_nodes, n_nodes, dim]
-            diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
-            sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
-            # Need layer-norm here for stability.
-            sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms_x_out)
+            if self.config.h_config.use_x_out:
+                # x out features.
+                diff_combos_x_out = jax.lax.stop_gradient(x_out - x_out[:, None])  # [n_nodes, n_nodes, dim]
+                diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
+                sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
+                if self.config.h_config.layer_norm:
+                    sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms_x_out)
+                mlp_in = jnp.stack([sq_norms, sq_norms_x_out], axis=-1)
+            else:
+                mlp_in = sq_norms[..., None]  # add unit feature dimension.
 
-            mlp_in = jnp.stack([sq_norms, sq_norms_x_out], axis=-1)
-            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(mlp_in)
+            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim))(mlp_in)
             h_out = jnp.mean(mlp_out, axis=(-2))
 
-            if self.config.share_h:
-                h_processed = jax.nn.tanh(h_processed)
-                h_out = jnp.concatenate([h_out, h_processed], axis=-1)
+            if self.config.h_config.share_h:
+                h_egnn = jax.nn.tanh(h_egnn)
+                h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
             h_out = self.h_final_layer(h_out)
             return x_out, h_out

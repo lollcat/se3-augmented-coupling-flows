@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional, Callable
 
 import distrax
 import chex
@@ -109,8 +109,8 @@ class ProjectedScalarAffine(distrax.Bijector):
 
 
 def make_conditioner(origin_equivariant_fn,
-                     y_equivariant_fn,
-                     x_equivariant_fn
+                     z_equivariant_fn,
+                     x_equivariant_fn: Optional[Callable] = None
                      ):
     def _conditioner(x):
         chex.assert_rank(x, 2)
@@ -118,10 +118,10 @@ def make_conditioner(origin_equivariant_fn,
 
         # Calculate new basis for the affine transform
         origin = origin_equivariant_fn(x)
-        y_basis_point, y_scale_and_shift_params = y_equivariant_fn(x)
+        z_basis_point, z_scale_and_shift_params = z_equivariant_fn(x)
         x_basis_point, x_scale_and_shift_params = x_equivariant_fn(x)
 
-        y_basis_vector = y_basis_point - origin
+        y_basis_vector = z_basis_point - origin
         # x_basis_vector = x_basis_point - origin
         theta = jnp.pi*0.4
         rotation_matrix = jnp.array(
@@ -132,8 +132,8 @@ def make_conditioner(origin_equivariant_fn,
 
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
-        log_scale = jnp.stack([y_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0]], axis=-1)
-        shift = jnp.stack([y_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1]], axis=-1)
+        log_scale = jnp.stack([z_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0]], axis=-1)
+        shift = jnp.stack([z_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1]], axis=-1)
 
         return change_of_basis_matrix, origin, log_scale, shift
 

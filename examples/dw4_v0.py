@@ -68,12 +68,11 @@ def train(
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),
-    flow_type = "proj",  # "nice", "proj", "vector_scale_shift"
+    flow_type = "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_embedding_dim=3,
-                                         share_h=True)
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1)
 ):
 
     logger = ListLogger()
