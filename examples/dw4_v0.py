@@ -147,7 +147,6 @@ def train(
                 # raise Exception("nan grad encountered")
 
 
-
         if i % (n_epoch // n_plots) == 0 or i == (n_epoch - 1):
             plot()
             key, subkey = jax.random.split(key)

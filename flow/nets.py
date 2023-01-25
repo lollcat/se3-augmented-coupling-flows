@@ -136,6 +136,8 @@ class se_equivariant_net(hk.Module):
                 if self.config.h_config.layer_norm:
                     sq_norms_x_out = hk.LayerNorm(axis=(0, 1), param_axis=-1, create_scale=True,
                                                   create_offset=True)(sq_norms_x_out)
+                if self.config.h_config.linear_softmax:
+                    sq_norms_x_out = jax.nn.softmax(hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms_x_out))
                 mlp_in = jnp.concatenate([sq_norms, sq_norms_x_out], axis=-1)
             else:
                 mlp_in = sq_norms
