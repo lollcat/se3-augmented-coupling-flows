@@ -47,6 +47,9 @@ class EGCL(hk.Module):
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
         sq_norms = jnp.sum(diff_combos**2, axis=-1)
 
+        # Layer norm here helps improve stability.
+        sq_norms = jnp.tanh(hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms))
+
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
@@ -108,11 +111,12 @@ class se_equivariant_net(hk.Module):
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
             sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
-            sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
+            # Need layer-norm here for stability.
+            sq_norms = jnp.tanh(hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms))
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms[..., None])
             h_out = jnp.mean(mlp_out, axis=(-2))
             if self.config.share_h:
-                h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
+                h_processed = jnp.tanh(hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed))
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
