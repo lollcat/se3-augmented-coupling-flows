@@ -112,8 +112,19 @@ class se_equivariant_net(hk.Module):
             sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms[..., None])
             h_out = jnp.mean(mlp_out, axis=(-2))
+
+            diff_combos_x_out = x_out - x_out[:, None]  # [n_nodes, n_nodes, dim]
+            diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
+            sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
+            # Need layer-norm here for stability.
+            sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_out)
+            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms_x_out[..., None])
+            h_out_x_out = jnp.mean(mlp_out, axis=(-2))
+
+            h_out = jnp.concatenate([h_out, h_out_x_out], axis=-1)
+
             if self.config.share_h:
-                h_processed = jnp.tanh(hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed))
+                h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
