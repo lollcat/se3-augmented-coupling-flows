@@ -13,7 +13,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
-from flow.nets import EgnnConfig
+from flow.nets import EgnnConfig, HConfig
 
 
 
@@ -74,7 +74,8 @@ def train(
     identity_init = True,
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1)
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
+        layer_norm=True))
 ):
 
     logger = ListLogger()

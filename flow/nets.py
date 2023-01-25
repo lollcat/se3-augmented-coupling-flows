@@ -117,22 +117,23 @@ class se_equivariant_net(hk.Module):
             # x features
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
-            sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
+            sq_norms = jnp.sum(diff_combos ** 2, axis=-1, keepdims=True)
 
             if self.config.h_config.layer_norm:
                 # Option for stability.
-                sq_norms = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms)
+                sq_norms = hk.LayerNorm(axis=(0, 1), param_axis=-1, create_scale=True, create_offset=True)(sq_norms)
 
             if self.config.h_config.use_x_out:
                 # x out features.
                 diff_combos_x_out = jax.lax.stop_gradient(x_out - x_out[:, None])  # [n_nodes, n_nodes, dim]
                 diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
-                sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
+                sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1, keepdims=True)
                 if self.config.h_config.layer_norm:
-                    sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(sq_norms_x_out)
-                mlp_in = jnp.stack([sq_norms, sq_norms_x_out], axis=-1)
+                    sq_norms_x_out = hk.LayerNorm(axis=(0, 1), param_axis=-1, create_scale=True,
+                                                  create_offset=True)(sq_norms_x_out)
+                mlp_in = jnp.concatenate([sq_norms, sq_norms_x_out], axis=-1)
             else:
-                mlp_in = sq_norms[..., None]  # add unit feature dimension.
+                mlp_in = sq_norms
 
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim))(mlp_in)
             h_out = jnp.mean(mlp_out, axis=(-2))
