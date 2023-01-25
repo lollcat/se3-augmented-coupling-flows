@@ -1,5 +1,4 @@
 import distrax
-import jax.nn
 import jax.numpy as jnp
 
 from flow.nets import se_equivariant_net

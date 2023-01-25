@@ -11,6 +11,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
+from flow.nets import EgnnConfig
 
 
 def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
@@ -72,14 +73,15 @@ def train(
     n_layers: int = 4,
     batch_size: int = 4,
     max_global_norm: float = jnp.inf,  # jnp.inf
-    mlp_units = (2,),
     seed: int = 0,
     flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
     identity_init = True,
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
     train_data_n_points = 1000,  # set to None to use full set
-    test_data_n_poins = 1000,  # set to None to use full set
+    test_data_n_poins = 1000,  # set to None to use full set,
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_embedding_dim=3,
+                                         share_h=False)
 ):
     key = jax.random.PRNGKey(seed)
 
@@ -92,15 +94,20 @@ def train(
     def log_prob_fn(x):
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units)
+            flow_identity_init=identity_init, type=flow_type,
+            egnn_conifg=egnn_config
+        )
         return distribution.log_prob(x)
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type, mlp_units=mlp_units)
+            flow_identity_init=identity_init, type=flow_type,
+            egnn_conifg=egnn_config
+        )
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
+
 
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
