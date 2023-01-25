@@ -84,14 +84,11 @@ class EgnnConfig(NamedTuple):
 class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
-        self.h_embedding_dim = config.h_embedding_dim
         self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x)(x, h)
-        self.n_layers = config.n_layers
-        self.h_out = config.h_out
         if config.h_out:
             self.h_final_layer = hk.Linear(config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
                 else hk.Linear(1)
-        self.share_h = config.share_h
+        self.config = config
 
     def __call__(self, x):
         if len(x.shape) == 2:
@@ -100,14 +97,22 @@ class se_equivariant_net(hk.Module):
             return hk.vmap(self.forward_single, split_rng=False)(x)
     
     def forward_single(self, x):
-        h = jnp.zeros((*x.shape[0:-1], self.h_embedding_dim))
-        stack = hk.experimental.layer_stack(self.n_layers, with_per_layer_inputs=False)
-        x, h_processed = stack(self.egnn_layer_fn)(x, h)
-        if self.h_out:
-            h_out = self.h_final_layer(h_processed if self.share_h else h)
-            return x, h_out
+        h = jnp.zeros((*x.shape[0:-1], self.config.h_embedding_dim))
+        stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False)
+        x_out, h_processed = stack(self.egnn_layer_fn)(x, h)
+        if self.config.h_out:
+            if self.config.share_h:
+                h_out = h_processed
+            else:
+                diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
+                diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
+                sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
+                mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms[..., None])
+                h_out = jnp.mean(mlp_out, axis=(-2))
+            h_out = self.h_final_layer(h_out)
+            return x_out, h_out
         else:
-            return x
+            return x_out
 
 
 
