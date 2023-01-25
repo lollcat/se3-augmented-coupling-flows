@@ -1,12 +1,16 @@
 import distrax
+import jax.nn
 import jax.numpy as jnp
 
 from flow.nets import se_equivariant_net
 
 
-def make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn, activation_fn = jnp.exp):
+def make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn, activation_fn):
     def conditioner(x):
         reference_point, log_scale_param = ref_and_scale_equivariant_fn(x)
+        if activation_fn == jax.nn.softplus:
+            inverse_softplus = lambda x: jnp.log(jnp.exp(x) - 1.)
+            log_scale_param = log_scale_param + inverse_softplus(jnp.array(1.0))
         log_scale_param = jnp.broadcast_to(log_scale_param, x.shape)
         scale = activation_fn(log_scale_param)
         equivariant_shift = 0  #  shift_equivariant_fn(x) - x
@@ -15,7 +19,8 @@ def make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn, activat
     return conditioner
 
 
-def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, egnn_config, identity_init: bool = True):
+def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, egnn_config, identity_init: bool = True,
+                                           activation_fn = jax.nn.softplus):
     """Flow is x + (x - r)*scale + shift where scale is an invariant scalar, and r is equivariant reference point"""
 
     ref_and_scale_equivariant_fn = se_equivariant_net(
@@ -34,7 +39,7 @@ def make_se_equivariant_vector_scale_shift(layer_number, dim, swap, egnn_config,
         scale, shift = params
         return distrax.ScalarAffine(scale=scale, shift=shift)
 
-    conditioner = make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn)
+    conditioner = make_conditioner(ref_and_scale_equivariant_fn, shift_equivariant_fn, activation_fn=activation_fn)
     return distrax.SplitCoupling(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
