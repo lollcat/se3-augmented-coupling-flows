@@ -110,16 +110,16 @@ class ProjectedScalarAffine(distrax.Bijector):
 
 def make_conditioner(origin_equivariant_fn,
                      y_equivariant_fn,
-                     x_equivariant_fn,
-                     invariant_fn):
+                     x_equivariant_fn
+                     ):
     def _conditioner(x):
         chex.assert_rank(x, 2)
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
         origin = origin_equivariant_fn(x)
-        y_basis_point = y_equivariant_fn(x)
-        x_basis_point = x_equivariant_fn(x)
+        y_basis_point, y_scale_and_shift_params = y_equivariant_fn(x)
+        x_basis_point, x_scale_and_shift_params = x_equivariant_fn(x)
 
         y_basis_vector = y_basis_point - origin
         # x_basis_vector = x_basis_point - origin
@@ -132,8 +132,8 @@ def make_conditioner(origin_equivariant_fn,
 
         change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
-        log_scale, shift = jnp.split(invariant_fn(x), axis=-1, indices_or_sections=2)
-        log_scale = log_scale
+        log_scale = jnp.stack([y_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0]], axis=-1)
+        shift = jnp.stack([y_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1]], axis=-1)
 
         return change_of_basis_matrix, origin, log_scale, shift
 
@@ -147,7 +147,7 @@ def make_conditioner(origin_equivariant_fn,
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, identity_init: bool = True, mlp_units=(5, 5)):
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config, identity_init: bool = True):
     assert dim == 2  # Currently just written for 2D
 
     def bijector_fn(params):
@@ -155,17 +155,27 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
 
-    origin_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_origin",
-                                        zero_init=False,
-                                        mlp_units=mlp_units)
+    origin_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_shift",
+                           identity_init_x=identity_init,
+                           h_out=False))
 
-    y_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_y_axis",
-                                            zero_init=False,
-                                            mlp_units=mlp_units)
+    y_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_ref",
+                           identity_init_x=False,
+                           zero_init_h=identity_init,
+                           h_out_dim=1,
+                           h_out=True
+                           ))
 
-    x_equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}_x_axis",
-                                            zero_init=False,
-                                            mlp_units=mlp_units)
+
+    x_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_ref",
+                           identity_init_x=False,
+                           zero_init_h=identity_init,
+                           h_out_dim=1,
+                           h_out=True
+                           ))
 
 
 
