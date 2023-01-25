@@ -105,27 +105,36 @@ class se_equivariant_net(hk.Module):
         stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False)
         x_out, h_processed = stack(self.egnn_layer_fn)(x, h)
         if self.config.h_out:
+            # x features
             diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
             sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
             # Need layer-norm here for stability.
             sq_norms = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms)
-            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms[..., None])
-            h_out = jnp.mean(mlp_out, axis=(-2))
 
+            # x out features.
             diff_combos_x_out = x_out - x_out[:, None]  # [n_nodes, n_nodes, dim]
             diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
             sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1)
             # Need layer-norm here for stability.
             sq_norms_x_out = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_out)
-            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(sq_norms_x_out[..., None])
-            h_out_x_out = jnp.mean(mlp_out, axis=(-2))
 
-            h_out = jnp.concatenate([h_out, h_out_x_out], axis=-1)
+            mlp_in = jnp.stack([sq_norms, sq_norms_x_out], axis=-1)
+            mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(mlp_in)
+            h_out = jnp.mean(mlp_out, axis=(-2))
+
+            # x & x-out features
+            sq_norms_x_xout = jnp.sum((x - x_out)**2, axis=-1)
+            sq_norms_x_xout = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_xout)
+
+            h_out = jnp.concatenate([h_out, sq_norms_x_xout[..., None]], axis=-1)
 
             if self.config.share_h:
                 h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
+
+            # Process concatenated features.
+            h_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(h_out)
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
         else:
