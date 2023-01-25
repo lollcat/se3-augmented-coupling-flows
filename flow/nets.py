@@ -124,17 +124,17 @@ class se_equivariant_net(hk.Module):
             h_out = jnp.mean(mlp_out, axis=(-2))
 
             # x & x-out features
-            sq_norms_x_xout = jnp.sum((x - x_out)**2, axis=-1)
-            sq_norms_x_xout = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_xout)
-
-            h_out = jnp.concatenate([h_out, sq_norms_x_xout[..., None]], axis=-1)
+            # sq_norms_x_xout = jnp.sum((x - x_out)**2, axis=-1)
+            # sq_norms_x_xout = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(sq_norms_x_xout)
+            #
+            # h_out = jnp.concatenate([h_out, sq_norms_x_xout[..., None]], axis=-1)
+            # # Process concatenated features.
+            # h_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(h_out)
 
             if self.config.share_h:
                 h_processed = hk.LayerNorm(axis=-2, create_scale=True, create_offset=True)(h_processed)
                 h_out = jnp.concatenate([h_out, h_processed], axis=-1)
 
-            # Process concatenated features.
-            h_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_embedding_dim))(h_out)
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
         else:
