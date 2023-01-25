@@ -42,6 +42,7 @@ class EGCL(hk.Module):
 
         h_combos = jnp.concatenate([jnp.repeat(h[None, ...], h.shape[0], axis=0),
                                     jnp.repeat(h[:, None, ...], h.shape[0], axis=1)], axis=-1)
+        h_combos = jax.lax.stop_gradient(h_combos)  # Prevent gradients from h effect x and visa versa.
 
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
@@ -50,9 +51,10 @@ class EGCL(hk.Module):
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
-        e = self.phi_inf(m_ij)
+        # Prevent gradients from x effect h and visa versa.
+        e = self.phi_inf(jax.lax.stop_gradient(m_ij))
         e = e.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
-        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
+        m_i = jnp.einsum('ijd,ij->id', jax.lax.stop_gradient(m_ij), jnp.squeeze(e, axis=-1))
 
         phi_x_out = jnp.squeeze(self.phi_x(m_ij), axis=-1)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
