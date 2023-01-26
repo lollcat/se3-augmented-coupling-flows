@@ -12,6 +12,8 @@ import haiku as hk
 
 class AttentionConfig(NamedTuple):
     use_attention: bool = False
+    key_size: int = 4
+    n_heads: int = 3
 
 
 class EGCL(hk.Module):
@@ -31,7 +33,8 @@ class EGCL(hk.Module):
 
             def make_attention_fn():
                 def attention_fn(x):
-                    x_out = hk.Sequential([lambda x_: hk.MultiHeadAttention(num_heads=3, key_size=3,
+                    x_out = hk.Sequential([lambda x_: hk.MultiHeadAttention(num_heads=attention_config.n_heads,
+                                                                            key_size=attention_config.key_size,
                                                              w_init=hk.initializers.VarianceScaling(1.0))(x_, x_, x_),
                                            jax.nn.relu,
                                             hk.nets.MLP(mlp_units, activate_final=True)])(x)
@@ -114,7 +117,7 @@ class EgnnConfig(NamedTuple):
     identity_init_x: bool = False
     zero_init_h: int = False
     n_layers: int = 3
-    attention_conifg: AttentionConfig = AttentionConfig()
+    attention_config: AttentionConfig = AttentionConfig()
     h_config: HConfig = HConfig()
 
 
@@ -124,7 +127,7 @@ class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
         self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x,
-                                               attention_config=config.attention_conifg)(x, h)
+                                               attention_config=config.attention_config)(x, h)
         if config.h_config.h_out:
             self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
                 else hk.Linear(1)
