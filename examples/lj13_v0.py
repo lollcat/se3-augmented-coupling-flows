@@ -59,7 +59,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
     differences = jax.vmap(get_pairwise_distances)(samples[..., dim])
     d = differences.flatten()
     d = d[jnp.isfinite(d)]
-    d.clip(max=15)  # Clip keep plot reasonable.
+    d = d.clip(max=15)  # Clip keep plot reasonable.
     d = d[d != 0.0]
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
