@@ -78,7 +78,7 @@ def train(
     test_set_size: int = 1000,
     K: int = 2,
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True, share_h=True))
+        linear_softmax=True, share_h=True))
 ):
 
     logger = ListLogger()
