@@ -13,3 +13,15 @@ def get_pairwise_distances(x):
 def set_diagonal_to_zero(x):
     chex.assert_rank(x, 2)
     return jnp.where(jnp.eye(x.shape[0]), jnp.zeros_like(x), x)
+
+def rotate_translate_2d(x, theta, translation, rotate_first=True):
+    chex.assert_shape(theta, ())
+    chex.assert_shape(translation, x.shape[-1:])
+    rotation_matrix = jnp.array(
+        [[jnp.cos(theta), -jnp.sin(theta)],
+         [jnp.sin(theta), jnp.cos(theta)]]
+    )
+    if rotate_first:
+        return jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, x) + translation[None, :]
+    else:
+        return jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, x + translation[None, :])
