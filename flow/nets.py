@@ -81,7 +81,6 @@ class HConfig(NamedTuple):
     layer_norm: bool = False
     linear_softmax: bool = False
     stop_gradient_x_out: bool = False
-    use_x_out: bool = False
 
 
 class EgnnConfig(NamedTuple):
@@ -128,24 +127,8 @@ class se_equivariant_net(hk.Module):
             if self.config.h_config.linear_softmax:
                 sq_norms = jax.nn.softmax(hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms))
 
-            if self.config.h_config.use_x_out:
-                # x out features.
-                diff_combos_x_out = x_out - x_out[:, None]  # [n_nodes, n_nodes, dim]
-                if self.config.h_config.stop_gradient_x_out:
-                    diff_combos_x_out = jax.lax.stop_gradient(diff_combos_x_out)
-                diff_combos_x_out = diff_combos_x_out.at[jnp.arange(x_out.shape[0]), jnp.arange(x_out.shape[0])].set(0.0)
-                sq_norms_x_out = jnp.sum(diff_combos_x_out ** 2, axis=-1, keepdims=True)
-                if self.config.h_config.layer_norm:
-                    sq_norms_x_out = hk.LayerNorm(axis=(0, 1), param_axis=-1, create_scale=True,
-                                                  create_offset=True)(sq_norms_x_out)
-                if self.config.h_config.linear_softmax:
-                    sq_norms_x_out = jax.nn.softmax(hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms_x_out))
-                mlp_in = jnp.concatenate([sq_norms, sq_norms_x_out], axis=-1)
-            else:
-                mlp_in = sq_norms
-
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim),
-                                  activate_final=True)(mlp_in)
+                                  activate_final=True)(sq_norms)
             h_out = jnp.mean(mlp_out, axis=(-2))
 
             if self.config.h_config.share_h:
