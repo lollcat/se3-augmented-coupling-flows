@@ -10,17 +10,10 @@ import haiku as hk
 #  the number of nodes?
 
 
-class AttentionConfig(NamedTuple):
-    use_attention: bool = False
-    key_size: int = 4
-    n_heads: int = 3
-
-
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True,
-                 attention_config: AttentionConfig = AttentionConfig()):
+    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True):
         """
 
         Args:
@@ -29,32 +22,12 @@ class EGCL(hk.Module):
             identity_init_x: Whether to initialise the transform of x to the identity function.
         """
         super().__init__(name=name + "equivariant")
-        if attention_config.use_attention:
-
-            def make_attention_fn():
-                def attention_fn(x):
-                    x_out = hk.Sequential([lambda x_: hk.MultiHeadAttention(num_heads=attention_config.n_heads,
-                                                                            key_size=attention_config.key_size,
-                                                             w_init=hk.initializers.VarianceScaling(1.0))(x_, x_, x_),
-                                           jax.nn.relu,
-                                            hk.nets.MLP(mlp_units, activate_final=True)])(x)
-                    return x_out
-                return attention_fn
-
-            self.phi_e = make_attention_fn()
-            self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
-            self.phi_x = hk.Sequential([make_attention_fn(),
-                                        hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
-                                        hk.Linear(1)])
-            self.phi_h_mlp = make_attention_fn()
-
-        else:
-            self.phi_e = hk.nets.MLP(mlp_units)
-            self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
-            self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
-                                 hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
-                                 hk.Linear(1)])
-            self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
+        self.phi_e = hk.nets.MLP(mlp_units)
+        self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
+        self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
+                             hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
+                             hk.Linear(1)])
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
         self.recurrent_h = recurrent_h
 
     def __call__(self, x, h):
@@ -117,7 +90,6 @@ class EgnnConfig(NamedTuple):
     identity_init_x: bool = False
     zero_init_h: int = False
     n_layers: int = 3
-    attention_config: AttentionConfig = AttentionConfig()
     h_config: HConfig = HConfig()
 
 
@@ -126,8 +98,8 @@ class EgnnConfig(NamedTuple):
 class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
-        self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x,
-                                               attention_config=config.attention_config)(x, h)
+        self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x
+                                               )(x, h)
         if config.h_config.h_out:
             self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) if config.zero_init_h \
                 else hk.Linear(1)
