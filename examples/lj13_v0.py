@@ -13,7 +13,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
-from flow.nets import EgnnConfig
+from flow.nets import EgnnConfig, HConfig
 
 
 def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000, seed: int = 0):
@@ -78,8 +78,8 @@ def train(
     identity_init = True,
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_embedding_dim=3,
-                                         share_h=False)
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
+        layer_norm=False, linear_softmax=True, share_h=True))
 ):
 
 

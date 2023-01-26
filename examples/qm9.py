@@ -11,7 +11,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
-from flow.nets import EgnnConfig
+from flow.nets import EgnnConfig, HConfig
 
 
 def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
@@ -82,8 +82,8 @@ def train(
     reload_aug_per_epoch: bool = True,
     train_data_n_points = 1000,  # set to None to use full set
     test_data_n_poins = 1000,  # set to None to use full set,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_embedding_dim=3,
-                                         share_h=False)
+    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
+        layer_norm=False, linear_softmax=True, share_h=True))
 ):
     key = jax.random.PRNGKey(seed)
 
