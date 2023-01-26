@@ -83,7 +83,8 @@ def train(
     train_data_n_points = 1000,  # set to None to use full set
     test_data_n_poins = 1000,  # set to None to use full set,
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True, share_h=True))
+        layer_norm=False, linear_softmax=True, share_h=True)),
+    plotting_n_nodes = 5,
 ):
     key = jax.random.PRNGKey(seed)
 
@@ -127,16 +128,20 @@ def train(
         params, opt_state, info = step(params, x, opt_state, log_prob_fn, optimizer)
         return (params, opt_state), info
 
-    def plot(n_samples=512):
+    def plot(n_samples=batch_size):
         fig, axs = plt.subplots(1, 2, figsize=(15, 6))
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
 
-        plot_sample_hist(samples, axs[0], dim=(0, 1, 2), label="flow samples")
-        plot_sample_hist(train_data[:n_samples], axs[0], dim=(0, 1, 2), label="ground truth samples")
-        plot_sample_hist(samples, axs[1], dim=(3, 4, 5), label="flow samples")
+        plot_sample_hist(samples, axs[0], dim=(0, 1, 2), label="flow samples", n_vertices=plotting_n_nodes)
+        plot_sample_hist(train_data[:n_samples], axs[0], dim=(0, 1, 2), label="train samples",
+                         n_vertices=plotting_n_nodes)
+        plot_sample_hist(test_data[:n_samples], axs[0], dim=(0, 1, 2), label="test samples",
+                         n_vertices=plotting_n_nodes)
+        plot_sample_hist(samples, axs[1], dim=(3, 4, 5), label="flow samples",
+                         n_vertices=plotting_n_nodes)
         plot_sample_hist(train_data[:n_samples], axs[1], dim=(3, 4, 5),
-                         label="ground truth samples")
+                         label="train samples", n_vertices=plotting_n_nodes)
         axs[0].set_title(f"norms between original coordinates")
         axs[1].set_title(f"norms between augmented coordinates")
         axs[0].legend()
