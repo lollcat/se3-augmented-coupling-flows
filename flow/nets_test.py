@@ -8,7 +8,8 @@ from utils.numerical import rotate_translate_2d
 from flow.nets import se_equivariant_net, HConfig, EgnnConfig
 
 
-def test_equivariant_fn(dim = 2, n_nodes = 8, batch_size = 3):
+def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
+    """Run the EGNN forward pass, and check that it is equivariant."""
     h_config = HConfig(h_embedding_dim=3, h_out=True, h_out_dim=2, share_h=True, linear_softmax=True)
     eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2, h_config=h_config,
                              zero_init_h=False)
