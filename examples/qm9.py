@@ -85,6 +85,7 @@ def train(
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
         layer_norm=False, linear_softmax=True, share_h=True)),
     plotting_n_nodes = 5,
+    K: int = 20,
 ):
     key = jax.random.PRNGKey(seed)
 
@@ -177,7 +178,8 @@ def train(
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
                                 key=subkey,
-                                batch_size=max(100, batch_size))
+                                batch_size=max(100, batch_size),
+                                K=K)
             pbar.write(str(eval_info))
             logger.write(eval_info)
 

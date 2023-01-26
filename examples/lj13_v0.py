@@ -79,7 +79,10 @@ def train(
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True, share_h=True))
+        layer_norm=False, linear_softmax=True, share_h=True)),
+    train_set_size: int = 1000,
+    test_set_size: int = 1000,
+    K: int = 2,
 ):
 
 
@@ -111,7 +114,7 @@ def train(
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size)
+    train_data, test_data = load_dataset(batch_size, train_set_size, test_set_size)
 
     print(f"training data size of {train_data.shape[0]}")
 
@@ -160,7 +163,8 @@ def train(
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
                                 target_log_prob=lj.log_prob_fn,
                                 key=subkey,
-                                batch_size=max(100, batch_size))
+                                batch_size=max(100, batch_size),
+                                K=K)
             pbar.write(str(eval_info))
             logger.write(eval_info)
 
