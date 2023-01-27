@@ -8,12 +8,15 @@ from flow.nets import EgnnConfig
 
 
 def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
+    egnn_config = EgnnConfig("")
+
     def make_flow():
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_se_equivariant_split_coupling_with_projection(i, dim, swap, identity_init=False,
-                                                                          egnn_config=EgnnConfig('dummy'))
+            bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
+                                                              identity_init=False,
+                                                              egnn_config=egnn_config)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow

@@ -90,7 +90,7 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type,
-            egnn_conifg=egnn_config
+            egnn_config=egnn_config
         )
         return distribution.log_prob(x)
 
@@ -99,7 +99,7 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type,
-            egnn_conifg=egnn_config
+            egnn_config=egnn_config
         )
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 

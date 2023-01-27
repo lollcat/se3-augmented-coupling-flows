@@ -81,7 +81,7 @@ class HConfig(NamedTuple):
     h_out: bool = False  # Whether to output h (it may be used as an invariant scale parameter for example).
     h_out_dim: int = 1  # Number of dimensions of h output by the EGNN.
     share_h: bool = False   # Whether to use the h from the EGCL for the computation of h-out.
-    linear_softmax: bool = False    # Linear layer followed by softmax for improving stability.
+    linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
 
 
 class EgnnConfig(NamedTuple):
@@ -101,7 +101,7 @@ class se_equivariant_net(hk.Module):
                                                )(x, h)
         if config.h_config.h_out:
             self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
-                if config.zero_init_h else hk.Linear(1)
+                if config.zero_init_h else hk.Linear(config.h_config.h_out_dim)
         self.config = config
 
     def __call__(self, x):

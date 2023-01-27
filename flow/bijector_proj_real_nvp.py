@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from flow.nets import se_equivariant_net
+from flow.nets import se_equivariant_net, EgnnConfig
 
 
 # TODO: need to figure out how to push all transforms into a single NN, instead of having multiple.
@@ -147,7 +147,7 @@ def make_conditioner(origin_equivariant_fn,
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config,
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
                                                        identity_init: bool = True):
     assert dim == 2  # Currently just written for 2D
 
@@ -159,24 +159,20 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     origin_equivariant_fn = se_equivariant_net(
         egnn_config._replace(name=f"layer_{layer_number}_origin",
                            identity_init_x=identity_init,
-                           h_out=False))
+                           h_config=egnn_config.h_config._replace(h_out=False)))
 
     y_equivariant_fn = se_equivariant_net(
         egnn_config._replace(name=f"layer_{layer_number}_y",
                            identity_init_x=False,
                            zero_init_h=identity_init,
-                           h_out_dim=1,
-                           h_out=True
-                           ))
+                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
 
 
     x_equivariant_fn = se_equivariant_net(
         egnn_config._replace(name=f"layer_{layer_number}_x",
                            identity_init_x=False,
                            zero_init_h=identity_init,
-                           h_out_dim=1,
-                           h_out=True
-                           ))
+                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
 
 
 

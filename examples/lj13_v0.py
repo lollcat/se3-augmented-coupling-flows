@@ -79,7 +79,7 @@ def train(
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
     egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True, share_h=True)),
+        linear_softmax=True, share_h=True)),
     train_set_size: int = 1000,
     test_set_size: int = 1000,
     K: int = 2,
@@ -95,7 +95,7 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type,
-            egnn_conifg=egnn_config
+            egnn_config=egnn_config
         )
         return distribution.log_prob(x)
 
@@ -104,7 +104,7 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(
             dim=dim, nodes=n_nodes, n_layers=n_layers,
             flow_identity_init=identity_init, type=flow_type,
-            egnn_conifg=egnn_config
+            egnn_config=egnn_config
         )
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 

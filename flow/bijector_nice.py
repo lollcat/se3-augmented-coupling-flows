@@ -1,7 +1,7 @@
 import distrax
 import jax.numpy as jnp
 
-from flow.nets import se_equivariant_net
+from flow.nets import se_equivariant_net, EgnnConfig
 
 
 def make_conditioner(equivariant_fn):
@@ -11,15 +11,19 @@ def make_conditioner(equivariant_fn):
     return conditioner
 
 
-def make_se_equivariant_nice(layer_number, dim, swap, identity_init: bool = True, mlp_units=(5, 5)):
+def make_se_equivariant_nice(layer_number, dim, swap, egnn_config: EgnnConfig, identity_init: bool = True):
+    """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
 
-    equivariant_fn = se_equivariant_net(name=f"layer_{layer_number}",
-                                        zero_init=identity_init,
-                                        mlp_units=mlp_units)
+    ref_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_ref",
+                           identity_init_x=False,
+                           zero_init_h=identity_init,
+                           h_config=egnn_config.h_config._replace(h_out=False)))
+
     def bijector_fn(shift):
         return distrax.ScalarAffine(log_scale=jnp.zeros_like(shift), shift=shift)
 
-    conditioner = make_conditioner(equivariant_fn)
+    conditioner = make_conditioner(ref_equivariant_fn)
     return distrax.SplitCoupling(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
