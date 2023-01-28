@@ -93,6 +93,7 @@ class EgnnConfig(NamedTuple):
     n_layers: int = 3  # Number of EGCL layers.
     h_config: HConfig = HConfig()
     hk_layer_stack: bool = True  # To lower compile time.
+    compile_n_unroll: int = 1
 
 
 class se_equivariant_net(hk.Module):
@@ -124,7 +125,8 @@ class se_equivariant_net(hk.Module):
         h = jnp.zeros((*x.shape[0:-1], self.config.h_config.h_embedding_dim))
         if self.config.hk_layer_stack:
             # Use layer_stack to speed up compilation time.
-            stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False, name="EGCL_layer_stack")
+            stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False, name="EGCL_layer_stack",
+                                                unroll=self.config.compile_n_unroll)
             x_out, h_egnn = stack(self.egnn_layer_fn)(x, h)
         else:
             x_out, h_egnn = x, h

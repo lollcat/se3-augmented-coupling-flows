@@ -7,7 +7,7 @@ from functools import partial
 import matplotlib.pyplot as plt
 import numpy as np
 
-from flow.distribution import make_equivariant_augmented_flow_dist, make_equivariant_augmented_flow_dist_distrax_chain
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
 from target import double_well as dw
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
@@ -15,12 +15,6 @@ from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
 from flow.nets import EgnnConfig, HConfig
 
-
-def get_n_params(params):
-    params = jax.tree_map(lambda x: x.flatten(), params)
-    params = jax.tree_util.tree_flatten(params)[0]
-    params = jnp.concatenate(params)
-    return params.shape[0]
 
 
 def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0):
@@ -66,55 +60,46 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
+_DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
+        dim=2, n_layers=6, nodes=4,  flow_identity_init=True,
+        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+                linear_softmax=True, share_h=True))
+    )
 
 def train(
     n_epoch = int(200),
-    dim = 2,
+    flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
     lr = 5e-4,
-    n_nodes = 4,
-    n_layers = 2,
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),
-    flow_type = "vector_scale",  # "nice", "proj", "vector_scale_shift", "vector_scale"
-    identity_init = True,
     n_plots = 4,
     reload_aug_per_epoch: bool = True,
     train_set_size: int = 1000,
     test_set_size: int = 1000,
-    K: int = 8,
-    fast_compile: bool = True,
-    egnn_config: EgnnConfig = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-        linear_softmax=True, share_h=True))
+    K: int = 8
 ):
+    dim = 2
+    n_nodes = 4
+    assert flow_dist_config.dim == dim
+    assert flow_dist_config.nodes == n_nodes
 
     logger = ListLogger()
 
-    make_dist = make_equivariant_augmented_flow_dist if fast_compile else \
-        make_equivariant_augmented_flow_dist_distrax_chain
     @hk.without_apply_rng
     @hk.transform
     def log_prob_fn(x):
-        distribution = make_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.log_prob(x)
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
-    print(len(params.keys()))
-    print(get_n_params(params))
 
 
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))

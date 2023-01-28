@@ -15,10 +15,11 @@ BijectorT = base.BijectorT
 class Chain(base.Bijector):
   """Chain of the same bijector, that is fast to compile."""
 
-  def __init__(self, bijector_fn: Callable, n_layers):
+  def __init__(self, bijector_fn: Callable, n_layers, compile_n_unroll=2):
     self._bijector_fn = bijector_fn
     self._n_layers = n_layers
-    self.stack = hk.experimental.layer_stack(self._n_layers, with_per_layer_inputs=False, name="flow_layer_stack")
+    self.stack = hk.experimental.layer_stack(self._n_layers, with_per_layer_inputs=False, name="flow_layer_stack",
+                                            unroll=compile_n_unroll)
 
     is_constant_jacobian = False
     is_constant_log_det = False
