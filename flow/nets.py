@@ -92,13 +92,19 @@ class EgnnConfig(NamedTuple):
     zero_init_h: int = False
     n_layers: int = 3  # Number of EGCL layers.
     h_config: HConfig = HConfig()
+    hk_layer_stack: bool = True  # To lower compile time.
 
 
 class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
-        self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x
-                                               )(x, h)
+        if config.hk_layer_stack:
+            self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x
+                                                   )(x, h)
+        else:
+            self.egnn_layers = [EGCL(config.name, config.mlp_units, config.identity_init_x
+                                                   ) for _ in range(config.n_layers)]
+
         if config.h_config.h_out:
             self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
                 if config.zero_init_h else hk.Linear(config.h_config.h_out_dim)
@@ -116,9 +122,14 @@ class se_equivariant_net(hk.Module):
         # Perform forward pass of EGNN.
         # No node feature, so initialise them with zeros.
         h = jnp.zeros((*x.shape[0:-1], self.config.h_config.h_embedding_dim))
-        # Use layer_stack to speed up compilation time.
-        stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False)
-        x_out, h_egnn = stack(self.egnn_layer_fn)(x, h)
+        if self.config.hk_layer_stack:
+            # Use layer_stack to speed up compilation time.
+            stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False, name="EGCL_layer_stack")
+            x_out, h_egnn = stack(self.egnn_layer_fn)(x, h)
+        else:
+            x_out, h_egnn = x, h
+            for layer in self.egnn_layers:
+                x_out, h_egnn = layer(x_out, h_egnn)
 
 
         if not self.config.h_config.h_out:

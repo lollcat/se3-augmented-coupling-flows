@@ -15,7 +15,7 @@ def make_se_equivariant_nice(layer_number, dim, swap, egnn_config: EgnnConfig, i
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
 
     ref_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_ref",
+        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_ref",
                            identity_init_x=False,
                            zero_init_h=identity_init,
                            h_config=egnn_config.h_config._replace(h_out=False)))
