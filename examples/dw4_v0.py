@@ -61,7 +61,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 
 _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
-        dim=2, n_layers=6, nodes=4,  flow_identity_init=True,
+        dim=2, n_layers=4, nodes=4,  flow_identity_init=True,
         type="vector_scale", fast_compile=True, compile_n_unroll=2,
         egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
                 linear_softmax=True, share_h=True))
