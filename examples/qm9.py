@@ -6,7 +6,7 @@ import optax
 from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
 
-from flow.distribution import make_equivariant_augmented_flow_dist
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
@@ -65,28 +65,30 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 3), n_vertices = 5, *args, **kwargs
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
+_DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
+        dim=3, n_layers=4, nodes=29,  flow_identity_init=True,
+        type="vector_scale", fast_compile=True, compile_n_unroll=1,
+        egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+                linear_softmax=True, share_h=True))
+    )
 
 
 def train(
     n_epoch = int(10),
-    dim: int = 3,
+    flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
     lr: float = 1e-4,
-    n_nodes: int = 29,
-    n_layers: int = 4,
     batch_size: int = 4,
     max_global_norm: float = jnp.inf,  # jnp.inf
     seed: int = 0,
-    flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
-    identity_init = True,
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
     train_data_n_points = 1000,  # set to None to use full set
     test_data_n_poins = 1000,  # set to None to use full set,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        layer_norm=False, linear_softmax=True, share_h=True)),
     plotting_n_nodes = 5,
     K: int = 20,
 ):
+    n_nodes = 29
+    dim = 3
     key = jax.random.PRNGKey(seed)
 
 
@@ -96,20 +98,12 @@ def train(
     @hk.without_apply_rng
     @hk.transform
     def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.log_prob(x)
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
 

@@ -7,7 +7,7 @@ from tqdm.autonotebook import tqdm
 from functools import partial
 import matplotlib.pyplot as plt
 
-from flow.distribution import make_equivariant_augmented_flow_dist
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
 from target import leonard_jones as lj
 from utils.loggers import ListLogger
 from utils.plotting import plot_history
@@ -65,26 +65,31 @@ def plot_sample_hist(samples, ax, dim=(0, 1, 3), *args, **kwargs):
 
 
 
+_DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
+        dim=3, n_layers=4, nodes=13,  flow_identity_init=True,
+        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+                linear_softmax=True, share_h=True))
+    )
+
+
 def train(
     n_epoch = int(32),
-    dim = 3,
+    flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
     lr = 1e-3,
-    n_nodes = 13,
-    n_layers = 4,
     batch_size = 32,
     max_global_norm = 100,  # jnp.inf
     key =  jax.random.PRNGKey(0),
-    flow_type= "vector_scale_shift",  # "nice", "proj", "vector_scale_shift"
-    identity_init = True,
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
-    egnn_config: EgnnConfig = EgnnConfig(name="dummy", mlp_units=(4,), n_layers=1, h_config=HConfig()._replace(
-        linear_softmax=True, share_h=True)),
     train_set_size: int = 1000,
     test_set_size: int = 1000,
     K: int = 2,
 ):
-
+    n_nodes = 13
+    dim = 3
+    assert flow_dist_config.dim == dim
+    assert flow_dist_config.nodes == n_nodes
 
     logger = ListLogger()
 
@@ -92,20 +97,12 @@ def train(
     @hk.without_apply_rng
     @hk.transform
     def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.log_prob(x)
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type,
-            egnn_config=egnn_config
-        )
+        distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
     key, subkey = jax.random.split(key)

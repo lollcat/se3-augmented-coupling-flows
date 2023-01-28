@@ -17,7 +17,7 @@ class EquivariantFlowDistConfig(NamedTuple):
     flow_identity_init: bool = True
     egnn_config: EgnnConfig = EgnnConfig(name="dummy_name")
     fast_compile: bool = True
-    compile_n_unroll: int = 2
+    compile_n_unroll: int = 1
 
 
 def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):

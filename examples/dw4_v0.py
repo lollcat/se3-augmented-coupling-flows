@@ -62,10 +62,11 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
         dim=2, n_layers=4, nodes=4,  flow_identity_init=True,
-        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        type="vector_scale", fast_compile=True, compile_n_unroll=1,
         egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
                 linear_softmax=True, share_h=True))
     )
+
 
 def train(
     n_epoch = int(200),
@@ -128,10 +129,6 @@ def train(
 
     plot()
 
-    # key, subkey = jax.random.split(key)
-    # eval_info = eval(params, test_data, log_prob_fn, subkey)
-    # logger.write(eval_info)
-
     pbar = tqdm(range(n_epoch))
     for i in pbar:
         key, subkey = jax.random.split(key)
@@ -144,7 +141,6 @@ def train(
             logger.write(info)
             if jnp.isnan(info["grad_norm"]):
                 print("nan grad")
-                # raise Exception("nan grad encountered")
 
 
         if i % (n_epoch // n_plots) == 0 or i == (n_epoch - 1):

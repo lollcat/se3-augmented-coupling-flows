@@ -3,13 +3,14 @@ import matplotlib.pyplot as plt
 import jax
 import haiku as hk
 
-from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant, bijector_test
-from flow.distribution import make_equivariant_augmented_flow_dist
+from flow.test_utils import test_fn_is_invariant, bijector_test
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
+from flow.nets import HConfig, EgnnConfig
 
 
 _N_FLOW_LAYERS = 4
 _N_NODES = 16
-_FLOW_TYPE = "vector_scale"  # "nice", "proj", 'vector_scale_shift' 'vector_scale'
+_FLOW_TYPE = "proj"  # "nice", "proj", 'vector_scale_shift' 'vector_scale'
 
 
 def test_distribution():
@@ -18,27 +19,26 @@ def test_distribution():
 
     dim = 2
     n_nodes = _N_NODES
-    n_layers = _N_FLOW_LAYERS
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    flow_type = _FLOW_TYPE
-    identity_init = False
+    config = EquivariantFlowDistConfig(
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=False,
+        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+            linear_softmax=True, share_h=True))
+    )
 
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type)
+        distribution = make_equivariant_augmented_flow_dist(config)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
 
     @hk.without_apply_rng
     @hk.transform
     def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type)
+        distribution = make_equivariant_augmented_flow_dist(config)
         return distribution.log_prob(x)
 
 
@@ -64,25 +64,24 @@ def test_distribution():
 def test_flow():
     dim = 2
     n_nodes = _N_NODES
-    n_layers = _N_FLOW_LAYERS
-    key = jax.random.PRNGKey(0)
-    flow_type = _FLOW_TYPE
-    identity_init = False
+
+    config = EquivariantFlowDistConfig(
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=False,
+        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+            linear_softmax=True, share_h=True))
+    )
 
     @hk.without_apply_rng
     @hk.transform
     def forward_and_log_det(x):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type)
+        distribution = make_equivariant_augmented_flow_dist(config)
         return distribution.bijector.forward_and_log_det(x)
 
     @hk.without_apply_rng
     @hk.transform
     def inverse_and_log_det(x):
-        distribution = make_equivariant_augmented_flow_dist(
-            dim=dim, nodes=n_nodes, n_layers=n_layers,
-            flow_identity_init=identity_init, type=flow_type)
+        distribution = make_equivariant_augmented_flow_dist(config)
         return distribution.bijector.inverse_and_log_det(x)
 
 
