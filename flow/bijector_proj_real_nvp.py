@@ -4,9 +4,9 @@ import distrax
 import chex
 import jax
 import jax.numpy as jnp
-import haiku as hk
 
 from flow.nets import se_equivariant_net, EgnnConfig
+from utils.numerical import rotate_2d, vector_rejection
 
 
 # TODO: need to figure out how to push all transforms into a single NN, instead of having multiple.
@@ -18,12 +18,7 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
     chex.assert_rank(point, 1)
     chex.assert_equal_shape((point, scale, shift))
     point_in_new_space = jnp.linalg.inv(change_of_basis_matrix) @ (point - origin)
-    # print(f"\n\n************************\n\n")
-    # print(f"change_of_basis_matrix: {change_of_basis_matrix}")
-    # print(f"point - origin: {point - origin}")
-    # print(f"point in new space: {point_in_new_space}")
     transformed_point_in_new_space = point_in_new_space * scale + shift
-    # print(f"transformed point in new space: {transformed_point_in_new_space}")
     new_point_original_space = change_of_basis_matrix @ transformed_point_in_new_space + origin
     return new_point_original_space
 
@@ -118,22 +113,33 @@ def make_conditioner(origin_equivariant_fn,
 
         # Calculate new basis for the affine transform
         origin = origin_equivariant_fn(x)
-        z_basis_point, z_scale_and_shift_params = z_equivariant_fn(x)
-        x_basis_point, x_scale_and_shift_params = x_equivariant_fn(x)
+        z_basis_point, zy_scale_and_shift_params = z_equivariant_fn(x)
+        z_scale_and_shift_params, y_scale_and_shift_params = jnp.split(zy_scale_and_shift_params, 2, axis=-1)
+        if x_equivariant_fn is not None:
+            chex.assert_tree_shape_suffix(x, (3, ))
+            # Compute reference axes.
+            z_basis_vector = z_basis_point - origin
+            x_basis_point, x_scale_and_shift_params = x_equivariant_fn(x)
+            x_basis_vector = x_basis_point - origin
+            x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
+            y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
+            change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
 
-        y_basis_vector = z_basis_point - origin
-        # x_basis_vector = x_basis_point - origin
-        theta = jnp.pi*0.4
-        rotation_matrix = jnp.array(
-            [[jnp.cos(theta), -jnp.sin(theta)],
-             [jnp.sin(theta), jnp.cos(theta)]]
-        )
-        x_basis_vector = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, y_basis_vector)
+            log_scale = jnp.stack([z_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0],
+                                   y_scale_and_shift_params[..., 0]], axis=-1)
+            shift = jnp.stack([z_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1],
+                               y_scale_and_shift_params[..., 1]], axis=-1)
 
-        change_of_basis_matrix = jnp.stack([x_basis_vector, y_basis_vector], axis=-1)
 
-        log_scale = jnp.stack([z_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0]], axis=-1)
-        shift = jnp.stack([z_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1]], axis=-1)
+        else:
+            chex.assert_tree_shape_suffix(x, (2,))
+            z_basis_vector = z_basis_point - origin
+            # x_basis_vector = x_basis_point - origin
+            y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
+            change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
+
+            log_scale = jnp.stack([z_scale_and_shift_params[..., 0], y_scale_and_shift_params[..., 0]], axis=-1)
+            shift = jnp.stack([z_scale_and_shift_params[..., 1], y_scale_and_shift_params[..., 1]], axis=-1)
 
         return change_of_basis_matrix, origin, log_scale, shift
 
@@ -149,7 +155,7 @@ def make_conditioner(origin_equivariant_fn,
 
 def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
                                                        identity_init: bool = True):
-    assert dim == 2  # Currently just written for 2D
+    assert dim in (2, 3)  # Currently just written for 2D
 
     def bijector_fn(params):
         change_of_basis_matrix, origin, log_scale, shift = params
@@ -165,14 +171,16 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_y",
                            identity_init_x=False,
                            zero_init_h=identity_init,
-                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
+                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=4)))
 
-
-    x_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
-                           identity_init_x=False,
-                           zero_init_h=identity_init,
-                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
+    if dim == 3:
+        x_equivariant_fn = se_equivariant_net(
+            egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
+                               identity_init_x=False,
+                               zero_init_h=identity_init,
+                               h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
+    else:
+        x_equivariant_fn = None
 
 
 

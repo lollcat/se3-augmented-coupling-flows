@@ -62,7 +62,6 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                 bijectors.append(bijector)
 
             elif type == "proj":
-                assert dim == 2
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=0, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config)
@@ -91,8 +90,7 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
-    # bijectors.append(distrax.ScalarAffine(log_scale=hk.get_parameter("base_scale", shape=(), init=jnp.zeros),
-    #                                       shift=jnp.zeros(dim*2)))
+
     for i in range(n_layers):
         for swap in (False, True):
             if type == "vector_scale_shift":
