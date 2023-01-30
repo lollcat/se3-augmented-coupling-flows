@@ -79,7 +79,7 @@ def train(
     lr: float = 1e-4,
     batch_size: int = 4,
     max_global_norm: float = jnp.inf,  # jnp.inf
-    seed: int = 0,
+    key: int = jax.random.PRNGKey(0),
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
     train_data_n_points = 1000,  # set to None to use full set
@@ -89,8 +89,6 @@ def train(
 ):
     n_nodes = 29
     dim = 3
-    key = jax.random.PRNGKey(seed)
-
 
     logger = ListLogger()
 
@@ -157,7 +155,7 @@ def train(
             train_data = original_dataset_to_joint_dataset(train_data[..., :dim], subkey)
 
         batched_data = jnp.reshape(train_data, (-1, batch_size, *train_data.shape[1:]))
-        (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=2)
+        (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=1)
 
         for batch_index in range(batched_data.shape[0]):
             info = jax.tree_map(lambda x: x[batch_index], infos)
