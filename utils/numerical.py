@@ -15,6 +15,33 @@ def set_diagonal_to_zero(x):
     return jnp.where(jnp.eye(x.shape[0]), jnp.zeros_like(x), x)
 
 
+def rotate_3d(x, theta, phi):
+    rotation_matrix_1 = jnp.array(
+        [[jnp.cos(theta), -jnp.sin(theta), 0],
+         [jnp.sin(theta), jnp.cos(theta), 0],
+         [0,              0,              1]]
+    )
+    rotation_matrix_2 = jnp.array([
+        [1, 0, 0],
+        [0, jnp.cos(phi), -jnp.sin(phi)],
+        [0, jnp.sin(phi), jnp.cos(phi)],
+         ])
+    x = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix_1, x)
+    x = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix_2, x)
+    return x
+
+
+def rotate_translate_3d(x, theta, phi, translation, rotate_first=True):
+    chex.assert_shape(theta, ())
+    chex.assert_shape(phi, ())
+    chex.assert_shape(translation, x.shape[-1:])
+
+    if rotate_first:
+        return rotate_3d(x, theta, phi) + translation[None, :]
+    else:
+        return rotate_3d(x + translation[None, :], theta, phi)
+
+
 def rotate_2d(x, theta):
     rotation_matrix = jnp.array(
         [[jnp.cos(theta), -jnp.sin(theta)],

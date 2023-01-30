@@ -42,4 +42,7 @@ if __name__ == '__main__':
 
         config.update("jax_enable_x64", True)
 
-    test_bijector_with_proj()
+    test_bijector_with_proj(dim=3)
+    print("passed 3D test")
+    test_bijector_with_proj(dim=2)
+    print("passed 2D test")

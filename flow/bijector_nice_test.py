@@ -6,7 +6,7 @@ from flow.bijector_nice import make_se_equivariant_nice
 from flow.nets import EgnnConfig
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 11):
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 11):
     egnn_config = EgnnConfig("")
 
     def make_flow():
@@ -41,4 +41,7 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_bijector_with_proj()
+    test_bijector_with_proj(dim=3)
+    print('passed test in 3D')
+    test_bijector_with_proj(dim=2)
+    print('passed test in 2D')

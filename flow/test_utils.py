@@ -2,28 +2,29 @@ import chex
 import jax.numpy as jnp
 import jax
 
-def get_pairwise_distances(x):
-    return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
+from utils.numerical import rotate_translate_2d, rotate_translate_3d
 
-
-def rotate_translate_2d(x_and_a, theta, translation):
-    chex.assert_shape(theta, ())
-    chex.assert_shape(translation, (int(x_and_a.shape[-1]/2),))
-    rotation_matrix = jnp.array(
-        [[jnp.cos(theta), -jnp.sin(theta)],
-         [jnp.sin(theta), jnp.cos(theta)]]
-    )
+def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
     x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
-    x_rot = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, x) + translation[None, :]
-    a_rot = jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, a) + translation[None, :]
+    x_rot = rotate_translate_2d(x, theta, translation)
+    a_rot = rotate_translate_2d(a, theta, translation)
+    return jnp.concatenate([x_rot, a_rot], axis=-1)
+
+def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
+    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
+    x_rot = rotate_translate_3d(x, theta, phi, translation)
+    a_rot = rotate_translate_3d(a, theta, phi, translation)
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, n_nodes=20):
+def get_pairwise_distances(x):
+    return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
 
-    dim = 2
+def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
+    assert dim in (2, 3)
+
     # Setup
-    key1, key2, key3 = jax.random.split(key, 3)
+    key1, key2, key3, key4 = jax.random.split(key, 4)
     x_and_a = jnp.zeros((n_nodes, dim * 2))
     x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape)
 
@@ -32,7 +33,17 @@ def test_fn_is_equivariant(equivariant_fn, key, n_nodes=20):
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2*jnp.pi
     translation = jax.random.normal(key3, shape=(dim,))
-    x_and_a_rot = rotate_translate_2d(x_and_a, theta, translation)
+    phi = jax.random.uniform(key4) * 2 * jnp.pi
+
+    def group_action(x_and_a):
+        if dim == 2:
+            x_and_a_rot = rotate_translate_x_and_a_2d(x_and_a, theta, translation)
+        else:  #  dim == 3:
+            x_and_a_rot = rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation)
+        return x_and_a_rot
+
+    x_and_a_rot = group_action(x_and_a)
+
     chex.assert_trees_all_close(get_pairwise_distances(x_and_a_rot),
                                 get_pairwise_distances(x_and_a), rtol=rtol)
 
@@ -41,24 +52,35 @@ def test_fn_is_equivariant(equivariant_fn, key, n_nodes=20):
     x_and_a_new_rot = equivariant_fn(x_and_a_rot)
 
     # Check that rotating x_and_a_new gives x_and_a_new_rot
-    chex.assert_trees_all_close(x_and_a_new_rot, rotate_translate_2d(x_and_a_new, theta, translation), rtol=rtol)
+
+    chex.assert_trees_all_close(x_and_a_new_rot, group_action(x_and_a_new), rtol=rtol)
 
     chex.assert_trees_all_close(get_pairwise_distances(x_and_a_new_rot),
                                 get_pairwise_distances(x_and_a_new), rtol=rtol)
 
 
-def test_fn_is_invariant(invariante_fn, key, n_nodes=7):
+def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):
+    assert dim in (2, 3)
 
-    dim = 2
     # Setup
-    key1, key2, key3 = jax.random.split(key, 3)
+    key1, key2, key3, key4 = jax.random.split(key, 4)
     x_and_a = jnp.zeros((n_nodes, dim * 2))
     x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape) * 0.1
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2 * jnp.pi
     translation = jax.random.normal(key3, shape=(dim,))
-    x_and_a_rot = rotate_translate_2d(x_and_a, theta, translation)
+    phi = jax.random.uniform(key4) * 2 * jnp.pi
+
+    def group_action(x_and_a):
+        if dim == 2:
+            x_and_a_rot = rotate_translate_x_and_a_2d(x_and_a, theta, translation)
+        else:  #  dim == 3:
+            x_and_a_rot = rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation)
+        return x_and_a_rot
+
+
+    x_and_a_rot = group_action(x_and_a)
 
     # Compute invariante_fn of both the original and rotated matrices.
     out = invariante_fn(x_and_a)
@@ -77,7 +99,7 @@ def bijector_test(bijector_forward, bijector_backward,
                   dim: int, n_nodes: int):
     """Test that the bijector is equivariant, and that it's log determinant is invariant.
     Assumes bijectors are haiku transforms."""
-    assert dim == 2
+    assert dim in (2, 3)
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
@@ -105,15 +127,15 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Test the transformation is equivariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey)
+    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, dim)
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey)
+    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, dim)
 
     # Check the change to the log det is invariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey)
+    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, dim)
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey)
+    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, dim)
 
 
     # Forward reverse test but with a batch.

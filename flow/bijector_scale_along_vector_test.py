@@ -6,7 +6,7 @@ from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vec
 from flow.nets import EgnnConfig
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 8):
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 8):
     egnn_config = EgnnConfig("")
 
     def make_flow():
@@ -44,4 +44,7 @@ if __name__ == '__main__':
 
         config.update("jax_enable_x64", True)
 
-    test_bijector_with_proj()
+    test_bijector_with_proj(dim=3)
+    print('passed test in 3D')
+    test_bijector_with_proj(dim=2)
+    print('passed test in 2D')
