@@ -127,7 +127,7 @@ class se_equivariant_net(hk.Module):
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
         sq_norms = jnp.sum(diff_combos**2, axis=-1)
         h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
-        h = jnp.sum(h, axis=-2)
+        h = jnp.mean(h, axis=-2)
 
         if self.config.hk_layer_stack:
             # Use layer_stack to speed up compilation time.
