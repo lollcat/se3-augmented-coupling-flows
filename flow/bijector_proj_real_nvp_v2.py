@@ -177,7 +177,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         x_equivariant_fn = None
 
     permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
-                                             config=TransformerConfig(output_dim=dim*2))
+                                             config=TransformerConfig(output_dim=dim*2, zero_init=identity_init))
 
     conditioner = make_conditioner(
         permutation_equivariant_fn=permutation_equivariant_fn,
