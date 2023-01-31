@@ -160,7 +160,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
     z_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_y",
+        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_z",
                            identity_init_x=False,
                            zero_init_h=False,
                            n_layers=1,
@@ -176,7 +176,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     else:
         x_equivariant_fn = None
 
-    permutation_equivariant_fn = Transformer(config=TransformerConfig(output_dim=dim*2))
+    permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
+                                             config=TransformerConfig(output_dim=dim*2))
 
     conditioner = make_conditioner(
         permutation_equivariant_fn=permutation_equivariant_fn,

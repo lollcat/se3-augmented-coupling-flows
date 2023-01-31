@@ -127,6 +127,8 @@ class se_equivariant_net(hk.Module):
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
         sq_norms = jnp.sum(diff_combos**2, axis=-1)
         h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
+        if self.config.h_config.linear_softmax:
+            h = jax.nn.softmax(h, axis=-1)
         h = jnp.mean(h, axis=-2)
 
         if self.config.hk_layer_stack:
@@ -179,7 +181,7 @@ class TransformerConfig(NamedTuple):
 
 class TransformerBlock(hk.Module):
     # Largely follows: https://theaisummer.com/jax-transformer/
-    def __init__(self, name: Optional[str] = None, config: TransformerConfig = TransformerConfig()):
+    def __init__(self, name: str, config: TransformerConfig = TransformerConfig()):
         super().__init__(name=name)
         self.config = config
 
@@ -199,10 +201,10 @@ class TransformerBlock(hk.Module):
 
 
 class Transformer(hk.Module):
-    def __init__(self, name: Optional[str] = None, config: TransformerConfig = TransformerConfig()):
+    def __init__(self, name: str, config: TransformerConfig = TransformerConfig()):
         super().__init__(name=name)
         self.config = config
-        self.transformer_block_fn = lambda x: TransformerBlock(config=config)(x)
+        self.transformer_block_fn = lambda x: TransformerBlock(name=name, config=config)(x)
 
     def __call__(self, x):
         x_out = jax.nn.relu(hk.Linear(self.config.num_heads * self.config.key_size)(x))
