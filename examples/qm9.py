@@ -89,6 +89,8 @@ def train(
 ):
     n_nodes = 29
     dim = 3
+    assert flow_dist_config.dim == dim
+    assert flow_dist_config.nodes == n_nodes
 
     logger = ListLogger()
 

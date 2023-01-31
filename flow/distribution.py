@@ -3,6 +3,7 @@ import distrax
 
 from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
 from flow.nets import EgnnConfig
@@ -66,6 +67,11 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config)
                 bijectors.append(bijector)
+            elif type == "proj_v2":
+                bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
+                                  identity_init=flow_identity_init,
+                                  egnn_config=egnn_config)
+                bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
                                                     identity_init=flow_identity_init,
@@ -112,9 +118,12 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                 bijectors.append(bijector)
 
             elif type == "proj":
-                assert dim == 2
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
+                                                                              egnn_config=egnn_config)
+                bijectors.append(bijector)
+            elif type == "proj_v2":
+                bijector = proj_v2(layer_number=i, dim=dim, swap=swap, identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config)
                 bijectors.append(bijector)
             elif type == "nice":

@@ -177,6 +177,7 @@ class TransformerConfig(NamedTuple):
     n_layers = 3
     layer_stack: bool = True
     compile_n_unroll: int = 1
+    zero_init: bool = False
 
 
 class TransformerBlock(hk.Module):
@@ -217,5 +218,7 @@ class Transformer(hk.Module):
             for i in range(self.config.n_layers):
                 x_out = self.transformer_block_fn(x_out)
         if self.config.output_dim is not None:
-            x_out = hk.Linear(self.config.output_dim)(x)
+            final_layer = hk.Linear(self.config.output_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
+                if self.config.zero_init else hk.Linear(self.config.output_dim)
+            x_out = final_layer(x)
         return x_out
