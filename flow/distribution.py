@@ -1,12 +1,12 @@
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 import distrax
 
 from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection as proj_v2
+from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
-from flow.nets import EgnnConfig
+from flow.nets import EgnnConfig, TransformerConfig
 from flow.fast_hk_chain import Chain
 
 
@@ -19,6 +19,7 @@ class EquivariantFlowDistConfig(NamedTuple):
     egnn_config: EgnnConfig = EgnnConfig(name="dummy_name")
     fast_compile: bool = True
     compile_n_unroll: int = 1
+    transformer_config: Optional[TransformerConfig] = None
 
 
 def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
@@ -38,7 +39,8 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          type="nice",
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
-                                         compile_n_unroll: int = 2):
+                                         compile_n_unroll: int = 2,
+                                         transformer_config: Optional[TransformerConfig] = None):
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     def bijector_fn():
@@ -70,7 +72,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
             elif type == "proj_v2":
                 bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
                                   identity_init=flow_identity_init,
-                                  egnn_config=egnn_config)
+                                  egnn_config=egnn_config, transformer_config=transformer_config)
                 bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
@@ -92,7 +94,8 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          n_layers,
                                          type="nice",
                                          flow_identity_init: bool = True,
-                                         egnn_config: EgnnConfig= EgnnConfig(name="dummy_name")):
+                                         egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
+                                         transformer_config: Optional[TransformerConfig] = None):
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
@@ -124,7 +127,8 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                 bijectors.append(bijector)
             elif type == "proj_v2":
                 bijector = proj_v2(layer_number=i, dim=dim, swap=swap, identity_init=flow_identity_init,
-                                                                              egnn_config=egnn_config)
+                                                                              egnn_config=egnn_config,
+                                   transformer_config=transformer_config)
                 bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,

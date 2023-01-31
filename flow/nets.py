@@ -172,9 +172,9 @@ class TransformerConfig(NamedTuple):
     output_dim: Optional[int] = None
     num_heads: int = 3
     key_size: int = 4
-    w_init_scale = 1.0
-    mlp_units = (32, 32)
-    n_layers = 3
+    w_init_scale: float = 1.0
+    mlp_units: Sequence[int] = (32, 32)
+    n_layers: int = 3
     layer_stack: bool = True
     compile_n_unroll: int = 1
     zero_init: bool = False

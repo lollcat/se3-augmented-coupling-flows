@@ -47,7 +47,11 @@ def rotate_2d(x, theta):
         [[jnp.cos(theta), -jnp.sin(theta)],
          [jnp.sin(theta), jnp.cos(theta)]]
     )
-    return jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, x)
+    if len(x.shape) == 2:
+        return jax.vmap(jnp.matmul, in_axes=(None, 0))(rotation_matrix, x)
+    else:
+        chex.assert_rank(x, 1)
+        return jnp.matmul(rotation_matrix, x)
 
 
 def rotate_translate_2d(x, theta, translation, rotate_first=True):

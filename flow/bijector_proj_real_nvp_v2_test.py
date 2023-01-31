@@ -36,6 +36,7 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
 
 
 if __name__ == '__main__':
+    # Need to make scale not too close to 0 to get a reasonable result for this.
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config

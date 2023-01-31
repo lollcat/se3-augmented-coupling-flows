@@ -13,7 +13,7 @@ from utils.loggers import ListLogger
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset
 from utils.numerical import get_pairwise_distances
-from flow.nets import EgnnConfig, HConfig
+from flow.nets import EgnnConfig, HConfig, TransformerConfig
 
 
 
@@ -64,14 +64,14 @@ _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
         dim=2, n_layers=4, nodes=4,  flow_identity_init=True,
         type="proj_v2", fast_compile=True, compile_n_unroll=1,
         egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-                linear_softmax=True, share_h=True))
+                linear_softmax=True, share_h=True)),
+        transformer_config=TransformerConfig(mlp_units=(4,))
     )
-
 
 def train(
     n_epoch = int(200),
     flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
-    lr = 5e-4,
+    lr = 1e-4,
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),

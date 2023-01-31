@@ -133,8 +133,10 @@ def make_conditioner(z_equivariant_fn,
         if normalize:
             change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=0)
 
+        # change_of_basis_matrix = jax.lax.stop_gradient(change_of_basis_matrix)
+
         x_proj = jax.vmap(lambda x: jnp.linalg.inv(change_of_basis_matrix) @ (x - origin))(x)
-        log_scale_and_shift = permutation_equivariant_fn(x_proj)
+        log_scale_and_shift = permutation_equivariant_fn(x_proj) + 0.1
         log_scale, shift = jnp.split(log_scale_and_shift, indices_or_sections=2, axis=-1)
 
         change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], x.shape[0], axis=0)
@@ -152,8 +154,11 @@ def make_conditioner(z_equivariant_fn,
 
 
 def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
+                                                       transformer_config: Optional[TransformerConfig] = None,
                                                        identity_init: bool = True):
     assert dim in (2, 3)  # Currently just written for 2D
+
+    transformer_config = TransformerConfig() if transformer_config is None else transformer_config
 
     def bijector_fn(params):
         change_of_basis_matrix, origin, log_scale, shift = params
@@ -176,8 +181,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     else:
         x_equivariant_fn = None
 
+    transformer_config = transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
     permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
-                                             config=TransformerConfig(output_dim=dim*2, zero_init=identity_init))
+                                             config=transformer_config)
 
     conditioner = make_conditioner(
         permutation_equivariant_fn=permutation_equivariant_fn,
