@@ -1,4 +1,4 @@
-from typing import NamedTuple, Sequence
+from typing import NamedTuple, Sequence, Optional
 
 import chex
 import jax
@@ -121,8 +121,14 @@ class se_equivariant_net(hk.Module):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
 
         # Perform forward pass of EGNN.
-        # No node feature, so initialise them with zeros.
-        h = jnp.zeros((*x.shape[0:-1], self.config.h_config.h_embedding_dim))
+
+        # No node feature, so initialise them invariant fn of x.
+        diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
+        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
+        sq_norms = jnp.sum(diff_combos**2, axis=-1)
+        h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
+        h = jnp.sum(h, axis=-2)
+
         if self.config.hk_layer_stack:
             # Use layer_stack to speed up compilation time.
             stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False, name="EGCL_layer_stack",
@@ -158,3 +164,56 @@ class se_equivariant_net(hk.Module):
 
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
+
+
+class TransformerConfig(NamedTuple):
+    output_dim: Optional[int] = None
+    num_heads: int = 3
+    key_size: int = 4
+    w_init_scale = 1.0
+    mlp_units = (32, 32)
+    n_layers = 3
+    layer_stack: bool = True
+    compile_n_unroll: int = 1
+
+
+class TransformerBlock(hk.Module):
+    # Largely follows: https://theaisummer.com/jax-transformer/
+    def __init__(self, name: Optional[str] = None, config: TransformerConfig = TransformerConfig()):
+        super().__init__(name=name)
+        self.config = config
+
+    def __call__(self, x):
+        # Simplifying assumption for now to make residual connections and layer stacking easy.
+        chex.assert_tree_shape_suffix(x, (self.config.key_size*self.config.num_heads,))
+
+        x_norm = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x)
+        x_attn = hk.MultiHeadAttention(num_heads=self.config.num_heads, key_size=self.config.key_size,
+                                       w_init=hk.initializers.VarianceScaling(self.config.w_init_scale))(
+            x_norm, x_norm, x_norm)
+        x = x + x_attn
+        x_norm = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x)
+        x_dense = hk.nets.MLP([*self.config.mlp_units, self.config.num_heads*self.config.key_size])(x_norm)
+        x = x + x_dense
+        return x
+
+
+class Transformer(hk.Module):
+    def __init__(self, name: Optional[str] = None, config: TransformerConfig = TransformerConfig()):
+        super().__init__(name=name)
+        self.config = config
+        self.transformer_block_fn = lambda x: TransformerBlock(config=config)(x)
+
+    def __call__(self, x):
+        x_out = jax.nn.relu(hk.Linear(self.config.num_heads * self.config.key_size)(x))
+        if self.config.layer_stack:
+            stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False,
+                                                name="EGCL_layer_stack",
+                                                unroll=self.config.compile_n_unroll)
+            x_out = stack(self.transformer_block_fn)(x_out)
+        else:
+            for i in range(self.config.n_layers):
+                x_out = self.transformer_block_fn(x_out)
+        if self.config.output_dim is not None:
+            x_out = hk.Linear(self.config.output_dim)(x)
+        return x_out
