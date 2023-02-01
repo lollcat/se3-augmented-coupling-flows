@@ -7,3 +7,7 @@ optax
 tqdm
 pandas
 jupyterlab
+wandb
+hydra-core
+hydra-joblib-launcher
+joblib

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Mapping, Union
 import pickle
 import numpy as np
 import pathlib
+import wandb
 
 LoggingData = Mapping[str, Any]
 
@@ -66,14 +67,14 @@ class ListLogger(Logger):
             pickle.dump(self.history, open(self.save_path, "wb"))
 
 
-# class WandbLogger(Logger):
-#     def __init__(self, **kwargs: Any):
-#         self.run = wandb.init(**kwargs, reinit=True)
-#         self.iter: int = 0
-#
-#     def write(self, data: Dict[str, Any]) -> None:
-#         self.run.log(data, step=self.iter, commit=False)
-#         self.iter += 1
-#
-#     def close(self) -> None:
-#         self.run.finish()
+class WandbLogger(Logger):
+    def __init__(self, **kwargs: Any):
+        self.run = wandb.init(**kwargs, reinit=True)
+        self.iter: int = 0
+
+    def write(self, data: Dict[str, Any]) -> None:
+        self.run.log(data, step=self.iter, commit=False)
+        self.iter += 1
+
+    def close(self) -> None:
+        self.run.finish()

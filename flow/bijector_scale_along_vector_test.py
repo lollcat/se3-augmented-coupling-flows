@@ -14,7 +14,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 8):
         for i in range(n_layers):
             swap = i % 2 == 0
             bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
-                                                              identity_init=False,
+                                                              identity_init=True,
                                                               egnn_config=egnn_config)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

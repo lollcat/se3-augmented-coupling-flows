@@ -13,7 +13,8 @@ import haiku as hk
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True):
+    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True,
+                 normalize_by_x_norm: bool = True):
         """
 
         Args:
@@ -21,6 +22,7 @@ class EGCL(hk.Module):
             mlp_units: MLP units for phi_e, phi_x and phi_h.
             identity_init_x: Whether to initialise the transform of x to the identity function.
             recurrent_h: Whether to include a residual connection for h.
+            normalize_by_x_norm: See divisor in Equation 12 of https://arxiv.org/pdf/2203.17003.pdf.
         """
         super().__init__(name=name + "equivariant")
         self.phi_e = hk.nets.MLP(mlp_units)
@@ -30,6 +32,7 @@ class EGCL(hk.Module):
                              hk.Linear(1)])
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
         self.recurrent_h = recurrent_h
+        self.normalize_by_x_norm = normalize_by_x_norm
 
     def __call__(self, x, h):
         if len(x.shape) == 2:
@@ -61,8 +64,12 @@ class EGCL(hk.Module):
         # Equation 5(a)
         phi_x_out = jnp.squeeze(self.phi_x(m_ij), axis=-1)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
-        C = x.shape[0] - 1  # This C is from the E(n) GNN paper: https://arxiv.org/pdf/2102.09844.pdf.
-        equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (sq_norms + 1)[..., None], phi_x_out) / C
+
+        if self.normalize_by_x_norm:
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (jnp.sqrt(sq_norms) + 1)[..., None], phi_x_out)
+        else:
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos[..., None], phi_x_out)
+
         x_new = x + equivariant_shift
 
         # Equation 5(b)
@@ -94,6 +101,7 @@ class EgnnConfig(NamedTuple):
     h_config: HConfig = HConfig()
     hk_layer_stack: bool = True  # To lower compile time.
     compile_n_unroll: int = 1
+    normalize_by_norms: bool = True
 
 
 class se_equivariant_net(hk.Module):
@@ -140,7 +148,6 @@ class se_equivariant_net(hk.Module):
             x_out, h_egnn = x, h
             for layer in self.egnn_layers:
                 x_out, h_egnn = layer(x_out, h_egnn)
-
 
         if not self.config.h_config.h_out:
             return x_out
@@ -219,6 +226,8 @@ class Transformer(hk.Module):
                 x_out = self.transformer_block_fn(x_out)
         if self.config.output_dim is not None:
             final_layer = hk.Linear(self.config.output_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
-                if self.config.zero_init else hk.Linear(self.config.output_dim)
-            x_out = final_layer(x)
+                if self.config.zero_init else hk.Linear(self.config.output_dim,
+                                                        w_init=hk.initializers.VarianceScaling(0.01),
+                                                        b_init=hk.initializers.VarianceScaling(0.01))
+            x_out = final_layer(x_out)
         return x_out

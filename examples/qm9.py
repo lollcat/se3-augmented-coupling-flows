@@ -82,8 +82,8 @@ def train(
     key: int = jax.random.PRNGKey(0),
     n_plots: int = 3,
     reload_aug_per_epoch: bool = True,
-    train_data_n_points = 1000,  # set to None to use full set
-    test_data_n_poins = 1000,  # set to None to use full set,
+    train_data_n_points = None,  # set to None to use full set
+    test_data_n_poins = None,  # set to None to use full set,
     plotting_n_nodes = 5,
     K: int = 20,
 ):
@@ -192,6 +192,6 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    logger, params, log_prob_fn, sample_and_log_prob_fn = train()
+    logger, params, log_prob_fn, sample_and_log_prob_fn = train(train_data_n_points=100, test_data_n_poins=100)
 
 

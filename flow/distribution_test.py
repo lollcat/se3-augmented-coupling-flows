@@ -5,27 +5,28 @@ import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, bijector_test
 from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
-from flow.nets import HConfig, EgnnConfig
+from flow.nets import HConfig, EgnnConfig, TransformerConfig
 
 
 _N_FLOW_LAYERS = 4
 _N_NODES = 16
-_FLOW_TYPE = "proj"  # "nice", "proj", 'vector_scale_shift' 'vector_scale'
+_FLOW_TYPE = "proj_v2"  # "nice", "proj", 'vector_scale_shift' 'vector_scale'
+_FAST_COMPILE_FLOW = False
+_IDENTITY_INIT = False
 
 
-def test_distribution():
+def test_distribution(dim = 3):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
-
-    dim = 2
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
     config = EquivariantFlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=False,
-        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=_IDENTITY_INIT,
+        type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-            linear_softmax=True, share_h=True))
+            linear_softmax=True, share_h=True)),
+        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2)
     )
 
 
@@ -48,28 +49,30 @@ def test_distribution():
 
     key, subkey = jax.random.split(key)
     sample, log_prob = sample_and_log_prob_fn.apply(params, subkey, (batch_size,))
+    chex.assert_tree_all_finite(log_prob)
 
     log_prob_check = log_prob_fn.apply(params, sample)
 
     chex.assert_trees_all_close(log_prob, log_prob_check)
 
     plt.plot(sample[0, :, 0], sample[0, :, 1], 'o')
+    plt.title("Samples marginal in first and second dim")
     plt.show()
 
     # Test log prob function is invariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x: log_prob_fn.apply(params, x), subkey, n_nodes=n_nodes)
+    test_fn_is_invariant(lambda x: log_prob_fn.apply(params, x), subkey, dim=dim, n_nodes=n_nodes)
 
 
-def test_flow():
-    dim = 2
+def test_flow(dim=3):
     n_nodes = _N_NODES
 
     config = EquivariantFlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=False,
-        type="vector_scale", fast_compile=True, compile_n_unroll=2,
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=_IDENTITY_INIT,
+        type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-            linear_softmax=True, share_h=True))
+            linear_softmax=True, share_h=True)),
+        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2)
     )
 
     @hk.without_apply_rng
@@ -95,6 +98,8 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_flow()
-    test_distribution()
+    test_flow(dim=2)
+    test_distribution(dim=2)
+    test_flow(dim=3)
+    test_distribution(dim=3)
 

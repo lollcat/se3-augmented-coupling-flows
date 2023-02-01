@@ -63,15 +63,15 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
         dim=2, n_layers=4, nodes=4,  flow_identity_init=True,
         type="proj_v2", fast_compile=True, compile_n_unroll=1,
-        egnn_config = EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
+        egnn_config = EgnnConfig(name="", mlp_units=(16,), n_layers=2, h_config=HConfig()._replace(
                 linear_softmax=True, share_h=True)),
-        transformer_config=TransformerConfig(mlp_units=(4,))
+        transformer_config=TransformerConfig(mlp_units=(16,))
     )
 
 def train(
     n_epoch = int(200),
     flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
-    lr = 1e-4,
+    lr = 4e-4,
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),
@@ -79,7 +79,8 @@ def train(
     reload_aug_per_epoch: bool = True,
     train_set_size: int = 1000,
     test_set_size: int = 1000,
-    K: int = 8
+    K: int = 8,
+    plot_n_samples: int = 512,
 ):
     dim = 2
     n_nodes = 4
@@ -99,19 +100,20 @@ def train(
         distribution = make_equivariant_augmented_flow_dist(flow_dist_config)
         return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
 
+    train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=train_set_size,
+                                         test_set_size=test_set_size)
+
     key, subkey = jax.random.split(key)
-    params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, n_nodes, dim*2)))
+    params = log_prob_fn.init(rng=subkey, x=train_data[0:2])
+
 
 
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = load_dataset(batch_size=batch_size, train_set_size=train_set_size,
-                                         test_set_size=test_set_size)
-
     print(f"training data size of {train_data.shape[0]}")
 
-    def plot(n_samples=512):
+    def plot(n_samples=plot_n_samples):
         fig, axs = plt.subplots(1, 2, figsize=(15, 6))
         samples = \
         jax.jit(sample_and_log_prob_fn.apply, static_argnums=(2,))(params, jax.random.PRNGKey(0), (n_samples,))[0]
@@ -169,7 +171,7 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    logger, params, log_prob_fn, sample_and_log_prob_fn = train()
+    logger, params, log_prob_fn, sample_and_log_prob_fn = train(plot_n_samples=128)
 
 
 

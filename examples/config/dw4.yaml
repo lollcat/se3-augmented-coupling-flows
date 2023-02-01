@@ -1,0 +1,41 @@
+#defaults:
+#  - override hydra/launcher: joblib
+
+flow:
+  dim: 2
+  nodes: 4
+  n_layers: 4
+  identity_init: true
+  type: proj_v2
+  fast_compile: true
+  compile_n_unroll: 1
+  enn:
+    mlp_units: (4,)
+    n_layers: 2
+    h_config:
+      linear_softmax: true
+      share_h: true
+
+
+training:
+  lr: 1e-3
+  n_epoch: 200
+  batch_size: 20
+  max_global_norm: null
+  seed: 0
+  reload_aug_per_epoch: true
+  train_set_size: 1000
+  test_set_size: 1000
+  n_plots: 4
+  n_checkpoints: null
+  n_eval: 4
+  K: 8  # For estimation of marginal NLL.
+
+
+logger:
+  wandb:
+    name: dw4_${flow.type}
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [dw4]
+

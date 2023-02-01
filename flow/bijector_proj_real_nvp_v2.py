@@ -131,12 +131,12 @@ def make_conditioner(z_equivariant_fn,
             change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
         if normalize:
-            change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=0)
+            change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=0,
+                                                                              keepdims=True)
 
-        # change_of_basis_matrix = jax.lax.stop_gradient(change_of_basis_matrix)
-
-        x_proj = jax.vmap(lambda x: jnp.linalg.inv(change_of_basis_matrix) @ (x - origin))(x)
-        log_scale_and_shift = permutation_equivariant_fn(x_proj) + 0.1
+        inv_change_of_basis = jnp.linalg.inv(change_of_basis_matrix)
+        x_proj = jax.vmap(lambda x:  inv_change_of_basis @ (x - origin))(x)
+        log_scale_and_shift = permutation_equivariant_fn(x_proj)
         log_scale, shift = jnp.split(log_scale_and_shift, indices_or_sections=2, axis=-1)
 
         change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], x.shape[0], axis=0)
@@ -168,7 +168,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_z",
                            identity_init_x=False,
                            zero_init_h=False,
-                           n_layers=1,
+                           n_layers=2,
                            h_config=egnn_config.h_config._replace(h_out=False)))
 
     if dim == 3:
@@ -176,7 +176,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
             egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
                                identity_init_x=False,
                                zero_init_h=False,
-                               n_layers=1,
+                               n_layers=2,
                                h_config=egnn_config.h_config._replace(h_out=False)))
     else:
         x_equivariant_fn = None

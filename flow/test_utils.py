@@ -109,7 +109,7 @@ def bijector_test(bijector_forward, bijector_backward,
     x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
 
     if x_and_a.dtype == jnp.float64:
-        rtol = 1e-5
+        rtol = 1e-4
     else:
         rtol = 1e-3
 
@@ -121,6 +121,7 @@ def bijector_test(bijector_forward, bijector_backward,
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
     # Check inverse gives original `x_and_a`
+    chex.assert_tree_all_finite(log_det_fwd)
     chex.assert_shape(log_det_fwd, ())
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)

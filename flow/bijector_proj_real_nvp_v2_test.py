@@ -4,11 +4,12 @@ import haiku as hk
 
 from flow.test_utils import bijector_test
 from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection
-from flow.nets import EgnnConfig
+from flow.nets import EgnnConfig, TransformerConfig
 
 
 def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
     egnn_config = EgnnConfig("")
+    transformer_config = TransformerConfig(mlp_units=(4,), n_layers=2)
 
     def make_flow():
         bijectors = []
@@ -16,7 +17,8 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
             swap = i % 2 == 0
             bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
                                                               identity_init=False,
-                                                              egnn_config=egnn_config)
+                                                              egnn_config=egnn_config,
+                                                              transformer_config=transformer_config)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -36,14 +38,15 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2):
 
 
 if __name__ == '__main__':
-    # Need to make scale not too close to 0 to get a reasonable result for this.
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
 
         config.update("jax_enable_x64", True)
 
-    test_bijector_with_proj(dim=3)
-    print("passed 3D test")
     test_bijector_with_proj(dim=2)
     print("passed 2D test")
+
+    test_bijector_with_proj(dim=3)
+    print("passed 3D test")
+
