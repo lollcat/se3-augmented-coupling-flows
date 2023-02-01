@@ -131,6 +131,7 @@ def make_conditioner(z_equivariant_fn,
         if normalize:
             change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=0,
                                                                               keepdims=True)
+        change_of_basis_matrix = jax.lax.stop_gradient(change_of_basis_matrix)
 
         inv_change_of_basis = jnp.linalg.inv(change_of_basis_matrix)
         x_proj = jax.vmap(lambda x:  inv_change_of_basis @ (x - origin))(x)

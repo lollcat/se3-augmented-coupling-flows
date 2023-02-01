@@ -65,10 +65,12 @@ class EGCL(hk.Module):
         phi_x_out = jnp.squeeze(self.phi_x(m_ij), axis=-1)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
+        N = x.shape[0]
         if self.normalize_by_x_norm:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (jnp.sqrt(sq_norms) + 1)[..., None], phi_x_out)
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (jnp.sqrt(sq_norms) + 1)[..., None], phi_x_out) \
+                                / N
         else:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos[..., None], phi_x_out)
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos[..., None], phi_x_out) / N
 
         x_new = x + equivariant_shift
 
