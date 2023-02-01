@@ -62,7 +62,7 @@ def plot_sample_hist(samples, ax, dim=(0, 1), *args, **kwargs):
 
 _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
         dim=2, n_layers=4, nodes=4,  flow_identity_init=True,
-        type="proj_v2", fast_compile=True, compile_n_unroll=1,
+        type="vector_scale", fast_compile=True, compile_n_unroll=1,
         egnn_config = EgnnConfig(name="", mlp_units=(16,), n_layers=2, h_config=HConfig()._replace(
                 linear_softmax=True, share_h=True)),
         transformer_config=TransformerConfig(mlp_units=(16,))
@@ -71,7 +71,7 @@ _DEFAULT_FLOW_CONFIG = EquivariantFlowDistConfig(
 def train(
     n_epoch = int(200),
     flow_dist_config: EquivariantFlowDistConfig = _DEFAULT_FLOW_CONFIG,
-    lr = 4e-4,
+    lr = 1e-4,
     batch_size = 16,
     max_global_norm: int = jnp.inf,  # 100, jnp.inf
     key = jax.random.PRNGKey(0),
@@ -106,7 +106,7 @@ def train(
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=train_data[0:2])
 
-
+    # probs = log_prob_fn.apply(params, train_data[0:2])
 
     optimizer = optax.chain(optax.zero_nans(), optax.clip_by_global_norm(max_global_norm), optax.adam(lr))
     opt_state = optimizer.init(params)

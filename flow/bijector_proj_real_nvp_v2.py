@@ -9,8 +9,6 @@ from flow.nets import se_equivariant_net, EgnnConfig, Transformer, TransformerCo
 from utils.numerical import rotate_2d, vector_rejection
 
 
-# TODO: need to figure out how to push all transforms into a single NN, instead of having multiple.
-
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
     """Perform affine transformation in the space define by the `origin` and `change_of_basis_matrix`, and then
     go back into the original space."""

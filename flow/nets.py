@@ -87,7 +87,7 @@ class HConfig(NamedTuple):
     h_embedding_dim: int = 3   # Dimension of h embedding in the EGCL.
     h_out: bool = False  # Whether to output h (it may be used as an invariant scale parameter for example).
     h_out_dim: int = 1  # Number of dimensions of h output by the EGNN.
-    share_h: bool = False   # Whether to use the h from the EGCL for the computation of h-out.
+    share_h: bool = True   # Whether to use the h from the EGCL for the computation of h-out.
     linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
 
 
@@ -108,7 +108,10 @@ class se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
         if config.hk_layer_stack:
-            self.egnn_layer_fn = lambda x, h: EGCL(config.name, config.mlp_units, config.identity_init_x
+            self.egnn_layer_fn = lambda x, h: EGCL(config.name,
+                                                   mlp_units=config.mlp_units,
+                                                   identity_init_x=config.identity_init_x,
+                                                   normalize_by_x_norm=config.normalize_by_norms
                                                    )(x, h)
         else:
             self.egnn_layers = [EGCL(config.name, config.mlp_units, config.identity_init_x
