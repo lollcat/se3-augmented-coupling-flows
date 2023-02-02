@@ -15,7 +15,7 @@ class EquivariantFlowDistConfig(NamedTuple):
     nodes: int
     n_layers: int
     type: str = "nice"
-    flow_identity_init: bool = True
+    identity_init: bool = True
     egnn_config: EgnnConfig = EgnnConfig(name="dummy_name")
     fast_compile: bool = True
     compile_n_unroll: int = 1
@@ -25,12 +25,12 @@ class EquivariantFlowDistConfig(NamedTuple):
 def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
     if config.fast_compile:
         return make_equivariant_augmented_flow_dist_fast_compile(config.dim, config.nodes, config.n_layers,
-                                                                 config.type, config.flow_identity_init,
+                                                                 config.type, config.identity_init,
                                                                  config.egnn_config, config.compile_n_unroll)
     else:
         return make_equivariant_augmented_flow_dist_distrax_chain(config.dim, config.nodes, config.n_layers,
-                                                          config.type, config.flow_identity_init,
-                                                          config.egnn_config)
+                                                                  config.type, config.identity_init,
+                                                                  config.egnn_config)
 
 
 def make_equivariant_augmented_flow_dist_fast_compile(dim,

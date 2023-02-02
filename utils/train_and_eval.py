@@ -3,8 +3,25 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from functools import partial
+import optax
 
 from flow.base import CentreGravityGaussian
+
+
+def ml_loss_fn(params, x, log_prob_fn):
+    log_prob = log_prob_fn.apply(params, x)
+    loss = - jnp.mean(log_prob)
+    info = {"loss": loss}
+    return loss, info
+
+
+
+def ml_step(params, x, opt_state, log_prob_fn, optimizer):
+    grad, info = jax.grad(ml_loss_fn, has_aux=True)(params, x, log_prob_fn)
+    updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
+    new_params = optax.apply_updates(params, updates)
+    info.update(grad_norm=optax.global_norm(grad))
+    return new_params, new_opt_state, info
 
 
 def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0):

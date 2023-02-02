@@ -95,7 +95,7 @@ class HConfig(NamedTuple):
 
 class EgnnConfig(NamedTuple):
     """Config of the EGNN."""
-    name: str
+    name: str = ""
     mlp_units: Sequence[int] = (3,)
     identity_init_x: bool = False
     zero_init_h: int = False

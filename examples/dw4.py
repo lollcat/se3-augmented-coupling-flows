@@ -1,0 +1,36 @@
+import hydra
+from omegaconf import DictConfig
+import jax
+import jax.numpy as jnp
+import numpy as np
+
+from examples.train import train, create_train_config
+from utils.train_and_eval import original_dataset_to_joint_dataset
+
+
+
+def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0):
+    # dataset from https://github.com/vgsatorras/en_flows
+    # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
+
+    data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
+    dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
+    dataset = jnp.reshape(dataset, (-1, 4, 2))
+    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
+
+    train_set = dataset[:train_set_size]
+    train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
+
+    test_set = dataset[-test_set_size:]
+    return train_set, test_set
+
+@hydra.main(config_path="./config", config_name="dw4.yaml")
+def run(cfg: DictConfig):
+    experiment_config = create_train_config(cfg, dim=2, n_nodes=4,
+                                            load_dataset=load_dataset)
+    train(experiment_config)
+
+
+
+if __name__ == '__main__':
+    run()
