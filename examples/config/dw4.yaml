@@ -14,29 +14,29 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   egnn:
-    mlp_units: [4,]
-    n_layers: 2
+    mlp_units: [32,32]
+    n_layers: 3
     h:
       linear_softmax: true
       share_h: true
   transformer: # for proj_v2 flow.
-    mlp_units: [4,]
+    mlp_units: [32,32]
 
 
 training:
   lr: 1e-3
   n_epoch: 200
-  batch_size: 20
-  plot_batch_size: 128
-  max_global_norm: null
+  batch_size: 100
+  plot_batch_size: 256
+  max_global_norm: 100
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: 1000
   test_set_size: 1000
-  n_plots: 4
-  n_checkpoints: 2
-  n_eval: 4
-  K_marginal_log_lik: 8
+  n_plots: 8
+  n_checkpoints: 0
+  n_eval: 10
+  K_marginal_log_lik: 20
   save: true
   save_dir: dw4_results
 

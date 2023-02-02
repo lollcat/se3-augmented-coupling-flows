@@ -14,29 +14,29 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   egnn:
-    mlp_units: [4,]
-    n_layers: 2
+    mlp_units: [64, 64]
+    n_layers: 3
     h:
       linear_softmax: true
       share_h: true
   transformer: # for proj_v2 flow.
-    mlp_units: [4,]
+    mlp_units: [64,64]
 
 
 training:
-  lr: 1e-3
-  n_epoch: 200
-  batch_size: 2
-  plot_batch_size: 2
-  max_global_norm: null
+  lr: 1e-4
+  n_epoch: 100
+  batch_size: 32
+  plot_batch_size: 32
+  max_global_norm: 10_000
   seed: 0
   reload_aug_per_epoch: true
-  train_set_size: 100
-  test_set_size: 100
-  n_plots: 4
-  n_checkpoints: 2
-  n_eval: 4
-  K_marginal_log_lik: 2
+  train_set_size: null
+  test_set_size: null
+  n_plots: 6
+  n_checkpoints: 8
+  n_eval: 10
+  K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
 
