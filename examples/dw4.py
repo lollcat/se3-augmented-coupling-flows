@@ -39,7 +39,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = True
+    local_config = False
     if local_config:
         cfg = to_local_config(cfg)
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4,
