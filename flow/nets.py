@@ -196,7 +196,8 @@ class _se_equivariant_net(hk.Module):
         h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
 
         if self.config.h_config.linear_softmax:
-            h = jax.nn.softmax(h, axis=-1)
+            h = h.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
+            h = jax.nn.softmax(h, axis=-2)
         h = jnp.mean(h, axis=-2)
 
         if self.config.hk_layer_stack:
@@ -214,21 +215,21 @@ class _se_equivariant_net(hk.Module):
         else:  # Extra processing to get h_out.
 
             # Pass square norms of x as a feature.
-            diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-            diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
-            sq_norms = jnp.sum(diff_combos ** 2, axis=-1, keepdims=True)
+            sq_norms = get_norms_sqrd(x)[..., None]
 
             if self.config.h_config.linear_softmax:
-                sq_norms = jax.nn.softmax(hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms))
+                sq_norms = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms)
+                sq_norms = sq_norms.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
+                sq_norms = jax.nn.softmax(sq_norms, axis=-2)
 
             mlp_out = hk.nets.MLP((*self.config.mlp_units, self.config.h_config.h_embedding_dim),
                                   activate_final=True, activation=self.config.activation_fn)(sq_norms)
-            h_out = jnp.mean(mlp_out, axis=(-2))
+            h_out = jnp.mean(mlp_out, axis=-2)
 
             if self.config.h_config.share_h:
                 # Use h_egnn output from the EGNN as a feature for h-out.
                 if self.config.h_config.linear_softmax:
-                    h_egnn = jax.nn.softmax(h_egnn)
+                    h_egnn = jax.nn.softmax(h_egnn, axis=-1)
                 h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
             h_out = self.h_final_layer(h_out)
