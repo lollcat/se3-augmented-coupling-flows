@@ -55,19 +55,6 @@ def get_target_augmented_variables(x_original, key):
     return x_augmented + augmented_mean
 
 
-# def get_augmented_dist(x_original, scale: float = 1.0):
-#     chex.assert_rank(x_original, 3)
-#     if AUG_DIST_GLOBAL_MEAN:
-#         augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
-#     else:
-#         augmented_mean = jnp.mean(x_original, axis=2, keepdims=True)
-#     augmented_mean = jnp.broadcast_to(augmented_mean, x_original.shape)
-#     scale_vector = jnp.ones_like(augmented_mean) * scale
-#     augmented_dist = distrax.Independent(distrax.MultivariateNormalDiag(
-#         loc=augmented_mean, scale_diag=scale_vector),
-#         reinterpreted_batch_ndims=1)
-#     return augmented_dist
-
 def get_augmented_sample_and_log_prob(x_original, key, K):
     B, N, D = x_original.shape
     x_augmented, log_p_a = CentreGravityGaussian(n_nodes=N, dim=D).sample_and_log_prob(seed=key, sample_shape=(K, B))
