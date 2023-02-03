@@ -177,6 +177,7 @@ class EGNN(hk.Module):
     tanh: bool = False
     coords_agg: str = "mean"
     norm_constant: int = 0
+    fast_compile: bool = True
 
     def __call__(self, h, y, edges=None, edge_attr=None, node_attr=None):
         y_leading_shape = y.shape[:-1]
@@ -198,22 +199,43 @@ class EGNN(hk.Module):
         embedding_out = hk.Linear(h.shape[-1])
         act_fn = get_activation(self.act_fn)
         h = embedding_in(h)
-        for i in range(0, self.n_layers):
-            layer = E_GCL(
-                output_nf=self.hidden_nf,
-                hidden_nf=self.hidden_nf,
-                act_fn=act_fn,
-                residual=self.residual,
-                attention=self.attention,
-                normalize=self.normalize,
-                tanh=self.tanh,
-                coords_agg=self.coords_agg,
-                norm_constant=self.norm_constant,
-            )
-            h, y, _ = layer(h, edges, y, edge_attr=edge_attr, node_attr=node_attr)
+
+        if not self.fast_compile:
+            for i in range(0, self.n_layers):
+                layer = E_GCL(
+                    output_nf=self.hidden_nf,
+                    hidden_nf=self.hidden_nf,
+                    act_fn=act_fn,
+                    residual=self.residual,
+                    attention=self.attention,
+                    normalize=self.normalize,
+                    tanh=self.tanh,
+                    coords_agg=self.coords_agg,
+                    norm_constant=self.norm_constant,
+                )
+                h, y, _ = layer(h, edges, y, edge_attr=edge_attr, node_attr=node_attr)
+        else:
+            def egnn_layer_fn(h, y):
+                layer = E_GCL(
+                    output_nf=self.hidden_nf,
+                    hidden_nf=self.hidden_nf,
+                    act_fn=act_fn,
+                    residual=self.residual,
+                    attention=self.attention,
+                    normalize=self.normalize,
+                    tanh=self.tanh,
+                    coords_agg=self.coords_agg,
+                    norm_constant=self.norm_constant,
+                )
+                h, y, _ = layer(h, edges, y, edge_attr=edge_attr, node_attr=node_attr)
+                return h, y
+
+            stack = hk.experimental.layer_stack(self.n_layers, with_per_layer_inputs=False,
+                                                name="EGCL_layer_stack",
+                                                unroll=1)
+            h, y = stack(egnn_layer_fn)(h, y)
+
         h = embedding_out(h)
-
-
         h = jnp.reshape(h, (*y_leading_shape, h.shape[-1]))
         y = jnp.reshape(y, (*y_leading_shape, y.shape[-1]))
 

@@ -27,11 +27,11 @@ def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 100
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.egnn.mlp_units = (4,)
-    cfg.flow.transformer.mlp_units = (4,)
+    cfg.flow.egnn.mlp_units = (16,)
+    cfg.flow.transformer.mlp_units = (16,)
     cfg.flow.n_layers = 4
     cfg.training.batch_size = 32
-    cfg.training.n_epoch = 32
+    cfg.training.n_epoch = 100
     cfg.training.save = False
     cfg.training.plot_batch_size = 64
     cfg.logger = DictConfig({"list_logger": None})
@@ -39,7 +39,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4,
