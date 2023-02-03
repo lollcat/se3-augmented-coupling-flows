@@ -11,7 +11,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: vector_scale  # vector_scale_shift  vector_scale nice proj   proj_v2
+  type: nice  # vector_scale_shift  vector_scale nice proj   proj_v2
   fast_compile: true
   compile_n_unroll: 1
   egnn:
