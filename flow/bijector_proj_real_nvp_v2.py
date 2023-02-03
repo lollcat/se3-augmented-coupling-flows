@@ -100,7 +100,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(z_equivariant_fn,
+def make_conditioner(origin_equivariant_fn,
+                     z_equivariant_fn,
                      permutation_equivariant_fn,
                      x_equivariant_fn: Optional[Callable] = None,
                      normalize: bool = True):
@@ -109,37 +110,35 @@ def make_conditioner(z_equivariant_fn,
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
-        origin = jnp.mean(x, axis=0)
+        origin = origin_equivariant_fn(x)
         z_basis_point = z_equivariant_fn(x)
-        z_basis_point = jnp.mean(z_basis_point, axis=0)
         if x_equivariant_fn is not None:
             chex.assert_tree_shape_suffix(x, (3, ))
             # Compute reference axes.
             z_basis_vector = z_basis_point - origin
             x_basis_point = x_equivariant_fn(x)
-            x_basis_point = jnp.mean(x_basis_point, axis=0)
             x_basis_vector = x_basis_point - origin
-            x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
-            y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
+            x_basis_vector = jax.vmap(vector_rejection)(x_basis_vector, z_basis_vector)
+            y_basis_vector = jax.vmap(jnp.cross)(z_basis_vector, x_basis_vector)
             change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
         else:
             chex.assert_tree_shape_suffix(x, (2,))
             z_basis_vector = z_basis_point - origin
-            y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
+            y_basis_vector = jax.vmap(rotate_2d, in_axes=(0, None))(z_basis_vector, jnp.pi * 0.5)
             change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
         if normalize:
-            change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=0,
+            change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
                                                                               keepdims=True)
-        change_of_basis_matrix = jax.lax.stop_gradient(change_of_basis_matrix)
 
-        inv_change_of_basis = jnp.linalg.inv(change_of_basis_matrix)
-        x_proj = jax.vmap(lambda x:  inv_change_of_basis @ (x - origin))(x)
-        log_scale_and_shift = permutation_equivariant_fn(x_proj)
+        inv_change_of_basis = jax.vmap(jnp.linalg.inv)(change_of_basis_matrix)
+        x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
+                          in_axes=(0, None, None)), in_axes=(None, 0, 0))(
+            x, inv_change_of_basis, origin)
+        log_scale_and_shift = jax.vmap(permutation_equivariant_fn)(x_proj)
+        log_scale_and_shift = log_scale_and_shift[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])]
         log_scale, shift = jnp.split(log_scale_and_shift, indices_or_sections=2, axis=-1)
 
-        change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], x.shape[0], axis=0)
-        origin = jnp.repeat(origin[None, ...], x.shape[0], axis=0)
         return change_of_basis_matrix, origin, log_scale, shift
 
     def conditioner(x):
@@ -163,11 +162,16 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         change_of_basis_matrix, origin, log_scale, shift = params
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
+    origin_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_origin",
+                           identity_init_x=True,
+                           zero_init_h=False,
+                           h_config=egnn_config.h_config._replace(h_out=False)))
+
     z_equivariant_fn = se_equivariant_net(
         egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_z",
                            identity_init_x=False,
                            zero_init_h=False,
-                           n_layers=2,
                            h_config=egnn_config.h_config._replace(h_out=False)))
 
     if dim == 3:
@@ -175,7 +179,6 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
             egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
                                identity_init_x=False,
                                zero_init_h=False,
-                               n_layers=2,
                                h_config=egnn_config.h_config._replace(h_out=False)))
     else:
         x_equivariant_fn = None
@@ -186,6 +189,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
 
     conditioner = make_conditioner(
         permutation_equivariant_fn=permutation_equivariant_fn,
+        origin_equivariant_fn=origin_equivariant_fn,
         z_equivariant_fn=z_equivariant_fn,
         x_equivariant_fn=x_equivariant_fn)
 

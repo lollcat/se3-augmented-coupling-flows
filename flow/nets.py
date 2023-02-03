@@ -26,7 +26,8 @@ class EGCL(hk.Module):
     def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, residual: bool = True,
                  normalize_by_x_norm: bool = True, activation_fn: Callable = jax.nn.silu,
                  normalization_constant: float = 1.0, tanh: bool = False, phi_x_max: float = 10.0,
-                 agg='mean', stop_gradient_for_norm: bool = False):
+                 agg='mean', stop_gradient_for_norm: bool = False,
+                 variance_scaling_init: float =0.001):
         """
 
         Args:
@@ -42,7 +43,7 @@ class EGCL(hk.Module):
 
 
         self.phi_x = hk.Sequential([
-            hk.Linear(1, with_bias=False, w_init=hk.initializers.VarianceScaling(0.001, "fan_avg", "uniform")),
+            hk.Linear(1, with_bias=False, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
             hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
              hk.Linear(1),
@@ -143,6 +144,7 @@ class EgnnConfig(NamedTuple):
     phi_x_max: float = 2.0
     agg: str = 'mean'
     stop_gradient_for_norm: bool = False
+    variance_scaling_init: float = 0.001
 
 
 class _se_equivariant_net(hk.Module):
@@ -158,7 +160,8 @@ class _se_equivariant_net(hk.Module):
                                                    tanh=config.tanh,
                                                    phi_x_max=config.phi_x_max,
                                                    agg=config.agg,
-                                                   stop_gradient_for_norm=config.stop_gradient_for_norm
+                                                   stop_gradient_for_norm=config.stop_gradient_for_norm,
+                                                   variance_scaling_init=config.variance_scaling_init
                                                    )(x, h)
         else:
             self.egnn_layers = [EGCL(config.name,
@@ -170,7 +173,8 @@ class _se_equivariant_net(hk.Module):
                                tanh=config.tanh,
                                phi_x_max=config.phi_x_max,
                                agg=config.agg,
-                               stop_gradient_for_norm=config.stop_gradient_for_norm
+                               stop_gradient_for_norm=config.stop_gradient_for_norm,
+                               variance_scaling_init=config.variance_scaling_init
                                ) for _ in range(config.n_layers)]
 
         if config.h_config.h_out:
@@ -283,6 +287,7 @@ class TransformerConfig(NamedTuple):
     layer_stack: bool = True
     compile_n_unroll: int = 1
     zero_init: bool = False
+    layer_norm: bool = True
 
 
 class TransformerBlock(hk.Module):
@@ -295,13 +300,13 @@ class TransformerBlock(hk.Module):
         # Simplifying assumption for now to make residual connections and layer stacking easy.
         chex.assert_tree_shape_suffix(x, (self.config.key_size*self.config.num_heads,))
 
-        x_norm = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x)
+        x_in = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x) if self.config.layer_norm else x
         x_attn = hk.MultiHeadAttention(num_heads=self.config.num_heads, key_size=self.config.key_size,
                                        w_init=hk.initializers.VarianceScaling(self.config.w_init_scale))(
-            x_norm, x_norm, x_norm)
+            x_in, x_in, x_in)
         x = x + x_attn
-        x_norm = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x)
-        x_dense = hk.nets.MLP([*self.config.mlp_units, self.config.num_heads*self.config.key_size])(x_norm)
+        x_in = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x) if self.config.layer_norm else x
+        x_dense = hk.nets.MLP([*self.config.mlp_units, self.config.num_heads*self.config.key_size])(x_in)
         x = x + x_dense
         return x
 

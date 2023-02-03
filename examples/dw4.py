@@ -29,9 +29,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.flow.egnn.mlp_units = (16,)
     cfg.flow.transformer.mlp_units = (16,)
+    cfg.flow.transformer.n_layers = 2
     cfg.flow.n_layers = 4
     cfg.training.batch_size = 32
-    cfg.training.n_epoch = 100
+    cfg.training.n_epoch = 200
     cfg.training.save = False
     cfg.training.plot_batch_size = 64
     cfg.logger = DictConfig({"list_logger": None})

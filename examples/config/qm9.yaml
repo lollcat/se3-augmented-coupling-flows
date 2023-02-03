@@ -32,7 +32,7 @@ training:
   n_epoch: 100
   batch_size: 32
   plot_batch_size: 32
-  max_global_norm: null
+  max_global_norm: 10_000
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null

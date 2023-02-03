@@ -19,6 +19,7 @@ flow:
     mlp_units: [32,32]
     n_layers: 3
     normalize_by_norms: true
+    variance_scaling_init: 0.001
     tanh: false
     agg: mean
     phi_x_max: 1.0
