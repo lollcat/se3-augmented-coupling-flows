@@ -15,16 +15,22 @@ flow:
   compile_n_unroll: 1
   egnn:
     emile_net: false
-    mlp_units: [64, 64]
+    mlp_units: [32, 32]
     n_layers: 3
+    normalize_by_norms: true
+    variance_scaling_init: 0.001
+    tanh: false
+    agg: mean
+    phi_x_max: 1.0
     h:
       linear_softmax: true
       share_h: true
   transformer: # for proj_v2 flow.
-    mlp_units: [64,64]
+    mlp_units: [32,32]
     num_heads: 3
     key_size: 4
-    w_init_scale: 1.0
+    w_init_scale: 0.1
+    n_layers: 2
 
 
 training:

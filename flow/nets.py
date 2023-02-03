@@ -140,7 +140,7 @@ class EgnnConfig(NamedTuple):
     normalize_by_norms: bool = True
     emile_net: bool = False
     activation_fn: Callable = jax.nn.silu
-    tanh: bool = True
+    tanh: bool = False
     phi_x_max: float = 2.0
     agg: str = 'mean'
     stop_gradient_for_norm: bool = False
