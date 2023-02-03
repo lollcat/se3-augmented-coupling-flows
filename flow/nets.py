@@ -34,12 +34,12 @@ class EGCL(hk.Module):
             normalize_by_x_norm: See divisor in Equation 12 of https://arxiv.org/pdf/2203.17003.pdf.
         """
         super().__init__(name=name + "equivariant")
-        self.phi_e = hk.nets.MLP(mlp_units)
+        self.phi_e = hk.nets.MLP(mlp_units, activation=jax.nn.silu)
         self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
         self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True, activation=jax.nn.silu),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=jax.nn.silu)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
 
@@ -76,7 +76,8 @@ class EGCL(hk.Module):
 
         N = x.shape[0]
         if self.normalize_by_x_norm:
-            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / (jnp.sqrt(sq_norms) + 1)[..., None], phi_x_out) \
+            norm = jax.lax.stop_gradient(jnp.sqrt(sq_norms) + 1)
+            equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos / norm[..., None], phi_x_out) \
                                 / N
         else:
             equivariant_shift = jnp.einsum('ijd,ij->id', diff_combos[..., None], phi_x_out) / N

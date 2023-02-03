@@ -107,7 +107,7 @@ class TrainConfig(NamedTuple):
     save: bool = True
     save_dir: str = "/tmp"
     wandb_upload_each_time: bool = True
-    scan_run: bool = False
+    scan_run: bool = False  # Set to False is useful for debugging.
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
