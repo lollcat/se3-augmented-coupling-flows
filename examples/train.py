@@ -107,6 +107,7 @@ class TrainConfig(NamedTuple):
     save: bool = True
     save_dir: str = "/tmp"
     wandb_upload_each_time: bool = True
+    scan_run: bool = False
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -206,11 +207,12 @@ def train(config: TrainConfig):
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
-    def scan_fn(carry, xs):
-        params, opt_state = carry
-        x = xs
-        params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
-        return (params, opt_state), info
+    if config.scan_run:
+        def scan_fn(carry, xs):
+            params, opt_state = carry
+            x = xs
+            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
+            return (params, opt_state), info
 
     pbar = tqdm(range(config.n_epoch))
 
@@ -221,14 +223,21 @@ def train(config: TrainConfig):
             key, subkey = jax.random.split(key)
             train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey)
 
-        batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
-        (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=1)
+        if config.scan_run:
+            batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
+            (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=1)
 
-        for batch_index in range(batched_data.shape[0]):
-            info = jax.tree_map(lambda x: x[batch_index], infos)
-            config.logger.write(info)
-            if jnp.isnan(info["grad_norm"]):
-                print("nan grad")
+            for batch_index in range(batched_data.shape[0]):
+                info = jax.tree_map(lambda x: x[batch_index], infos)
+                config.logger.write(info)
+                if jnp.isnan(info["grad_norm"]):
+                    print("nan grad")
+        else:
+            for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
+                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
+                config.logger.write(info)
+                if jnp.isnan(info["grad_norm"]):
+                    print("nan grad")
 
         if i in plot_iter:
             plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data,

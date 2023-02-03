@@ -14,6 +14,7 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   egnn:
+    emile_net: false
     mlp_units: [64, 64]
     n_layers: 3
     h:
@@ -21,6 +22,9 @@ flow:
       share_h: true
   transformer: # for proj_v2 flow.
     mlp_units: [64,64]
+    num_heads: 3
+    key_size: 4
+    w_init_scale: 1.0
 
 
 training:
@@ -28,7 +32,7 @@ training:
   n_epoch: 100
   batch_size: 32
   plot_batch_size: 32
-  max_global_norm: 10_000
+  max_global_norm: null
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null

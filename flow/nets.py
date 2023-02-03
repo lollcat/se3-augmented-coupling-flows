@@ -5,15 +5,24 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
+from flow.nets_emile import EGNN
+
 
 # TODO: need to be careful of mean if number of nodes is varying? Could normalisation a parameter function of
 #  the number of nodes?
 
 
+def get_norms_sqrd(x):
+    diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
+    diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
+    sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
+    return sq_norms
+
+
 class EGCL(hk.Module):
     """Single layer of Equivariant Graph Convolutional layer.
     Following notation of E(n) normalizing flows paper (section 2.1): https://arxiv.org/pdf/2105.09016.pdf"""
-    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, recurrent_h: bool = True,
+    def __init__(self, name: str, mlp_units: Sequence[int], identity_init_x: bool, residual: bool = True,
                  normalize_by_x_norm: bool = True):
         """
 
@@ -21,17 +30,17 @@ class EGCL(hk.Module):
             name: Layer name.
             mlp_units: MLP units for phi_e, phi_x and phi_h.
             identity_init_x: Whether to initialise the transform of x to the identity function.
-            recurrent_h: Whether to include a residual connection for h.
+            residual: Whether to include a residual connection for h.
             normalize_by_x_norm: See divisor in Equation 12 of https://arxiv.org/pdf/2203.17003.pdf.
         """
         super().__init__(name=name + "equivariant")
         self.phi_e = hk.nets.MLP(mlp_units)
         self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
-        self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True),
+        self.phi_x = hk.Sequential([hk.nets.MLP(mlp_units, activate_final=True, activation=jax.nn.silu),
                              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
                              hk.Linear(1)])
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False)
-        self.recurrent_h = recurrent_h
+        self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
 
     def __call__(self, x, h):
@@ -51,7 +60,7 @@ class EGCL(hk.Module):
 
         diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        sq_norms = jnp.sum(diff_combos**2, axis=-1)
+        sq_norms = get_norms_sqrd(x)
 
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
@@ -78,7 +87,7 @@ class EGCL(hk.Module):
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
         phi_h_in = jnp.concatenate([m_i, h], axis=-1)
         h_new = phi_h(phi_h_in)
-        if self.recurrent_h:
+        if self.residual_h:
             h_new = h + h_new
 
         return x_new, h_new
@@ -91,6 +100,7 @@ class HConfig(NamedTuple):
     h_out_dim: int = 1  # Number of dimensions of h output by the EGNN.
     share_h: bool = True   # Whether to use the h from the EGCL for the computation of h-out.
     linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
+    residual: bool = True
 
 
 class EgnnConfig(NamedTuple):
@@ -104,20 +114,26 @@ class EgnnConfig(NamedTuple):
     hk_layer_stack: bool = True  # To lower compile time.
     compile_n_unroll: int = 1
     normalize_by_norms: bool = True
+    emile_net: bool = False
 
 
-class se_equivariant_net(hk.Module):
+class _se_equivariant_net(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
         if config.hk_layer_stack:
             self.egnn_layer_fn = lambda x, h: EGCL(config.name,
                                                    mlp_units=config.mlp_units,
                                                    identity_init_x=config.identity_init_x,
-                                                   normalize_by_x_norm=config.normalize_by_norms
+                                                   normalize_by_x_norm=config.normalize_by_norms,
+                                                   residual=config.h_config.residual
                                                    )(x, h)
         else:
-            self.egnn_layers = [EGCL(config.name, config.mlp_units, config.identity_init_x
-                                                   ) for _ in range(config.n_layers)]
+            self.egnn_layers = [EGCL(config.name,
+                               mlp_units=config.mlp_units,
+                               identity_init_x=config.identity_init_x,
+                               normalize_by_x_norm=config.normalize_by_norms,
+                               residual=config.h_config.residual
+                               ) for _ in range(config.n_layers)]
 
         if config.h_config.h_out:
             self.h_final_layer = hk.Linear(config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
@@ -140,6 +156,7 @@ class se_equivariant_net(hk.Module):
         diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
         sq_norms = jnp.sum(diff_combos**2, axis=-1)
         h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
+
         if self.config.h_config.linear_softmax:
             h = jax.nn.softmax(h, axis=-1)
         h = jnp.mean(h, axis=-2)
@@ -178,6 +195,43 @@ class se_equivariant_net(hk.Module):
 
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
+
+
+
+class se_equivariant_net(hk.Module):
+    def __init__(self, config: EgnnConfig):
+        super().__init__(name=config.name + "_egnn")
+        self.config = config
+        if config.emile_net:
+            self.egnn = EGNN(hidden_nf=config.mlp_units[0],
+                             n_layers=config.n_layers,
+                             residual=config.h_config.residual,
+                             normalize=config.normalize_by_norms,
+                             attention=True,
+                             norm_constant=1,
+                             )
+        else:
+            self.egnn = _se_equivariant_net(config)
+
+    def __call__(self, x):
+        if self.config.emile_net:
+            if len(x.shape) == 3:
+                sq_norms = jax.vmap(get_norms_sqrd)(x)
+            else:
+                sq_norms = get_norms_sqrd(x)
+            h = hk.Linear(self.config.h_config.h_embedding_dim)(sq_norms[..., None])
+            h = jnp.mean(h, axis=-2)
+            h, x = self.egnn(h, x)
+
+            if self.config.h_config.h_out:
+                h_final_layer = hk.Linear(self.config.h_config.h_out_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
+                    if self.config.zero_init_h else hk.Linear(self.config.h_config.h_out_dim)
+                h = h_final_layer(h)
+                return x, h
+            else:
+                return x
+        else:
+            return self.egnn(x)
 
 
 class TransformerConfig(NamedTuple):

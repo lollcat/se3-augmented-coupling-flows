@@ -5,6 +5,7 @@ hydra:
   job:
     chdir: false
 
+
 flow:
   dim: 2
   nodes: 4
@@ -14,6 +15,7 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   egnn:
+    emile_net: false
     mlp_units: [32,32]
     n_layers: 3
     h:
@@ -21,6 +23,9 @@ flow:
       share_h: true
   transformer: # for proj_v2 flow.
     mlp_units: [32,32]
+    num_heads: 3
+    key_size: 4
+    w_init_scale: 0.1
 
 
 training:
