@@ -27,7 +27,7 @@ def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 100
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.training.lr = 1e-3
+    cfg.training.lr = 1e-4
     cfg.flow.egnn.mlp_units = (16,)
     cfg.flow.transformer.mlp_units = (16,)
     cfg.flow.transformer.n_layers = 2
@@ -36,6 +36,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.n_epoch = 50
     cfg.training.save = False
     cfg.training.plot_batch_size = 64
+    cfg.training.K_marginal_log_lik = 5
     cfg.logger = DictConfig({"list_logger": None})
     return cfg
 

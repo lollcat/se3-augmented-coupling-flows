@@ -1,6 +1,9 @@
+from typing import List
+
 import chex
 import jax
 import jax.numpy as jnp
+
 
 def get_pairwise_distances(x):
     chex.assert_rank(x, 2)
@@ -77,3 +80,23 @@ def vector_rejection(a, b):
         return jax.vmap(vector_rejection_single)(a, b)
     else:
         raise NotImplementedError
+
+
+
+def gram_schmidt_fn(vectors: List[chex.Array]):
+    n_vectors = len(vectors)
+    orthonormal_vectors = []
+    u0 = vectors[0] / jnp.linalg.norm(vectors[0])
+    orthonormal_vectors.append(u0)
+
+    for i in range(n_vectors - 1):
+        current_vector_indx = i + 1
+        temp_vector = vectors[current_vector_indx]
+        for j in range(current_vector_indx):
+            temp_vector = vector_rejection_single(temp_vector, vectors[j])
+        orthonormal_vectors.append(temp_vector / jnp.linalg.norm(temp_vector))
+
+    return orthonormal_vectors
+
+
+

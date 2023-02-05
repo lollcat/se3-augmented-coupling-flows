@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from flow.nets import se_equivariant_net, EgnnConfig, Transformer, TransformerConfig
-from utils.numerical import rotate_2d, vector_rejection
+from utils.numerical import gram_schmidt_fn
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -102,34 +102,28 @@ class ProjectedScalarAffine(distrax.Bijector):
 
 def make_conditioner(origin_equivariant_fn,
                      z_equivariant_fn,
+                     y_equivariant_fn,
                      permutation_equivariant_fn,
-                     x_equivariant_fn: Optional[Callable] = None,
-                     normalize: bool = True):
+                     x_equivariant_fn: Optional[Callable] = None):
     def _conditioner(x):
         chex.assert_rank(x, 2)
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
+        basis_vectors = []
         origin = origin_equivariant_fn(x)
-        z_basis_point = z_equivariant_fn(x)
+        z_basis_vector = z_equivariant_fn(x) - origin
+        y_basis_vector = y_equivariant_fn(x) - origin
+        basis_vectors.append(z_basis_vector)
+        basis_vectors.append(y_basis_vector)
         if x_equivariant_fn is not None:
             chex.assert_tree_shape_suffix(x, (3, ))
             # Compute reference axes.
-            z_basis_vector = z_basis_point - origin
-            x_basis_point = x_equivariant_fn(x)
-            x_basis_vector = x_basis_point - origin
-            x_basis_vector = jax.vmap(vector_rejection)(x_basis_vector, z_basis_vector)
-            y_basis_vector = jax.vmap(jnp.cross)(z_basis_vector, x_basis_vector)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
-        else:
-            chex.assert_tree_shape_suffix(x, (2,))
-            z_basis_vector = z_basis_point - origin
-            y_basis_vector = jax.vmap(rotate_2d, in_axes=(0, None))(z_basis_vector, jnp.pi * 0.5)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
+            x_basis_vector = x_equivariant_fn(x) - origin
+            basis_vectors.append(x_basis_vector)
 
-        if normalize:
-            change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
-                                                                              keepdims=True)
+        orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
+        change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
 
         inv_change_of_basis = jax.vmap(jnp.linalg.inv)(change_of_basis_matrix)
         x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
@@ -174,6 +168,12 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
                            zero_init_h=False,
                            h_config=egnn_config.h_config._replace(h_out=False)))
 
+    y_equivariant_fn = se_equivariant_net(
+        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_y",
+                           identity_init_x=False,
+                           zero_init_h=False,
+                           h_config=egnn_config.h_config._replace(h_out=False)))
+
     if dim == 3:
         x_equivariant_fn = se_equivariant_net(
             egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
@@ -191,7 +191,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         permutation_equivariant_fn=permutation_equivariant_fn,
         origin_equivariant_fn=origin_equivariant_fn,
         z_equivariant_fn=z_equivariant_fn,
-        x_equivariant_fn=x_equivariant_fn)
+        x_equivariant_fn=x_equivariant_fn,
+        y_equivariant_fn=y_equivariant_fn
+    )
 
     return distrax.SplitCoupling(
         split_index=dim,
