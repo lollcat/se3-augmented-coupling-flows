@@ -171,9 +171,9 @@ def train(config: TrainConfig):
     checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
     pathlib.Path(checkpoints_dir).mkdir(exist_ok=False)
 
-    checkpoint_iter = list(np.linspace(1, config.n_epoch, config.n_checkpoints, dtype="int"))
-    eval_iter = list(np.linspace(1, config.n_epoch, config.n_eval, dtype="int"))
-    plot_iter = list(np.linspace(1, config.n_epoch, config.n_plots, dtype="int"))
+    checkpoint_iter = list(np.linspace(0, config.n_epoch - 1, config.n_checkpoints, dtype="int"))
+    eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))
+    plot_iter = list(np.linspace(0, config.n_epoch - 1, config.n_plots, dtype="int"))
 
     @hk.without_apply_rng
     @hk.transform
@@ -249,7 +249,7 @@ def train(config: TrainConfig):
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
                                 key=subkey,
-                                batch_size=max(100, config.batch_size),
+                                batch_size=config.batch_size,
                                 K=config.K_marginal_log_lik)
             pbar.write(str(eval_info))
             config.logger.write(eval_info)
