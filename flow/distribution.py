@@ -20,17 +20,23 @@ class EquivariantFlowDistConfig(NamedTuple):
     fast_compile: bool = True
     compile_n_unroll: int = 1
     transformer_config: Optional[TransformerConfig] = None
+    kwargs: dict = {}
 
 
 def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
     if config.fast_compile:
-        return make_equivariant_augmented_flow_dist_fast_compile(config.dim, config.nodes, config.n_layers,
-                                                                 config.type, config.identity_init,
-                                                                 config.egnn_config, config.compile_n_unroll)
+        return make_equivariant_augmented_flow_dist_fast_compile(
+            config.dim, config.nodes, config.n_layers,
+            config.type, config.identity_init,
+            config.egnn_config, config.compile_n_unroll,
+            transformer_config=config.transformer_config,
+            kwargs=config.kwargs)
     else:
         return make_equivariant_augmented_flow_dist_distrax_chain(config.dim, config.nodes, config.n_layers,
                                                                   config.type, config.identity_init,
-                                                                  config.egnn_config)
+                                                                  config.egnn_config,
+                                                                  transformer_config=config.transformer_config,
+                                                                  kwargs=config.kwargs)
 
 
 def make_equivariant_augmented_flow_dist_fast_compile(dim,
@@ -40,7 +46,11 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
                                          compile_n_unroll: int = 2,
-                                         transformer_config: Optional[TransformerConfig] = None):
+                                         transformer_config: Optional[TransformerConfig] = None,
+                                         kwargs: dict = {}):
+    if not "proj_v2" in kwargs.keys():
+        if not kwargs == {}:
+            raise NotImplementedError
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     def bijector_fn():
@@ -70,9 +80,11 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                                               egnn_config=egnn_config)
                 bijectors.append(bijector)
             elif type == "proj_v2":
+                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
                 bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
                                   identity_init=flow_identity_init,
-                                  egnn_config=egnn_config, transformer_config=transformer_config)
+                                  egnn_config=egnn_config, transformer_config=transformer_config,
+                                   **kwargs_proj_v2)
                 bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
@@ -95,7 +107,10 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          type="nice",
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
-                                         transformer_config: Optional[TransformerConfig] = None):
+                                         transformer_config: Optional[TransformerConfig] = None,
+                                         kwargs: dict = {}):
+    if kwargs != {}:
+        raise NotImplementedError
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []

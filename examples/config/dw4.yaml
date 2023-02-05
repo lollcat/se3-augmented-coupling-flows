@@ -12,6 +12,9 @@ flow:
   n_layers: 4
   identity_init: true
   type: proj_v2  # vector_scale_shift  vector_scale nice proj   proj_v2
+  kwargs:
+    proj_v2:
+      gram_schmidt: false
   fast_compile: true
   compile_n_unroll: 1
   egnn:
