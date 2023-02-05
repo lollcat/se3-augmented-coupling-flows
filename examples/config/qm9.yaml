@@ -8,7 +8,7 @@ hydra:
 flow:
   dim: 3
   nodes: 29
-  n_layers: 4
+  n_layers: 6
   identity_init: true
   type: nice  # vector_scale_shift  vector_scale nice proj   proj_v2
   fast_compile: true
@@ -29,24 +29,24 @@ flow:
   transformer: # for proj_v2 flow.
     mlp_units: [64,64]
     num_heads: 3
-    key_size: 4
+    key_size: 16
     w_init_scale: 0.1
     n_layers: 3
 
 
 training:
-  lr: 1e-4
-  n_epoch: 32
+  lr: 6e-5
+  n_epoch: 300
   batch_size: 16
-  plot_batch_size: 32
+  plot_batch_size: 16
   max_global_norm: null
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
   test_set_size: null
-  n_plots: 6
+  n_plots: 10
   n_checkpoints: 8
-  n_eval: 10
+  n_eval: 12
   K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
