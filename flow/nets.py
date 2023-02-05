@@ -145,6 +145,7 @@ class EgnnConfig(NamedTuple):
     agg: str = 'mean'
     stop_gradient_for_norm: bool = False
     variance_scaling_init: float = 0.001
+    normalization_constant: float = 1.0
 
 
 class _se_equivariant_net(hk.Module):
@@ -161,7 +162,8 @@ class _se_equivariant_net(hk.Module):
                                                    phi_x_max=config.phi_x_max,
                                                    agg=config.agg,
                                                    stop_gradient_for_norm=config.stop_gradient_for_norm,
-                                                   variance_scaling_init=config.variance_scaling_init
+                                                   variance_scaling_init=config.variance_scaling_init,
+                                                   normalization_constant=config.normalization_constant
                                                    )(x, h)
         else:
             self.egnn_layers = [EGCL(config.name,
@@ -174,7 +176,8 @@ class _se_equivariant_net(hk.Module):
                                phi_x_max=config.phi_x_max,
                                agg=config.agg,
                                stop_gradient_for_norm=config.stop_gradient_for_norm,
-                               variance_scaling_init=config.variance_scaling_init
+                               variance_scaling_init=config.variance_scaling_init,
+                               normalization_constant=config.normalization_constant
                                ) for _ in range(config.n_layers)]
 
         if config.h_config.h_out:
