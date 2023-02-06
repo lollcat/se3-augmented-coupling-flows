@@ -19,7 +19,7 @@ flow:
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
-    tanh: false
+    tanh: true
     agg: mean
     phi_x_max: 1.0
     normalization_constant: 1.0
@@ -54,7 +54,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize_{training.batch_size}_layers${flow.n_layers}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]
