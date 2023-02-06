@@ -203,7 +203,7 @@ def train(config: TrainConfig):
     train_data, test_data = config.load_datasets(config.batch_size, config.train_set_size, config.test_set_size)
 
     print(f"training data shape of {train_data.shape}")
-    chex.assert_tree_shape_suffix(train_data, (config.n_nodes, config.dim))
+    chex.assert_tree_shape_suffix(train_data, (config.n_nodes, config.dim*2))
 
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
