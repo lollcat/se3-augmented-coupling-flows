@@ -45,7 +45,7 @@ if __name__ == '__main__':
     n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
 
     datasets, charge_scale = retrieve_dataloaders(remove_h=remove_h)
-    print("data has been downloaded for QM9 positional")
+    print(f"data has been downloaded for QM9 positional: remove h={remove_h}")
 
     train = datasets['train'].data['positions'][:, :n_atoms]
     test = datasets['test'].data['positions'][:, :n_atoms]
