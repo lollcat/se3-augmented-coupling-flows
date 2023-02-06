@@ -41,7 +41,7 @@ def filter_atoms(datasets, n_nodes):
 
 
 if __name__ == '__main__':
-    remove_h = True
+    remove_h = False
     n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
 
     datasets, charge_scale = retrieve_dataloaders(remove_h=remove_h)
