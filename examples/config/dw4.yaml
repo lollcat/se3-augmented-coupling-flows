@@ -38,7 +38,7 @@ flow:
 
 
 training:
-  lr: 1e-3
+  lr: 4e-4
   n_epoch: 50
   batch_size: 100
   plot_batch_size: 256

@@ -8,18 +8,18 @@ hydra:
 flow:
   dim: 3
   nodes: 29
-  n_layers: 6
+  n_layers: 8
   identity_init: true
-  type: nice  # vector_scale_shift  vector_scale nice proj   proj_v2
+  type: proj_v2  # vector_scale_shift  vector_scale nice proj   proj_v2
   fast_compile: true
   compile_n_unroll: 1
   egnn:
     emile_net: false
-    mlp_units: [64,64]
+    mlp_units: [32,32]
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
-    tanh: false
+    tanh: true
     agg: mean
     phi_x_max: 1.0
     normalization_constant: 1.0
@@ -27,16 +27,16 @@ flow:
       linear_softmax: true
       share_h: true
   transformer: # for proj_v2 flow.
-    mlp_units: [64,64]
-    num_heads: 3
+    mlp_units: [32,32]
+    num_heads: 6
     key_size: 16
     w_init_scale: 0.1
     n_layers: 3
 
 
 training:
-  lr: 6e-5
-  n_epoch: 300
+  lr: 2e-5
+  n_epoch: 100
   batch_size: 32
   plot_batch_size: 32
   max_global_norm: null
@@ -47,7 +47,7 @@ training:
   n_plots: 10
   n_checkpoints: 8
   n_eval: 12
-  K_marginal_log_lik: 20
+  K_marginal_log_lik: 10
   save: true
   save_dir: qm9pos_results
 
