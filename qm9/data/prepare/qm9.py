@@ -225,8 +225,3 @@ def get_unique_charges(charges):
             charge_counts[z][idx] = num_z
 
     return charge_counts
-
-
-if __name__ == '__main__':
-    dataloaders, charge_scale = dataset.retrieve_dataloaders(args.batch_size, args.num_workers,
-                                                             filter_n_atoms=n_particles)

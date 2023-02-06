@@ -1,15 +1,19 @@
-from torch.utils.data import DataLoader
 from qm9.data.args import init_argparse
-from qm9.data.collate import collate_fn
 from qm9.data.utils import initialize_datasets
+import numpy as np
 
-def retrieve_dataloaders(batch_size, num_workers=0, filter_n_atoms=None):
+
+def retrieve_dataloaders(remove_h = True,
+                         dataset='qm9',
+                         datadir='./'):
     # Initialize dataloader
+    filter_n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
     args = init_argparse('qm9')
-    args, datasets, num_species, charge_scale = initialize_datasets(args, args.datadir, 'qm9',
+    # data_dir = cfg.data_root_dir
+    args, datasets, num_species, charge_scale = initialize_datasets(args, datadir, dataset,
                                                                     subtract_thermo=args.subtract_thermo,
-                                                                    force_download=args.force_download
-                                                                    )
+                                                                    force_download=args.force_download,
+                                                                    remove_h=remove_h)
     qm9_to_eV = {'U0': 27.2114, 'U': 27.2114, 'G': 27.2114, 'H': 27.2114, 'zpve': 27211.4, 'gap': 27.2114, 'homo': 27.2114,
                  'lumo': 27.2114}
 
@@ -17,17 +21,11 @@ def retrieve_dataloaders(batch_size, num_workers=0, filter_n_atoms=None):
         dataset.convert_units(qm9_to_eV)
 
     if filter_n_atoms is not None:
+        print("Retrieving molecules with only %d atoms" % filter_n_atoms)
         datasets = filter_atoms(datasets, filter_n_atoms)
 
     # Construct PyTorch dataloaders from datasets
-    dataloaders = {split: DataLoader(dataset,
-                                     batch_size=batch_size,
-                                     shuffle=args.shuffle if (split == 'train') else False,
-                                     num_workers=num_workers,
-                                     collate_fn=collate_fn)
-                         for split, dataset in datasets.items()}
-
-    return dataloaders, charge_scale
+    return datasets, charge_scale
 
 
 def filter_atoms(datasets, n_nodes):
@@ -40,3 +38,28 @@ def filter_atoms(datasets, n_nodes):
         datasets[key].num_pts = dataset.data['one_hot'].size(0)
         datasets[key].perm = None
     return datasets
+
+
+if __name__ == '__main__':
+    remove_h = True
+    n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
+
+    datasets, charge_scale = retrieve_dataloaders(remove_h=remove_h)
+    print("data has been downloaded for QM9 positional")
+
+    train = datasets['train'].data['positions'][:, :n_atoms]
+    test = datasets['test'].data['positions'][:, :n_atoms]
+    valid = datasets['valid'].data['positions'][:, :n_atoms]
+
+    if remove_h:
+        np.save('../target/data/qm9_train_no_h.npy', train)
+        np.save('../target/data/qm9_test_no_h.npy', test)
+        np.save('../target/data/qm9_valid_no_h.npy', valid)
+    else:
+        np.save('../target/data/qm9_train.npy', train)
+        np.save('../target/data/qm9_test.npy', test)
+        np.save('../target/data/qm9_valid.npy', valid)
+
+    print("data saved to target/data")
+
+

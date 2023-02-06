@@ -55,39 +55,49 @@ def drop_zeros(props, to_keep):
         return props[:, to_keep, ...]
 
 
-def collate_fn(batch):
-    """
-    Collation function that collates datapoints into the batch format for cormorant
+class PreprocessQM9:
+    def __init__(self, load_charges=True):
+        self.load_charges = load_charges
 
-    Parameters
-    ----------
-    batch : list of datapoints
-        The data to be collated.
+    def add_trick(self, trick):
+        self.tricks.append(trick)
 
-    Returns
-    -------
-    batch : dict of Pytorch tensors
-        The collated data.
-    """
-    batch = {prop: batch_stack([mol[prop] for mol in batch]) for prop in batch[0].keys()}
+    def collate_fn(self, batch):
+        """
+        Collation function that collates datapoints into the batch format for cormorant
 
-    to_keep = (batch['charges'].sum(0) > 0)
+        Parameters
+        ----------
+        batch : list of datapoints
+            The data to be collated.
 
-    batch = {key: drop_zeros(prop, to_keep) for key, prop in batch.items()}
+        Returns
+        -------
+        batch : dict of Pytorch tensors
+            The collated data.
+        """
+        batch = {prop: batch_stack([mol[prop] for mol in batch]) for prop in batch[0].keys()}
 
-    atom_mask = batch['charges'] > 0
-    batch['atom_mask'] = atom_mask
+        to_keep = (batch['charges'].sum(0) > 0)
 
-    #Obtain edges
-    batch_size, n_nodes = atom_mask.size()
-    edge_mask = atom_mask.unsqueeze(1) * atom_mask.unsqueeze(2)
+        batch = {key: drop_zeros(prop, to_keep) for key, prop in batch.items()}
 
-    #mask diagonal
-    diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
-    edge_mask *= diag_mask
+        atom_mask = batch['charges'] > 0
+        batch['atom_mask'] = atom_mask
 
-    #edge_mask = atom_mask.unsqueeze(1) * atom_mask.unsqueeze(2)
-    batch['edge_mask'] = edge_mask.view(batch_size * n_nodes * n_nodes, 1)
+        #Obtain edges
+        batch_size, n_nodes = atom_mask.size()
+        edge_mask = atom_mask.unsqueeze(1) * atom_mask.unsqueeze(2)
 
+        #mask diagonal
+        diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
+        edge_mask *= diag_mask
 
-    return batch
+        #edge_mask = atom_mask.unsqueeze(1) * atom_mask.unsqueeze(2)
+        batch['edge_mask'] = edge_mask.view(batch_size * n_nodes * n_nodes, 1)
+
+        if self.load_charges:
+            batch['charges'] = batch['charges'].unsqueeze(2)
+        else:
+            batch['charges'] = torch.zeros(0)
+        return batch

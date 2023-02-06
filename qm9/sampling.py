@@ -1,6 +1,7 @@
 import numpy as np
 import torch
-from flows.utils import assert_mean_zero_with_mask, remove_mean_with_mask,\
+import torch.nn.functional as F
+from equivariant_diffusion.utils import assert_mean_zero_with_mask, remove_mean_with_mask,\
     assert_correctly_masked
 from qm9.analyze import check_stability
 
@@ -46,13 +47,24 @@ def rotate_chain(z):
     return results
 
 
-def sample_chain(args, device, flow, dequantizer, prior, n_tries, n_nodes=19):
-    flow.set_trace('exact')
+def reverse_tensor(x):
+    return x[torch.arange(x.size(0) - 1, -1, -1)]
+
+
+def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
     n_samples = 1
+    if args.dataset == 'qm9' or args.dataset == 'qm9_second_half' or args.dataset == 'qm9_first_half':
+        n_nodes = 19
+    elif args.dataset == 'geom':
+        n_nodes = 44
+    else:
+        raise ValueError()
 
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:
-        context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
+        context = prop_dist.sample(n_nodes).unsqueeze(1).unsqueeze(0)
+        context = context.repeat(1, n_nodes, 1).to(device)
+        #context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
     else:
         context = None
 
@@ -61,93 +73,99 @@ def sample_chain(args, device, flow, dequantizer, prior, n_tries, n_nodes=19):
     edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
     edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
 
-    for i in range(n_tries):
-        z_x, z_h = prior.sample(n_samples, n_nodes, node_mask)
-        z = torch.cat([z_x, z_h], dim=2)
-        tmp = flow.reverse(z, node_mask, edge_mask, context)
-        x = tmp[:, :, 0:3]
-        one_hot = tmp[:, :, 3:8]
-        charges = tmp[:, :, 8:]
-        tensor = dequantizer.reverse(
-            {'categorical': one_hot, 'integer': charges})
-        one_hot, charges = tensor['categorical'], tensor['integer']
-        atom_type = one_hot.argmax(2).squeeze(0).cpu().detach().numpy()
-        x_squeeze = x.squeeze(0).cpu().detach().numpy()
-        mol_stable = check_stability(x_squeeze, atom_type)[0]
+    if args.probabilistic_model == 'diffusion':
+        one_hot, charges, x = None, None, None
+        for i in range(n_tries):
+            chain = flow.sample_chain(n_samples, n_nodes, node_mask, edge_mask, context, keep_frames=100)
+            chain = reverse_tensor(chain)
 
-        if mol_stable:
-            print('Found stable molecule to visualize :)')
-            break
-        elif i == n_tries - 1:
-            print('Did not find stable molecule, showing last sample.')
+            # Repeat last frame to see final sample better.
+            chain = torch.cat([chain, chain[-1:].repeat(10, 1, 1)], dim=0)
+            x = chain[-1:, :, 0:3]
+            one_hot = chain[-1:, :, 3:-1]
+            one_hot = torch.argmax(one_hot, dim=2)
 
-    # DO NOT plot prior rotations, actnorm is missing.
-    prior_rotations = rotate_chain(z)
+            atom_type = one_hot.squeeze(0).cpu().detach().numpy()
+            x_squeeze = x.squeeze(0).cpu().detach().numpy()
+            mol_stable = check_stability(x_squeeze, atom_type, dataset_info)[0]
 
-    assert_mean_zero_with_mask(z_x, node_mask)
+            # Prepare entire chain.
+            x = chain[:, :, 0:3]
+            one_hot = chain[:, :, 3:-1]
+            one_hot = F.one_hot(torch.argmax(one_hot, dim=2), num_classes=len(dataset_info['atom_decoder']))
+            charges = torch.round(chain[:, :, -1:]).long()
 
-    zs = flow.reverse_chain(z, node_mask, edge_mask, context)
-    zs_rotated = flow.reverse_chain(prior_rotations[-1:], node_mask, edge_mask, context)
+            if mol_stable:
+                print('Found stable molecule to visualize :)')
+                break
+            elif i == n_tries - 1:
+                print('Did not find stable molecule, showing last sample.')
 
-    data_rotations = rotate_chain(zs[-1:])
+    else:
+        raise ValueError
 
-    # This is the one we have to plot ;)
-    prior_rotations_with_actnorm = rotate_chain(zs[0:1])
-
-    def reverse_tensor(x):
-        return x[torch.arange(x.size(0) - 1, -1, -1)]
-
-    zs_rotated_rev = reverse_tensor(zs_rotated)
-    prior_rotations_rev = reverse_tensor(prior_rotations_with_actnorm)
-
-    z = torch.cat(
-        [zs, data_rotations, zs_rotated_rev, prior_rotations_rev], dim=0
-    )
-
-    x = z[:, :, 0:3]
-    one_hot = z[:, :, 3:8]
-    charges = z[:, :, 8:]
-    tensor = dequantizer.reverse({'categorical': one_hot, 'integer': charges})
-
-    one_hot, charges = tensor['categorical'], tensor['integer']
-
-    flow.set_trace(args.trace)
     return one_hot, charges, x
 
 
-def sample(args, device, flow, dequantizer, prior, n_samples=5, n_nodes=10):
-    flow.set_trace('exact')
+def sample(args, device, generative_model, dataset_info,
+           prop_dist=None, nodesxsample=torch.tensor([10]), context=None,
+           fix_noise=False):
+    max_n_nodes = dataset_info['max_n_nodes']  # this is the maximum node_size in QM9
+
+    assert int(torch.max(nodesxsample)) <= max_n_nodes
+    batch_size = len(nodesxsample)
+
+    node_mask = torch.zeros(batch_size, max_n_nodes)
+    for i in range(batch_size):
+        node_mask[i, 0:nodesxsample[i]] = 1
+
+    # Compute edge_mask
+
+    edge_mask = node_mask.unsqueeze(1) * node_mask.unsqueeze(2)
+    diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
+    edge_mask *= diag_mask
+    edge_mask = edge_mask.view(batch_size * max_n_nodes * max_n_nodes, 1).to(device)
+    node_mask = node_mask.unsqueeze(2).to(device)
 
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:
-        context = torch.zeros(n_samples, n_nodes, args.context_node_nf).to(device)
+        if context is None:
+            context = prop_dist.sample_batch(nodesxsample)
+        context = context.unsqueeze(1).repeat(1, max_n_nodes, 1).to(device) * node_mask
     else:
         context = None
 
-    node_mask = torch.ones(n_samples, n_nodes, 1).to(device)
+    if args.probabilistic_model == 'diffusion':
+        x, h = generative_model.sample(batch_size, max_n_nodes, node_mask, edge_mask, context, fix_noise=fix_noise)
 
-    z_x, z_h = prior.sample(n_samples, n_nodes, node_mask)
-    z = torch.cat([z_x, z_h], dim=2)
+        assert_correctly_masked(x, node_mask)
+        assert_mean_zero_with_mask(x, node_mask)
 
-    assert_mean_zero_with_mask(z_x, node_mask)
+        one_hot = h['categorical']
+        charges = h['integer']
 
-    edge_mask = (1 - torch.eye(n_nodes)).unsqueeze(0)
-    edge_mask = edge_mask.repeat(n_samples, 1, 1).view(-1, 1).to(device)
-    z = flow.reverse(z, node_mask, edge_mask, context)
+        assert_correctly_masked(one_hot.float(), node_mask)
+        if args.include_charges:
+            assert_correctly_masked(charges.float(), node_mask)
 
-    if torch.any(torch.isnan(z)).item() or torch.any(torch.isinf(z)).item():
-        print('NaN occured, setting z to zero.')
-        z = torch.zeros_like(z)
+    else:
+        raise ValueError(args.probabilistic_model)
 
-    assert_correctly_masked(z, node_mask)
+    return one_hot, charges, x, node_mask
 
-    x = z[:, :, 0:3]
-    one_hot = z[:, :, 3:8]
-    charges = z[:, :, 8:]
 
-    assert_mean_zero_with_mask(x, node_mask)
+def sample_sweep_conditional(args, device, generative_model, dataset_info, prop_dist, n_nodes=19, n_frames=100):
+    nodesxsample = torch.tensor([n_nodes] * n_frames)
 
-    tensor = dequantizer.reverse({'categorical': one_hot, 'integer': charges})
-    one_hot, charges = tensor['categorical'], tensor['integer']
-    flow.set_trace(args.trace)
-    return one_hot, charges, x
+    context = []
+    for key in prop_dist.distributions:
+        min_val, max_val = prop_dist.distributions[key][n_nodes]['params']
+        mean, mad = prop_dist.normalizer[key]['mean'], prop_dist.normalizer[key]['mad']
+        min_val = (min_val - mean) / (mad)
+        max_val = (max_val - mean) / (mad)
+        context_row = torch.tensor(np.linspace(min_val, max_val, n_frames)).unsqueeze(1)
+        context.append(context_row)
+    context = torch.cat(context, dim=1).float().to(device)
+
+    one_hot, charges, x, node_mask = sample(args, device, generative_model, dataset_info, prop_dist, nodesxsample=nodesxsample, context=context, fix_noise=True)
+    return one_hot, charges, x, node_mask

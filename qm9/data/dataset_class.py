@@ -91,9 +91,3 @@ class ProcessedDataset(Dataset):
         if self.perm is not None:
             idx = self.perm[idx]
         return {key: val[idx] for key, val in self.data.items()}
-
-
-if __name__ == '__main__':
-    batch_size = 32
-    dataloaders, charge_scale = retrieve_dataloaders(args.batch_size, args.num_workers,
-                                                             filter_n_atoms=n_particles)

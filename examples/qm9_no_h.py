@@ -13,9 +13,9 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
     data_dir = "target/data/qm9_"
-    train_data = np.load(data_dir + "train.npy")
-    test_data = np.load(data_dir + "test.npy")
-    valid_data = np.load(data_dir + "valid.npy")
+    train_data = np.load(data_dir + "train_no_h.npy")
+    test_data = np.load(data_dir + "test_no_h.npy")
+    valid_data = np.load(data_dir + "valid_no_h.npy")
 
     if train_data_n_points is not None:
         train_data = train_data[:train_data_n_points]
@@ -33,12 +33,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.flow.egnn.mlp_units = (4,)
     cfg.flow.transformer.mlp_units = (4,)
-    cfg.flow.transformer.num_heads = 2
-    cfg.flow.transformer.key_size = 2
-    cfg.flow.transformer.n_layers = 2
-    cfg.flow.egnn.n_layers = 2
     cfg.flow.n_layers = 2
-    cfg.training.batch_size = 2
+    cfg.training.batch_size = 8
     cfg.training.n_epoch = 32
     cfg.training.save = False
     cfg.training.plot_batch_size = 2
@@ -49,13 +45,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 
 
-@hydra.main(config_path="./config", config_name="qm9.yaml")
+@hydra.main(config_path="./config", config_name="qm9_no_h.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 
-    experiment_config = create_train_config(cfg, dim=3, n_nodes=19,
+    experiment_config = create_train_config(cfg, dim=3, n_nodes=9,
                                             load_dataset=load_dataset)
     train(experiment_config)
 
