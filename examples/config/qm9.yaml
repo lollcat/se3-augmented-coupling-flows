@@ -54,7 +54,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize_{training.batch_size}_layers${flow.n_layers}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr{training.lr}_layers${flow.n_layers}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]
