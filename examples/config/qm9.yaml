@@ -15,11 +15,11 @@ flow:
   compile_n_unroll: 1
   egnn:
     emile_net: false
-    mlp_units: [64,64]
+    mlp_units: [32,32]
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
-    tanh: true
+    tanh: false
     agg: mean
     phi_x_max: 1.0
     normalization_constant: 1.0
@@ -27,7 +27,7 @@ flow:
       linear_softmax: true
       share_h: true
   transformer: # for proj_v2 flow.
-    mlp_units: [64,64]
+    mlp_units: [32,32]
     num_heads: 6
     key_size: 16
     w_init_scale: 0.1
@@ -35,8 +35,8 @@ flow:
 
 
 training:
-  lr: 1e-4
-  n_epoch: 32
+  lr: 2e-5
+  n_epoch: 200
   batch_size: 32
   plot_batch_size: 32
   max_global_norm: null
@@ -47,7 +47,7 @@ training:
   n_plots: 10
   n_checkpoints: 8
   n_eval: 12
-  K_marginal_log_lik: 10
+  K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
 
