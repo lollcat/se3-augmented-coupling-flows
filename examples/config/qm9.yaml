@@ -8,7 +8,7 @@ hydra:
 flow:
   dim: 3
   nodes: 19
-  n_layers: 8
+  n_layers: 12
   identity_init: true
   type: proj_v2  # vector_scale_shift  vector_scale nice proj   proj_v2
   kwargs:
@@ -22,7 +22,7 @@ flow:
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
-    tanh: true
+    tanh: false
     agg: mean
     phi_x_max: 1.0
     normalization_constant: 1.0
@@ -38,7 +38,7 @@ flow:
 
 
 training:
-  lr: 2e-5
+  lr: 8e-5
   optimizer_name: adamw
   n_epoch: 200
   batch_size: 32
