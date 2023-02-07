@@ -43,10 +43,9 @@ class EGCL(hk.Module):
 
 
         self.phi_x = hk.Sequential([
-            hk.Linear(1, with_bias=False, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
             hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
              hk.Linear(1, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
-             hk.Linear(1),
+             hk.Linear(1, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
@@ -60,6 +59,7 @@ class EGCL(hk.Module):
         if len(x.shape) == 2:
             return self.forward_single(x, h)
         else:
+            chex.assert_rank(x, 3)
             return hk.vmap(self.forward_single, split_rng=False)(x, h)
 
     def forward_single(self, x, h):

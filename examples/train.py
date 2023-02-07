@@ -44,10 +44,11 @@ def plot_sample_hist(samples,
     n_vertices = samples.shape[1] if n_vertices is None else n_vertices
     n_vertices = min(samples.shape[1], n_vertices)
     differences = jax.jit(jax.vmap(get_pairwise_distances))(samples[:, :n_vertices, dims])
+    mask = jnp.ones_like(differences, dtype=bool).at[:, jnp.arange(n_vertices), jnp.arange(n_vertices)].set(False)
     d = differences.flatten()
+    d = d[mask.flatten()]
     d = d[jnp.isfinite(d)]
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
-    d = d[d != 0.0]
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
@@ -56,8 +57,10 @@ def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_dat
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
     samples = flow_sample_fn(params, key, (n_samples,))
     for i, og_coords in enumerate([True, False]):
-        plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples", n_vertices=plotting_n_nodes)
-        plot_sample_hist(samples, axs[1, i], original_coords=og_coords, label="flow samples", n_vertices=plotting_n_nodes)
+        plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples",
+                         n_vertices=plotting_n_nodes)
+        plot_sample_hist(samples, axs[1, i], original_coords=og_coords, label="flow samples",
+                         n_vertices=plotting_n_nodes)
         plot_sample_hist(train_data[:n_samples], axs[0, i], original_coords=og_coords, label="train samples",
                          n_vertices=plotting_n_nodes)
         plot_sample_hist(test_data[:n_samples], axs[1, i], original_coords=og_coords, label="test samples",

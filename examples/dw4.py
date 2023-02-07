@@ -28,8 +28,8 @@ def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 100
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.training.lr = 1e-3
-    cfg.flow.egnn.tanh = True
-    cfg.flow.type = 'vector_scale_shift' # 'proj_v2'
+    cfg.flow.egnn.tanh = False
+    cfg.flow.type = 'proj_v2' # 'proj_v2'
     cfg.flow.egnn.mlp_units = (16,)
     cfg.flow.transformer.mlp_units = (16,)
     cfg.flow.transformer.n_layers = 2
