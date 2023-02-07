@@ -108,6 +108,7 @@ class TrainConfig(NamedTuple):
     save_dir: str = "/tmp"
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
+    optimizer_name: str = 'adam'
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -197,7 +198,7 @@ def train(config: TrainConfig):
 
     optimizer = optax.chain(optax.zero_nans(),
                             optax.clip_by_global_norm(config.max_global_norm if config.max_global_norm else jnp.inf),
-                            optax.adam(config.lr))
+                            getattr(optax, config.optimizer_name)(config.lr))
     opt_state = optimizer.init(params)
 
     train_data, test_data = config.load_datasets(config.batch_size, config.train_set_size, config.test_set_size)

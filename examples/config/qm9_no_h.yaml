@@ -36,10 +36,11 @@ flow:
 
 training:
   lr: 2e-5
-  n_epoch: 100
+  optimizer_name: adam
+  n_epoch: 200
   batch_size: 32
   plot_batch_size: 32
-  max_global_norm: null
+  max_global_norm: 20_000
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
@@ -47,14 +48,14 @@ training:
   n_plots: 10
   n_checkpoints: 8
   n_eval: 12
-  K_marginal_log_lik: 10
+  K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
 
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]
