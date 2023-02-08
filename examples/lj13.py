@@ -35,7 +35,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.egnn.mlp_units = (4,)
     cfg.flow.transformer.mlp_units = (4,)
     cfg.flow.n_layers = 4
-    cfg.training.batch_size = 8
+    cfg.training.batch_size = 16
     cfg.training.n_epoch = 32
     cfg.training.save = False
     cfg.training.plot_batch_size = 8
@@ -45,7 +45,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="lj13.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 
