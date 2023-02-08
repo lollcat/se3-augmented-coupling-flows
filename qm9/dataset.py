@@ -41,25 +41,23 @@ def filter_atoms(datasets, n_nodes):
 
 
 if __name__ == '__main__':
-    remove_h = False
-    n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
+    for remove_h in (True, False):
+        n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
 
-    datasets, charge_scale = retrieve_dataloaders(remove_h=remove_h)
-    print(f"data has been downloaded for QM9 positional: remove h={remove_h}")
+        datasets, charge_scale = retrieve_dataloaders(remove_h=remove_h)
+        print(f"data has been downloaded for QM9 positional: remove h={remove_h}")
 
-    train = datasets['train'].data['positions'][:, :n_atoms]
-    test = datasets['test'].data['positions'][:, :n_atoms]
-    valid = datasets['valid'].data['positions'][:, :n_atoms]
+        train = datasets['train'].data['positions'][:, :n_atoms]
+        test = datasets['test'].data['positions'][:, :n_atoms]
+        valid = datasets['valid'].data['positions'][:, :n_atoms]
 
-    if remove_h:
-        np.save('../target/data/qm9_train_no_h.npy', train)
-        np.save('../target/data/qm9_test_no_h.npy', test)
-        np.save('../target/data/qm9_valid_no_h.npy', valid)
-    else:
-        np.save('../target/data/qm9_train.npy', train)
-        np.save('../target/data/qm9_test.npy', test)
-        np.save('../target/data/qm9_valid.npy', valid)
+        if remove_h:
+            np.save('../target/data/qm9_train_no_h.npy', train)
+            np.save('../target/data/qm9_test_no_h.npy', test)
+            np.save('../target/data/qm9_valid_no_h.npy', valid)
+        else:
+            np.save('../target/data/qm9_train.npy', train)
+            np.save('../target/data/qm9_test.npy', test)
+            np.save('../target/data/qm9_valid.npy', valid)
 
-    print("data saved to target/data")
-
-
+        print("data saved to target/data")

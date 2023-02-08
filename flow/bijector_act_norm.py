@@ -12,11 +12,19 @@ def global_scaling(x, scaling):
     return (x - global_mean)*scaling + global_mean
 
 class GlobalScaling(distrax.Bijector):
-    def __init__(self, log_scale):
+    def __init__(self, log_scale, activation = jax.nn.softplus):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
-        self._scale = jnp.exp(log_scale)
-        self._inv_scale = jnp.exp(jnp.negative(log_scale))
-        self._log_scale = log_scale
+        if activation == jnp.exp:
+            self._scale = jnp.exp(log_scale)
+            self._inv_scale = jnp.exp(jnp.negative(log_scale))
+            self._log_scale = log_scale
+        else:
+            assert activation == jax.nn.softplus
+            inverse_softplus = lambda x: jnp.log(jnp.exp(x) - 1.)
+            log_scale_param = log_scale + inverse_softplus(jnp.array(1.0))
+            self._scale = jax.nn.softplus(log_scale_param)
+            self._inv_scale = 1. / self._scale
+            self._log_scale = jnp.log(jnp.abs(self._scale))
 
     @property
     def log_scale(self) -> chex.Array:
@@ -46,9 +54,9 @@ class GlobalScaling(distrax.Bijector):
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
         if len(y.shape) == 2:
-            return global_scaling(y, 1 / self._scale)
+            return global_scaling(y, self._inv_scale)
         elif len(y.shape) == 3:
-            return jax.vmap(global_scaling)(y,  1 / self._scale)
+            return jax.vmap(global_scaling)(y,  self._inv_scale)
         else:
             raise Exception
 
