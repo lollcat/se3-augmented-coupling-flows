@@ -32,14 +32,23 @@ class ProjectedScalarAffine(distrax.Bijector):
     """Following style of `ScalarAffine` distrax Bijector.
 
     Note: Doesn't need to operate on batches, as it gets called with vmap."""
-    def __init__(self, change_of_basis_matrix, origin, log_scale, shift):
+    def __init__(self, change_of_basis_matrix, origin, log_scale, shift, activation=jax.nn.softplus):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
         self._change_of_basis_matrix = change_of_basis_matrix
         self._origin = origin
-        self._scale = jnp.exp(log_scale)
-        self._inv_scale = jnp.exp(jnp.negative(log_scale))
-        self._log_scale = log_scale
         self._shift = shift
+        if activation == jnp.exp:
+            self._scale = jnp.exp(log_scale)
+            self._inv_scale = jnp.exp(jnp.negative(log_scale))
+            self._log_scale = log_scale
+        else:
+            assert activation == jax.nn.softplus
+            inverse_softplus = lambda x: jnp.log(jnp.exp(x) - 1.)
+            log_scale_param = log_scale + inverse_softplus(jnp.array(1.0))
+            self._scale = jax.nn.softplus(log_scale_param)
+            self._inv_scale = 1. / self._scale
+            self._log_scale = jnp.log(jnp.abs(self._scale))
+
 
     @property
     def shift(self) -> chex.Array:

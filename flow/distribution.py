@@ -5,6 +5,7 @@ from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
+from flow.bijector_act_norm import make_global_scaling
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
 from flow.nets import EgnnConfig, TransformerConfig
 from flow.fast_hk_chain import Chain
@@ -47,6 +48,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
                                          compile_n_unroll: int = 2,
                                          transformer_config: Optional[TransformerConfig] = None,
+                                         act_norm: bool = True,
                                          kwargs: dict = {}):
     if not "proj_v2" in kwargs.keys():
         if not kwargs == {}:
@@ -56,6 +58,9 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
     def bijector_fn():
         bijectors = []
         for swap in (False, True):
+            if act_norm:
+                bijectors.append(make_global_scaling(layer_number=0, swap=swap, dim=dim))
+
             if type == "vector_scale_shift":
                 # Append both the nice, and scale_along_vector bijectors
                 bijector = make_se_equivariant_scale_along_vector(layer_number=0, dim=dim, swap=swap,
@@ -108,6 +113,7 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
                                          transformer_config: Optional[TransformerConfig] = None,
+                                         act_norm: bool = True,
                                          kwargs: dict = {}):
     if kwargs != {}:
         raise NotImplementedError
@@ -117,6 +123,8 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
 
     for i in range(n_layers):
         for swap in (False, True):
+            if act_norm:
+                bijectors.append(make_global_scaling(layer_number=0, swap=swap, dim=dim))
             if type == "vector_scale_shift":
                 # Append both the nice, and scale_along_vector bijectors
                 bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
