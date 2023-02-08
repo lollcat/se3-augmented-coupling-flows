@@ -21,6 +21,7 @@ class EquivariantFlowDistConfig(NamedTuple):
     fast_compile: bool = True
     compile_n_unroll: int = 1
     transformer_config: Optional[TransformerConfig] = None
+    act_norm: bool = True
     kwargs: dict = {}
 
 
@@ -31,13 +32,16 @@ def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
             config.type, config.identity_init,
             config.egnn_config, config.compile_n_unroll,
             transformer_config=config.transformer_config,
+            act_norm=config.act_norm,
             kwargs=config.kwargs)
     else:
-        return make_equivariant_augmented_flow_dist_distrax_chain(config.dim, config.nodes, config.n_layers,
-                                                                  config.type, config.identity_init,
-                                                                  config.egnn_config,
-                                                                  transformer_config=config.transformer_config,
-                                                                  kwargs=config.kwargs)
+        return make_equivariant_augmented_flow_dist_distrax_chain(
+            config.dim, config.nodes, config.n_layers,
+            config.type, config.identity_init,
+            config.egnn_config,
+            transformer_config=config.transformer_config,
+            act_norm=config.act_norm,
+            kwargs=config.kwargs)
 
 
 def make_equivariant_augmented_flow_dist_fast_compile(dim,
@@ -100,9 +104,10 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                 raise NotImplemented
         return distrax.Chain(bijectors)
     flow = Chain(bijector_fn=bijector_fn, n_layers=n_layers, compile_n_unroll=compile_n_unroll)
-    final_act_norm = distrax.Chain([make_global_scaling(layer_number=-1, swap=True, dim=dim),
-                            make_global_scaling(layer_number=-1, swap=False, dim=dim)])
-    flow = distrax.Chain([flow, final_act_norm])
+    if act_norm:
+        final_act_norm = distrax.Chain([make_global_scaling(layer_number=-1, swap=True, dim=dim),
+                                make_global_scaling(layer_number=-1, swap=False, dim=dim)])
+        flow = distrax.Chain([flow, final_act_norm])
     distribution = distrax.Transformed(base, flow)
     return distribution
 
@@ -164,8 +169,9 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
             else:
                 raise NotImplemented
 
-    bijectors.append(make_global_scaling(layer_number=-1, swap=True, dim=dim))
-    bijectors.append(make_global_scaling(layer_number=-1, swap=False, dim=dim))
+    if act_norm:
+        bijectors.append(make_global_scaling(layer_number=-1, swap=True, dim=dim))
+        bijectors.append(make_global_scaling(layer_number=-1, swap=False, dim=dim))
 
     flow = distrax.Chain(bijectors)
     distribution = distrax.Transformed(base, flow)
