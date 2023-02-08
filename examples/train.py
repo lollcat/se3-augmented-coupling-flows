@@ -125,6 +125,7 @@ class TrainConfig(NamedTuple):
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
     optimizer_name: str = 'adam'
+    use_64_bit: bool = False
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -179,6 +180,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
 
 def train(config: TrainConfig):
     """Generic Training script."""
+    if config.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
 
     assert config.flow_dist_config.dim == config.dim
     assert config.flow_dist_config.nodes == config.n_nodes
