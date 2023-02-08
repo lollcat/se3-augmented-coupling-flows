@@ -8,7 +8,7 @@ import jax
 
 def global_scaling(x, scaling):
     chex.assert_rank(x, 2)
-    global_mean = jnp.mean(x)
+    global_mean = jnp.mean(x, axis=0)
     return (x - global_mean)*scaling + global_mean
 
 class GlobalScaling(distrax.Bijector):
