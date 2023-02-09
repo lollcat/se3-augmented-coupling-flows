@@ -161,11 +161,10 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_tree_all_finite(grad)
 
 
-def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, seed=0):
+def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
     batch_size, n_nodes, joint_dim = samples.shape
     dim = joint_dim // 2
 
-    key = jax.random.PRNGKey(seed)
     key1, key2, key3 = jax.random.split(key, 3)
 
     # Get rotated version of x_and_a.
@@ -190,7 +189,8 @@ def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, seed=0):
     max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
     mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
     mean_diff_x_space = jnp.mean(jnp.abs(samples - samples_rot))
-    return {"max_abs_diff_log_prob_after_group_action": max_abs_diff, "mean_abs_diff_after_group_action": mean_abs_diff,
+    return {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
+            "mean_abs_diff_log_prob_after_group_action": mean_abs_diff,
             "mean_diff_x_space_after_group_action": mean_diff_x_space}
 
 

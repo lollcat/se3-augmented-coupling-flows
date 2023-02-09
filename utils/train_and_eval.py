@@ -90,12 +90,14 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
     dim = x.shape[-1] // 2
     key1, key2 = jax.random.split(key)
 
+    log_prob_samples_only_fn = lambda x: flow_log_prob_fn.apply(params, x)
+
     def scan_fn(carry, xs):
         x_batch, key = xs
         info = {}
         if test_invariances:
             invariances_info = get_max_diff_log_prob_invariance_test(
-            x_batch,  log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch))
+            x_batch,  log_prob_fn=log_prob_samples_only_fn, key=key)
             info.update(invariances_info)
 
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
