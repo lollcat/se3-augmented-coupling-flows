@@ -2,8 +2,9 @@ import jax.numpy as jnp
 import numpy as np
 import jax
 import chex
+from functools import partial
 
-from utils.numerical import get_pairwise_distances, set_diagonal_to_zero
+from utils.numerical import get_pairwise_distances
 from utils.mcmc import get_samples_simple
 
 def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
@@ -14,21 +15,25 @@ def energy(x, a = 0.0, b = -4., c = 0.9, d0 = 4.0, tau = 1.0):
     return jnp.sum(a*diff_minus_d0 + b*diff_minus_d0**2 + c*diff_minus_d0**4, axis=(-1, -2)) / tau / 2
 
 
-def log_prob_fn(x: chex.Array):
+def log_prob_fn(x: chex.Array, temperature=1.0):
     if len(x.shape) == 2:
-        return - energy(x)
+        return - energy(x, tau=temperature)
     elif len(x.shape) == 3:
-        return - jax.vmap(energy)(x)
+        return - jax.vmap(partial(energy, tau=temperature))(x)
     else:
         raise Exception
 
 
-def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
+def make_dataset(seed: int = 0, n_vertices=4, dim=2, n_samples: int = 10000, temperature: float = -1.,
+                 n_warmup_steps=10000, step_sizes=(5.0, 1.0, 0.2, 0.1, 0.1, 0.1, 0.05)):
     batch_size = 64
     key = jax.random.PRNGKey(seed)
-    samples = get_samples_simple(log_prob_fn, key, n_vertices, dim, n_samples // batch_size, batch_size,
-                                 step_size=0.5, n_warmup_steps=1000)
-    np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
+    samples = get_samples_simple(partial(log_prob_fn, temperature=temperature),
+                                 key, n_vertices, dim, n_samples // batch_size, batch_size,
+                                 step_sizes=step_sizes, n_warmup_steps=n_warmup_steps,
+                                 init_scale=10)
+    np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}_temperature{temperature}.npy", np.asarray(samples))
+    return samples
 
 
 
@@ -58,9 +63,6 @@ if __name__ == '__main__':
     x = jnp.stack([x0, x1], axis=1)
     log_probs = log_prob_fn(x)
 
-    grad_log_prob = jax.jacfwd(log_prob_fn)(x)
-    # print(grad_log_prob)
-
     print(jax.grad(log_prob_fn)(x[0]))
 
     plt.plot(d, log_probs)
@@ -71,12 +73,17 @@ if __name__ == '__main__':
     # plt.show()
 
     key = jax.random.PRNGKey(0)
-    samples = get_samples_simple(log_prob_fn, key, n_steps=100, batch_size=128, step_size=0.5, n_warmup_steps=1000,
+    samples = get_samples_simple(log_prob_fn, key, n_steps=100, batch_size=128, step_sizes=(0.5,), n_warmup_steps=1000,
                                  init_scale=0.1)
     plot_sample_hist(samples, ax=ax)
     plt.show()
 
-    make_dataset(n_vertices=4)
+
+    fig, ax = plt.subplots()
+    samples = make_dataset(n_vertices=4, temperature=0.1)
+    plot_sample_hist(samples, ax=ax)
+    plt.title("dataset samples")
+    plt.show()
 
 
 
