@@ -1,15 +1,14 @@
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Callable
 
 import distrax
 import chex
 import jax
 import jax.numpy as jnp
 
-from flow.nets import se_equivariant_net, EgnnConfig
+from flow.nets import EgnnConfig
+from flow.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
 from utils.numerical import rotate_2d, vector_rejection
 
-
-# TODO: need to figure out how to push all transforms into a single NN, instead of having multiple.
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -103,9 +102,7 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def make_conditioner(origin_equivariant_fn,
-                     z_equivariant_fn,
-                     x_equivariant_fn: Optional[Callable] = None,
+def make_conditioner(multi_x_equivariant_fn: Callable,
                      normalize: bool = True,
                      ):
     def _conditioner(x):
@@ -113,34 +110,28 @@ def make_conditioner(origin_equivariant_fn,
         dim = x.shape[-1]
 
         # Calculate new basis for the affine transform
-        origin = origin_equivariant_fn(x)
-        z_basis_point, zy_scale_and_shift_params = z_equivariant_fn(x)
-        z_scale_and_shift_params, y_scale_and_shift_params = jnp.split(zy_scale_and_shift_params, 2, axis=-1)
-        if x_equivariant_fn is not None:
+        various_x_points, h = multi_x_equivariant_fn(x)
+        chex.assert_tree_shape_suffix(various_x_points, (dim, dim))
+        various_x_points = jnp.swapaxes(various_x_points, 0, 1)
+
+
+        origin = various_x_points[0]
+        basis_vectors = various_x_points[1:] - origin[None, ...]
+        z_basis_vector = basis_vectors[0]
+        log_scale, shift = jnp.split(h, 2, axis=-1)
+        if dim == 3:
             chex.assert_tree_shape_suffix(x, (3, ))
+            x_basis_vector = basis_vectors[1]
+
             # Compute reference axes.
-            z_basis_vector = z_basis_point - origin
-            x_basis_point, x_scale_and_shift_params = x_equivariant_fn(x)
-            x_basis_vector = x_basis_point - origin
             x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
             y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
             change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
 
-            log_scale = jnp.stack([z_scale_and_shift_params[..., 0], x_scale_and_shift_params[..., 0],
-                                   y_scale_and_shift_params[..., 0]], axis=-1)
-            shift = jnp.stack([z_scale_and_shift_params[..., 1], x_scale_and_shift_params[..., 1],
-                               y_scale_and_shift_params[..., 1]], axis=-1)
-
-
         else:
             chex.assert_tree_shape_suffix(x, (2,))
-            z_basis_vector = z_basis_point - origin
-            # x_basis_vector = x_basis_point - origin
             y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
             change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
-
-            log_scale = jnp.stack([z_scale_and_shift_params[..., 0], y_scale_and_shift_params[..., 0]], axis=-1)
-            shift = jnp.stack([z_scale_and_shift_params[..., 1], y_scale_and_shift_params[..., 1]], axis=-1)
 
         if normalize:
             change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
@@ -166,33 +157,18 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         change_of_basis_matrix, origin, log_scale, shift = params
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
-
-    origin_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_origin",
-                           identity_init_x=identity_init,
-                           h_config=egnn_config.h_config._replace(h_out=False)))
-
-    y_equivariant_fn = se_equivariant_net(
-        egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_y",
-                           identity_init_x=False,
-                           zero_init_h=identity_init,
-                           h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=4)))
-
-    if dim == 3:
-        x_equivariant_fn = se_equivariant_net(
-            egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_x",
-                               identity_init_x=False,
-                               zero_init_h=identity_init,
-                               h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2)))
-    else:
-        x_equivariant_fn = None
+    egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
+                         identity_init_x=False, zero_init_h=identity_init,
+                         h_config=egnn_config.h_config._replace(h_out=True, h_out_dim=2*dim,
+                                                                ))
+    multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=dim)
+    multi_egnn = multi_se_equivariant_net(multi_egnn_config)
 
 
 
     conditioner = make_conditioner(
-        origin_equivariant_fn,
-        y_equivariant_fn,
-        x_equivariant_fn)
+        multi_egnn
+    )
 
     return distrax.SplitCoupling(
         split_index=dim,

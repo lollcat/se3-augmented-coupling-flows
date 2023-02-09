@@ -29,9 +29,9 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
-    cfg.flow.type = 'proj_v2' # 'proj_v2'
-    cfg.flow.egnn.mlp_units = (16,)
-    cfg.flow.transformer.mlp_units = (16,)
+    cfg.flow.type = 'proj'  # 'proj_v2'
+    cfg.flow.egnn.mlp_units = (4,)
+    cfg.flow.transformer.mlp_units = (4,)
     cfg.flow.transformer.n_layers = 2
     cfg.flow.n_layers = 3
     cfg.training.batch_size = 32
@@ -40,6 +40,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.plot_batch_size = 64
     cfg.training.K_marginal_log_lik = 5
     cfg.logger = DictConfig({"list_logger": None})
+
+    debug = False
+    if debug:
+        cfg.flow.fast_compile = False
+        cfg_train = dict(cfg['training'])
+        cfg_train['scan_run'] = False
+        cfg.training = DictConfig(cfg_train)
     return cfg
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")

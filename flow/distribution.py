@@ -123,8 +123,9 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          transformer_config: Optional[TransformerConfig] = None,
                                          act_norm: bool = True,
                                          kwargs: dict = {}):
-    if kwargs != {}:
-        raise NotImplementedError
+    if not "proj_v2" in kwargs.keys():
+        if not kwargs == {}:
+            raise NotImplementedError
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
