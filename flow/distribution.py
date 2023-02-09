@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Sequence, Union
 import distrax
 
 from flow.base import CentreGravityGaussian
@@ -14,7 +14,7 @@ class EquivariantFlowDistConfig(NamedTuple):
     dim: int
     nodes: int
     n_layers: int
-    type: str = "nice"
+    type: Union[str, Sequence[str]]
     identity_init: bool = True
     egnn_config: EgnnConfig = EgnnConfig(name="dummy_name")
     fast_compile: bool = True
@@ -46,7 +46,7 @@ def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
 def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          nodes,
                                          n_layers,
-                                         type="nice",
+                                         type: Union[str, Sequence[str]],
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
                                          compile_n_unroll: int = 2,
@@ -60,43 +60,31 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
 
     def bijector_fn():
         bijectors = []
+        kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+
         for swap in (True, False):  # For swap False we condition augmented on original.
             if act_norm:
                 bijectors.append(make_global_scaling(layer_number=0, swap=True, dim=dim))
                 bijectors.append(make_global_scaling(layer_number=0, swap=False, dim=dim))
 
-            if type == "vector_scale_shift":
-                # Append both the nice, and scale_along_vector bijectors
+            if "vector_scale" in type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=0, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
                                                                   egnn_config=egnn_config)
                 bijectors.append(bijector)
-
-                bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
-                                                    identity_init=flow_identity_init,
-                                                    egnn_config=egnn_config)
-                bijectors.append(bijector)
-
-            elif type == "vector_scale":
-                bijector = make_se_equivariant_scale_along_vector(layer_number=0, dim=dim, swap=swap,
-                                                                  identity_init=flow_identity_init,
-                                                                  egnn_config=egnn_config)
-                bijectors.append(bijector)
-            elif type == "proj":
-                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+            if "proj" in type:
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=0, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config,
                                                                               transformer_config=transformer_config,
                                                                               **kwargs_proj_v2)
                 bijectors.append(bijector)
-            elif type == "nice":
+
+            if "nice" in type:
                 bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
                                                     identity_init=flow_identity_init,
                                                     egnn_config=egnn_config)
                 bijectors.append(bijector)
-            else:
-                raise NotImplemented
         return distrax.Chain(bijectors)
     flow = Chain(bijector_fn=bijector_fn, n_layers=n_layers, compile_n_unroll=compile_n_unroll)
     if act_norm:
@@ -112,7 +100,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
 def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          nodes,
                                          n_layers,
-                                         type="nice",
+                                         type: Union[str, Sequence[str]],
                                          flow_identity_init: bool = True,
                                          egnn_config: EgnnConfig= EgnnConfig(name="dummy_name"),
                                          transformer_config: Optional[TransformerConfig] = None,
@@ -124,44 +112,31 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
     base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     bijectors = []
+    kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+
 
     for i in range(n_layers):
         for swap in (True, False):
             if act_norm:
                 bijectors.append(make_global_scaling(layer_number=0, swap=swap, dim=dim))
-            if type == "vector_scale_shift":
-                # Append both the nice, and scale_along_vector bijectors
+            if "vector_scale" in type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
                                                                   egnn_config=egnn_config)
                 bijectors.append(bijector)
 
-                bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,
-                                                    identity_init=flow_identity_init,
-                                                    egnn_config=egnn_config)
-                bijectors.append(bijector)
-
-            elif type == "vector_scale":
-                bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
-                                                                  identity_init=flow_identity_init,
-                                                                  egnn_config=egnn_config)
-                bijectors.append(bijector)
-
-            elif type == "proj":
-                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+            if "proj" in type:
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config,
                                                                               transformer_config=transformer_config,
                                                                               **kwargs_proj_v2)
                 bijectors.append(bijector)
-            elif type == "nice":
+            if "nice" in type:
                 bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,
                                                     identity_init=flow_identity_init,
                                                     egnn_config=egnn_config)
                 bijectors.append(bijector)
-            else:
-                raise NotImplemented
 
     if act_norm:
         bijectors.append(make_global_scaling(layer_number=-1, swap=True, dim=dim))

@@ -15,7 +15,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: proj  # vector_scale_shift  vector_scale nice proj   proj_v2
+  type: [proj,nice]  # vector_scale  vector_scale nice proj   proj_v2
   kwargs:
     proj_v2:
       global_frame: false

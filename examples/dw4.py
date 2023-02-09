@@ -45,7 +45,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = True
-    cfg.flow.type = 'proj'
+    cfg.flow.type = ['proj', 'nice']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.transformer.mlp_units = (4,)
