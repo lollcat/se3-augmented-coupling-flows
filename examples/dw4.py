@@ -1,21 +1,36 @@
 import hydra
 from omegaconf import DictConfig
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 from examples.train import train, create_train_config
+from target.double_well import make_dataset
 from utils.train_and_eval import original_dataset_to_joint_dataset
 
 
 
-def load_dataset(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0):
+def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0):
     # dataset from https://github.com/vgsatorras/en_flows
     # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
 
     data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
     dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
     dataset = jnp.reshape(dataset, (-1, 4, 2))
+    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
+
+    train_set = dataset[:train_set_size]
+    train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
+
+    test_set = dataset[-test_set_size:]
+    return train_set, test_set
+
+def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
+                        temperature: float = 1.0):
+    dataset = make_dataset(seed=seed, n_vertices=4, dim=2, n_samples=test_set_size+train_set_size,
+                           temperature=temperature)
     dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
 
     train_set = dataset[:train_set_size]
@@ -49,11 +64,18 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
         cfg.training = DictConfig(cfg_train)
     return cfg
 
+
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
     local_config = True
     if local_config:
         cfg = to_local_config(cfg)
+
+    if cfg.target.custom_samples:
+        print(f"loading custom dataset for temperature of {cfg.target.temperature}")
+        load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
+    else:
+        load_dataset = load_dataset_standard
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4,
                                             load_dataset=load_dataset)
     train(experiment_config)

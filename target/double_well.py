@@ -25,14 +25,15 @@ def log_prob_fn(x: chex.Array, temperature=1.0):
 
 
 def make_dataset(seed: int = 0, n_vertices=4, dim=2, n_samples: int = 10000, temperature: float = -1.,
-                 n_warmup_steps=10000, step_sizes=(5.0, 1.0, 0.2, 0.1, 0.1, 0.1, 0.05)):
+                 n_warmup_steps=10000, step_sizes=(5.0, 1.0, 0.2, 0.1, 0.1, 0.1, 0.05), save=False):
     batch_size = 64
     key = jax.random.PRNGKey(seed)
     samples = get_samples_simple(partial(log_prob_fn, temperature=temperature),
                                  key, n_vertices, dim, n_samples // batch_size, batch_size,
                                  step_sizes=step_sizes, n_warmup_steps=n_warmup_steps,
                                  init_scale=10)
-    np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}_temperature{temperature}.npy", np.asarray(samples))
+    if save:
+        np.save(f"data/dw_data_vertices{n_vertices}_dim{dim}_temperature{temperature}.npy", np.asarray(samples))
     return samples
 
 
