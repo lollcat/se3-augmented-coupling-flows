@@ -8,7 +8,7 @@ hydra:
 flow:
   dim: 3
   nodes: 19
-  n_layers: 12
+  n_layers: 8
   identity_init: true
   type: proj  # vector_scale_shift  vector_scale nice proj
   act_norm: true
@@ -17,12 +17,12 @@ flow:
       global_frame: false
       process_flow_params_jointly: false
       gram_schmidt: false
-      mlp_function_units: [16,]
+      mlp_function_units: [64,64]
   fast_compile: true
   compile_n_unroll: 1
   egnn:
     emile_net: false
-    mlp_units: [32,32]
+    mlp_units: [128,128]
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
@@ -44,11 +44,11 @@ flow:
 training:
   lr: 8e-5
   use_64_bit: false
-  optimizer_name: adamw
-  n_epoch: 200
+  optimizer_name: adam
+  n_epoch: 400
   batch_size: 32
   plot_batch_size: 32
-  max_global_norm: 5_000
+  max_global_norm: 12_000
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
@@ -63,7 +63,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_bigger_net_adam
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]
