@@ -6,6 +6,7 @@ from functools import partial
 import optax
 
 from flow.base import CentreGravityGaussian
+from flow.test_utils import get_max_diff_log_prob_invariance_test
 
 
 def ml_loss_fn(params, x, log_prob_fn):
@@ -78,7 +79,7 @@ def get_marginal_log_lik(log_prob_fn, x_original, key, K: int):
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob = None, batch_size=None,
-            K: int = 20):
+            K: int = 20, test_invariances: bool = True):
     if batch_size is None:
         batch_size = x.shape[0]
     else:
@@ -91,22 +92,24 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
 
     def scan_fn(carry, xs):
         x_batch, key = xs
+        info = {}
+        if test_invariances:
+            invariances_info = get_max_diff_log_prob_invariance_test(
+            x_batch,  log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch))
+            info.update(invariances_info)
+
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
         marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
                                                       x_original=x_batch[..., :dim], key=key, K=K)
-
-        return None, (log_prob_batch, marginal_log_lik_batch)
+        info.update(eval_log_lik = jnp.mean(log_prob_batch),
+                    eval_marginal_log_lik=jnp.mean(marginal_log_lik_batch))
+        return None, info
 
     x_batched = jnp.reshape(x, (-1, batch_size, *x.shape[1:]))
-    _, (log_probs, marginal_log_liks) = jax.lax.scan(
+    _, info = jax.lax.scan(
         scan_fn, None, (x_batched, jax.random.split(key1, x_batched.shape[0])))
 
-    marginal_log_lik = jnp.mean(marginal_log_liks)
-    log_prob = log_probs.flatten()
-
-    info = {"eval_marginal_log_lik": marginal_log_lik,
-            "eval_log_lik": jnp.mean(log_prob),
-            }
+    info = jax.tree_map(jnp.mean, info)
 
 
     if target_log_prob is not None:
@@ -116,7 +119,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
         log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_aug) - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
-            {"eval_kl": jnp.mean(target_log_prob(x) - log_prob),
+            {"eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],
              "ess": ess}
         )
     return info

@@ -161,3 +161,37 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_tree_all_finite(grad)
 
 
+def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, seed=0):
+    batch_size, n_nodes, joint_dim = samples.shape
+    dim = joint_dim // 2
+
+    key = jax.random.PRNGKey(seed)
+    key1, key2, key3 = jax.random.split(key, 3)
+
+    # Get rotated version of x_and_a.
+    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
+    translation = jax.random.normal(key2, shape=(batch_size, dim))
+    phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
+
+    def group_action(x_and_a):
+        if dim == 2:
+            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
+        else:  #  dim == 3:
+            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
+        return x_and_a_rot
+
+
+    samples_rot = group_action(samples)
+
+    log_prob = log_prob_fn(samples)
+
+    log_prob_alt = log_prob_fn(samples_rot)
+
+    max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
+    mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
+    mean_diff_x_space = jnp.mean(jnp.abs(samples - samples_rot))
+    return {"max_abs_diff_log_prob_after_group_action": max_abs_diff, "mean_abs_diff_after_group_action": mean_abs_diff,
+            "mean_diff_x_space_after_group_action": mean_diff_x_space}
+
+
+
