@@ -5,17 +5,18 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils.numerical import rotate_translate_2d
-from flow.nets_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig
+from flow.nets_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig, EgnnConfig
 
 
 def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
                         n_heads: int = 2):
     """Run the EGNN forward pass, and check that it is equivariant."""
     h_config = HConfig(h_embedding_dim=3, h_out=True, h_out_dim=2, share_h=True, linear_softmax=True)
-    eggn_config = MultiEgnnConfig(name='egnn', n_heads=n_heads, mlp_units=(16,), identity_init_x=False, n_layers=2,
+    eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2,
                                   h_config=h_config, zero_init_h=False)
+    multi_x_config = MultiEgnnConfig(n_heads=n_heads, egnn_config=eggn_config)
 
-    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: multi_se_equivariant_net(eggn_config)(x)))
+    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: multi_se_equivariant_net(multi_x_config)(x)))
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)

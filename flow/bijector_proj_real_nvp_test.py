@@ -14,7 +14,7 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
 
     egnn_config = EgnnConfig("", mlp_units=(2,), n_layers=2)
     transformer_config = TransformerConfig(mlp_units=(2,), n_layers=2) if process_flow_params_jointly else None
-    mlp_function_units = (4,) if not process_flow_params_jointly else None
+    mlp_function_units = (2,) if not process_flow_params_jointly else None
 
     def make_flow():
         bijectors = []
@@ -49,7 +49,7 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
 
 
 if __name__ == '__main__':
-    USE_64_BIT = True  # Fails for 32-bit
+    USE_64_BIT = False  # Fails for 32-bit
     gram_schmidt = False
 
     if USE_64_BIT:

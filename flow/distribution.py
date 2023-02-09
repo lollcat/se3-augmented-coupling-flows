@@ -62,7 +62,8 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
         bijectors = []
         for swap in (True, False):  # For swap False we condition augmented on original.
             if act_norm:
-                bijectors.append(make_global_scaling(layer_number=0, swap=swap, dim=dim))
+                bijectors.append(make_global_scaling(layer_number=0, swap=True, dim=dim))
+                bijectors.append(make_global_scaling(layer_number=0, swap=False, dim=dim))
 
             if type == "vector_scale_shift":
                 # Append both the nice, and scale_along_vector bijectors
@@ -100,7 +101,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
     flow = Chain(bijector_fn=bijector_fn, n_layers=n_layers, compile_n_unroll=compile_n_unroll)
     if act_norm:
         final_act_norm = distrax.Chain([make_global_scaling(layer_number=-1, swap=True, dim=dim),
-                                make_global_scaling(layer_number=-1, swap=False, dim=dim)])
+                                        make_global_scaling(layer_number=-1, swap=False, dim=dim)])
         flow = distrax.Chain([flow, final_act_norm])
     distribution = distrax.Transformed(base, flow)
     return distribution

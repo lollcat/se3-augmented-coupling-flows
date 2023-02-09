@@ -38,6 +38,12 @@ class EGCL_Multi(hk.Module):
              hk.Linear(n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
+        self.phi_x_cross = hk.Sequential([
+            hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
+             hk.Linear(n_heads*n_heads, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
+             hk.Linear(n_heads*n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
+             lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
+
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
@@ -66,8 +72,8 @@ class EGCL_Multi(hk.Module):
 
         diff_combos_heads = diff_combos_heads.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)  # prevents nan grads
         sq_norms_heads = jnp.sum(diff_combos_heads**2, axis=-1)
-        sq_norms_heads = sq_norms_heads.reshape(sq_norms_heads.shape[0], np.prod(sq_norms_heads.shape[1:]))  # Flatten.
-        h_concat = jnp.concatenate([h, sq_norms_heads], axis=-1)
+        sq_norms_heads_flat = sq_norms_heads.reshape(sq_norms_heads.shape[0], np.prod(sq_norms_heads.shape[1:]))  # Flatten.
+        h_concat = jnp.concatenate([h, sq_norms_heads_flat], axis=-1)
 
         # create h_combos.
         h_combos = jnp.concatenate([jnp.repeat(h_concat[None, ...], h.shape[0], axis=0),
@@ -90,17 +96,32 @@ class EGCL_Multi(hk.Module):
         phi_x_out = self.phi_x(m_ij)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
+        # Get phi_x_out_cross_attention
+        phi_x_cross_out = self.phi_x_cross(m_i)
+        phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
+
         # TODO: add "cross attention" shifting term also here.
         if self.normalize_by_x_norm:
             norm = jnp.sqrt(sq_norms_nodes + 1e-8) + self.normalization_constant
             if self.stop_gradient_for_norm:
                 norm = jax.lax.stop_gradient(norm)
             norm_diff_combo = diff_combos_nodes / norm[..., None]
-            norm_diff_combo = norm_diff_combo.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)
+            norm_diff_combo = norm_diff_combo.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)
             equivariant_shift = jnp.einsum('ijhd,ijh->ihd', norm_diff_combo, phi_x_out)
+
+            # cross attention
+            norm = jnp.sqrt(sq_norms_heads + 1e-8) + self.normalization_constant
+            if self.stop_gradient_for_norm:
+                norm = jax.lax.stop_gradient(norm)
+            norm_diff_combo = diff_combos_heads / norm[..., None]
+            norm_diff_combo = norm_diff_combo.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)
+            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', norm_diff_combo, phi_x_cross_out)
         else:
             equivariant_shift = jnp.einsum('ijhd,ijh->id', diff_combos_nodes, phi_x_out)
+            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', diff_combos_heads, phi_x_cross_out)
 
+        chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
+        equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
 
         if self.agg == 'mean':
             equivariant_shift = equivariant_shift / (n_nodes - 1)
