@@ -65,7 +65,7 @@ def get_samples_with_tuning(log_prob_fn, key, n_vertices: int = 2, dim: int = 2,
 def get_samples_simple(log_prob_fn, key, n_vertices: int = 2, dim: int = 2, n_steps: int = 64, batch_size: int = 32,
                        step_sizes: Sequence[float] = (2.0,), n_warmup_steps: int = 1000, init_scale = 1.0):
     # Build the kernel
-    kernels = [blackjax.rmh(log_prob_fn, step_size) for step_size in step_sizes]
+    kernels = [blackjax.rmh(log_prob_fn, sigma=step_size) for step_size in step_sizes]
 
     # Initialize the state
     initial_position = jax.random.normal(key, shape=(batch_size, n_vertices, dim)) * init_scale
