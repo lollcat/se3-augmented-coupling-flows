@@ -7,7 +7,7 @@ hydra:
 
 target:
   custom_samples: true
-  temperature: 0.1  # 0.1 or 1 are two good options
+  temperature: 1.0  # 0.1 or 1 are two good options
 
 
 flow:

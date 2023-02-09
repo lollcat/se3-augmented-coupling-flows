@@ -51,14 +51,14 @@ def original_dataset_to_joint_dataset(dataset, key):
 def get_target_augmented_variables(x_original, key):
     B, N, D = x_original.shape
     x_augmented = CentreGravityGaussian(n_nodes=N, dim=D)._sample_n(key=key, n=B)
-    augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
+    augmented_mean = jnp.mean(x_original, axis=-2, keepdims=True)
     return x_augmented + augmented_mean
 
 
 def get_augmented_sample_and_log_prob(x_original, key, K):
     B, N, D = x_original.shape
     x_augmented, log_p_a = CentreGravityGaussian(n_nodes=N, dim=D).sample_and_log_prob(seed=key, sample_shape=(K, B))
-    augmented_mean = jnp.mean(x_original, axis=(1, 2), keepdims=True)
+    augmented_mean = jnp.mean(x_original, axis=-2, keepdims=True)
     x_augmented = x_augmented + augmented_mean
     return x_augmented, log_p_a
 

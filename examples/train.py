@@ -51,7 +51,7 @@ def plot_sample_hist(samples,
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
-def plot_original_aug_norms_sample_hist(samples, ax, max_distance=20, *args, **kwargs):
+def plot_original_aug_norms_sample_hist(samples, ax, max_distance=10, *args, **kwargs):
     dim = samples.shape[-1] // 2
     norms = jnp.linalg.norm(samples[..., :dim] - samples[..., dim:], axis=-1).flatten()
     norms = norms.clip(max=max_distance)  # Clip keep plot reasonable.
