@@ -51,7 +51,7 @@ def plot_sample_hist(samples,
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
-def plot_original_aug_norms_sample_hist(samples, ax, max_distance=10, *args, **kwargs):
+def plot_original_aug_norms_sample_hist(samples, ax, max_distance=20, *args, **kwargs):
     dim = samples.shape[-1] // 2
     norms = jnp.linalg.norm(samples[..., :dim] - samples[..., dim:], axis=-1).flatten()
     norms = norms.clip(max=max_distance)  # Clip keep plot reasonable.
@@ -61,7 +61,7 @@ def plot_original_aug_norms_sample_hist(samples, ax, max_distance=10, *args, **k
 
 def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_data,
                     plotting_n_nodes: Optional[int] = None):
-    fig, axs = plt.subplots(2, 3, figsize=(10, 10))
+    fig, axs = plt.subplots(2, 3, figsize=(15, 10))
     samples = flow_sample_fn(params, key, (n_samples,))
     for i, og_coords in enumerate([True, False]):
         plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples",

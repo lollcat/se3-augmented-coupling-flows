@@ -3,7 +3,6 @@ import distrax
 
 from flow.base import CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
 from flow.bijector_act_norm import make_global_scaling
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
@@ -82,18 +81,13 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                                   identity_init=flow_identity_init,
                                                                   egnn_config=egnn_config)
                 bijectors.append(bijector)
-
             elif type == "proj":
+                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=0, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
-                                                                              egnn_config=egnn_config)
-                bijectors.append(bijector)
-            elif type == "proj_v2":
-                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
-                bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
-                                  identity_init=flow_identity_init,
-                                  egnn_config=egnn_config, transformer_config=transformer_config,
-                                   **kwargs_proj_v2)
+                                                                              egnn_config=egnn_config,
+                                                                              transformer_config=transformer_config,
+                                                                              **kwargs_proj_v2)
                 bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
@@ -153,14 +147,12 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                 bijectors.append(bijector)
 
             elif type == "proj":
+                kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
                 bijector = make_se_equivariant_split_coupling_with_projection(layer_number=i, dim=dim, swap=swap,
                                                                               identity_init=flow_identity_init,
-                                                                              egnn_config=egnn_config)
-                bijectors.append(bijector)
-            elif type == "proj_v2":
-                bijector = proj_v2(layer_number=i, dim=dim, swap=swap, identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config,
-                                   transformer_config=transformer_config)
+                                                                              transformer_config=transformer_config,
+                                                                              **kwargs_proj_v2)
                 bijectors.append(bijector)
             elif type == "nice":
                 bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,

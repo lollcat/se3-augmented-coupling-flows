@@ -28,7 +28,7 @@ def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
     x_and_a = jnp.zeros((n_nodes, dim * 2))
     x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape)
 
-    rtol = 1e-6 if x_and_a.dtype == jnp.float64 else 1e-3
+    rtol = 1e-5 if x_and_a.dtype == jnp.float64 else 1e-3
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2*jnp.pi

@@ -10,11 +10,14 @@ flow:
   nodes: 19
   n_layers: 12
   identity_init: true
-  type: proj_v2  # vector_scale_shift  vector_scale nice proj   proj_v2
+  type: proj  # vector_scale_shift  vector_scale nice proj
   act_norm: true
   kwargs:
     proj_v2:
+      global_frame: false
+      process_flow_params_jointly: false
       gram_schmidt: false
+      mlp_function_units: [16,]
   fast_compile: true
   compile_n_unroll: 1
   egnn:
@@ -30,7 +33,7 @@ flow:
     h:
       linear_softmax: true
       share_h: true
-  transformer: # for proj_v2 flow.
+  transformer: # for proj flow
     mlp_units: [32,32]
     num_heads: 6
     key_size: 16

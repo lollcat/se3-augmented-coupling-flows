@@ -11,11 +11,15 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: proj_v2  # vector_scale_shift  vector_scale nice proj   proj_v2
-  act_norm: true
+  type: proj  # vector_scale_shift  vector_scale nice proj   proj_v2
   kwargs:
     proj_v2:
+      global_frame: false
+      process_flow_params_jointly: false
       gram_schmidt: false
+      mlp_function_units: [16,]
+
+  act_norm: true
   fast_compile: true
   compile_n_unroll: 1
   egnn:
