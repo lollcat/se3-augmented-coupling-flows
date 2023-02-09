@@ -72,6 +72,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 def run(cfg: DictConfig):
     local_config = True
     if local_config:
+        print("running locally")
         cfg = to_local_config(cfg)
 
     if cfg.target.custom_samples:

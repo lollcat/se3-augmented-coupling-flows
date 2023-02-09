@@ -140,6 +140,7 @@ def setup_logger(cfg: DictConfig) -> Logger:
 
 
 def create_flow_config(flow_cfg: DictConfig):
+    print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
     egnn_cfg = dict(flow_cfg.pop("egnn"))
     h_cfg = dict(egnn_cfg.pop("h"))
