@@ -6,7 +6,7 @@ hydra:
     chdir: false
 
 target:
-  custom_samples: true
+  custom_samples: false
   temperature: 1.0  # 0.1 or 1 are two good options
 
 

@@ -250,6 +250,7 @@ def train(config: TrainConfig):
 
             for batch_index in range(batched_data.shape[0]):
                 info = jax.tree_map(lambda x: x[batch_index], infos)
+                info.update(epoch=i)
                 config.logger.write(info)
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
@@ -257,6 +258,7 @@ def train(config: TrainConfig):
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
                 config.logger.write(info)
+                info.update(epoch=i)
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
 
@@ -273,6 +275,7 @@ def train(config: TrainConfig):
                                 batch_size=config.batch_size,
                                 K=config.K_marginal_log_lik)
             pbar.write(str(eval_info))
+            eval_info.update(epoch=i)
             config.logger.write(eval_info)
 
         if i in checkpoint_iter and config.save:
