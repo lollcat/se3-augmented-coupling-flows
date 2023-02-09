@@ -36,13 +36,13 @@ flow:
 
 
 training:
-  lr: 2e-5
+  lr: 1e-4
   use_64_bit: false
   optimizer_name: adam
-  n_epoch: 200
-  batch_size: 32
-  plot_batch_size: 32
-  max_global_norm: 20_000
+  n_epoch: 100
+  batch_size: 200
+  plot_batch_size: 100
+  max_global_norm: 5_000
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
