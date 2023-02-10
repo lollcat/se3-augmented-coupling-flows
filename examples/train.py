@@ -34,7 +34,7 @@ Plotter = Callable[[hk.Params, FlowSampleFn, TestData, TrainData], List[plt.Figu
 
 def plot_sample_hist(samples,
                      ax,
-                     original_coords, # or augmented
+                     original_coords,  # or augmented
                      n_vertices: Optional[int] = None,
                      max_distance = 10, *args, **kwargs):
     """n_vertices argument allows us to look at pairwise distances for subset of vertices,
@@ -63,6 +63,11 @@ def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_dat
                     plotting_n_nodes: Optional[int] = None):
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
     samples = flow_sample_fn(params, key, (n_samples,))
+
+    if False:
+        dim = samples.shape[-1] // 2
+        samples = samples.at[..., dim:].set(samples.at[..., dim:])
+
     for i, og_coords in enumerate([True, False]):
         plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples",
                          n_vertices=plotting_n_nodes)

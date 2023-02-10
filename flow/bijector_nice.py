@@ -7,6 +7,7 @@ from flow.nets import se_equivariant_net, EgnnConfig
 def make_conditioner(equivariant_fn):
     def conditioner(x):
         shift = equivariant_fn(x) - x
+        shift = shift
         return shift
     return conditioner
 

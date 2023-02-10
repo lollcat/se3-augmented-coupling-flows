@@ -1,7 +1,7 @@
 from typing import NamedTuple, Optional, Sequence, Union
 import distrax
 
-from flow.base import CentreGravityGaussian
+from flow.base import DoubleCentreGravitryGaussian, CentreGravityGaussian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijector_nice import make_se_equivariant_nice
 from flow.bijector_act_norm import make_global_scaling
@@ -52,11 +52,16 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          compile_n_unroll: int = 2,
                                          transformer_config: Optional[TransformerConfig] = None,
                                          act_norm: bool = True,
+                                         double_centre_gravity_gaussian_base: bool = True,
                                          kwargs: dict = {}):
     if not "proj_v2" in kwargs.keys():
         if not kwargs == {}:
             raise NotImplementedError
-    base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
+
+    if double_centre_gravity_gaussian_base:
+        base = DoubleCentreGravitryGaussian(dim=dim, n_nodes=nodes)
+    else:
+        base = CentreGravityGaussian(dim=int(dim*2), n_nodes=nodes)
 
     def bijector_fn():
         bijectors = []

@@ -113,11 +113,14 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
 
     info = jax.tree_map(jnp.mean, info)
 
+    x_flow, log_prob_flow = flow_sample_and_log_prob_fn.apply(params, key2, (batch_size,))
+    x_flow_original, x_flow_aug = jnp.split(x_flow, axis=-1, indices_or_sections=2)
+    original_centre = jnp.mean(x_flow_original, axis=-2)
+    aug_centre = jnp.mean(x_flow_aug, axis=-2)
+    info.update(mean_aug_orig_norm=jnp.mean(jnp.linalg.norm(original_centre-aug_centre, axis=-1)))
 
     if target_log_prob is not None:
         # Calculate ESS
-        x_flow, log_prob_flow = flow_sample_and_log_prob_fn.apply(params, key2, (batch_size, ))
-        x_flow_original, x_flow_aug = jnp.split(x_flow, axis=-1, indices_or_sections=2)
         log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_aug) - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
