@@ -4,13 +4,11 @@ import jax
 import numpy as np
 
 from examples.train import train, create_train_config
-from utils.train_and_eval import original_dataset_to_joint_dataset
 
 
 
-def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
+def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None):
     # First need to run `qm9.download_data`
-    key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
     data_dir = "target/data/qm9_"
     train_data = np.load(data_dir + "train_no_h.npy")
@@ -23,9 +21,6 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
         test_data = test_data[:test_data_n_points]
 
     train_data = train_data[:train_data.shape[0] - (train_data.shape[0] % batch_size)]
-
-    train_data = original_dataset_to_joint_dataset(train_data, key1)
-    test_data = original_dataset_to_joint_dataset(test_data, key2)
 
     return train_data, test_data
 

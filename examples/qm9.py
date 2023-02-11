@@ -4,7 +4,6 @@ import jax
 import numpy as np
 
 from examples.train import train, create_train_config
-from utils.train_and_eval import original_dataset_to_joint_dataset
 
 
 
@@ -23,9 +22,6 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
         test_data = test_data[:test_data_n_points]
 
     train_data = train_data[:train_data.shape[0] - (train_data.shape[0] % batch_size)]
-
-    train_data = original_dataset_to_joint_dataset(train_data, key1)
-    test_data = original_dataset_to_joint_dataset(test_data, key2)
 
     return train_data, test_data
 

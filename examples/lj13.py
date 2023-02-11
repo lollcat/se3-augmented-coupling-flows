@@ -5,7 +5,6 @@ import jax.numpy as jnp
 import numpy as np
 
 from examples.train import train, create_train_config
-from utils.train_and_eval import original_dataset_to_joint_dataset
 
 
 
@@ -18,14 +17,12 @@ def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000
     idx = np.load("target/data/idx_LJ13.npy")
     train_set = data[idx[:train_set_size]]
     train_set = jnp.reshape(train_set, (-1, 13, 3))
-    train_set = original_dataset_to_joint_dataset(train_set, jax.random.PRNGKey(seed))
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
 
     # Test set
     test_data_path = 'target/data/all_data_LJ13.npy'  # target/data/lj_data_vertices13_dim3.npy
     dataset = np.load(test_data_path)
     dataset = jnp.reshape(dataset, (-1, 13, 3))
-    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
     test_set = dataset[:val_set_size]
     return train_set, test_set
 

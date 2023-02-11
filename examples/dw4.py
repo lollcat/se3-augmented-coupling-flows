@@ -8,18 +8,16 @@ import numpy as np
 
 from examples.train import train, create_train_config
 from target.double_well import make_dataset
-from utils.train_and_eval import original_dataset_to_joint_dataset
 
 
 
-def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0):
+def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000):
     # dataset from https://github.com/vgsatorras/en_flows
     # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
 
     data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
     dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
     dataset = jnp.reshape(dataset, (-1, 4, 2))
-    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
 
     train_set = dataset[:train_set_size]
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
@@ -31,7 +29,6 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
                         temperature: float = 1.0):
     dataset = make_dataset(seed=seed, n_vertices=4, dim=2, n_samples=test_set_size+train_set_size,
                            temperature=temperature)
-    dataset = original_dataset_to_joint_dataset(dataset, jax.random.PRNGKey(seed))
 
     train_set = dataset[:train_set_size]
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
@@ -45,7 +42,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = True
-    cfg.flow.type = ['nice']
+    cfg.flow.type = ['proj']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.transformer.mlp_units = (4,)

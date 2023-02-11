@@ -6,6 +6,7 @@ hydra:
     chdir: false
 
 target:
+  global_centering: false
   custom_samples: true
   temperature: 0.1  # 0.1 or 1 are two good options
 

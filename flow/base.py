@@ -5,8 +5,61 @@ import chex
 import jax
 import jax.numpy as jnp
 from chex import PRNGKey, Array
+import haiku as hk
 
 import distrax
+
+
+def get_conditional_gaussian_augmented_dist(x, global_centering: bool, scale: float = 1.):
+    scale_diag = jnp.zeros_like(x) + scale
+    loc = jnp.zeros_like(x)
+    if global_centering:
+        loc = loc + jnp.mean(x, axis=-2, keepdims=True)
+    else:
+        loc = loc + x
+    dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=loc,
+                                                              scale_diag=scale_diag), reinterpreted_batch_ndims=1)
+    return dist
+
+class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
+    """x ~ CentreGravityGaussian, a ~ Normal(x, I)"""
+    def __init__(self, dim, n_nodes, global_centering: bool = False,
+                 augmented_scale_init: float = 1.0,
+                 trainable_augmented_scale: bool = True):
+        self.dim = dim
+        self.n_nodes = n_nodes
+        self.global_centering = global_centering
+        if trainable_augmented_scale:
+            self.augmented_scale_logit = hk.get_parameter(name='agumented_scale_logit', shape=(),
+                                                          init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
+        else:
+            self.augmented_scale_logit = jnp.zeros(())
+
+
+    def get_augmented_dist(self, x) -> distrax.Distribution:
+        dist = get_conditional_gaussian_augmented_dist(x, scale=jnp.exp(self.augmented_scale_logit),
+                                                       global_centering=self.global_centering)
+        return dist
+
+
+    def _sample_n(self, key: PRNGKey, n: int) -> Array:
+        key1, key2 = jax.random.split(key)
+        shape = (n, self.n_nodes, self.dim)
+        original_coords = sample_center_gravity_zero_gaussian(key1, shape)
+        augmented_coords = self.get_augmented_dist(original_coords).sample(seed=key2)
+        joint_coords = jnp.concatenate([original_coords, augmented_coords], axis=-1)
+        return joint_coords
+
+    def log_prob(self, value: Array) -> Array:
+        original_coords, augmented_coords = jnp.split(value, 2, axis=-1)
+        log_prob_a_given_x = self.get_augmented_dist(original_coords).log_prob(augmented_coords)
+        log_p_x = center_gravity_zero_gaussian_log_likelihood(remove_mean(original_coords))
+        chex.assert_equal_shape((log_p_x, log_prob_a_given_x))
+        return log_p_x + log_prob_a_given_x
+
+    @property
+    def event_shape(self) -> Tuple[int, ...]:
+        return (self.n_nodes, self.dim)
 
 
 class DoubleCentreGravitryGaussian(distrax.Distribution):
@@ -25,8 +78,9 @@ class DoubleCentreGravitryGaussian(distrax.Distribution):
         return joint_coords
 
     def log_prob(self, value: Array) -> Array:
-        value = remove_mean(value)
         original_coords, augmented_coords = jnp.split(value, 2, axis=-1)
+        original_coords = remove_mean(original_coords)
+        augmented_coords = remove_mean(augmented_coords)
         log_prob = center_gravity_zero_gaussian_log_likelihood(original_coords) +\
                    center_gravity_zero_gaussian_log_likelihood(augmented_coords)
         return log_prob
@@ -59,7 +113,7 @@ class CentreGravityGaussian(distrax.Distribution):
 
 def assert_mean_zero(x: chex.Array):
     mean = jnp.mean(x, axis=-2, keepdims=True)
-    chex.assert_trees_all_close(mean, jnp.zeros_like(mean))
+    chex.assert_trees_all_close(1 + jnp.zeros_like(mean), 1 + mean)
 
 def remove_mean(x: chex.Array) -> chex.Array:
     mean = jnp.mean(x, axis=-2, keepdims=True)

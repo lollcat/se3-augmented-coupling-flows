@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from functools import partial
 import optax
 
-from flow.base import CentreGravityGaussian
+from flow.base import get_conditional_gaussian_augmented_dist
 from flow.test_utils import get_max_diff_log_prob_invariance_test
 
 
@@ -44,41 +44,42 @@ def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0
     return train_set, test_set
 
 
-def original_dataset_to_joint_dataset(dataset, key):
-    augmented_dataset = get_target_augmented_variables(dataset, key)
+def original_dataset_to_joint_dataset(dataset, key, global_centering):
+    augmented_dataset = get_target_augmented_variables(dataset, key, global_centering)
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
     return dataset
 
-def get_target_augmented_variables(x_original, key):
-    B, N, D = x_original.shape
-    x_augmented = CentreGravityGaussian(n_nodes=N, dim=D)._sample_n(key=key, n=B)
-    augmented_mean = jnp.mean(x_original, axis=-2, keepdims=True)
-    return x_augmented + augmented_mean
+def get_target_augmented_variables(x_original, key, global_centering):
+    x_augmented = get_conditional_gaussian_augmented_dist(
+        x=x_original, scale=1,
+        global_centering=global_centering).sample(seed=key)
+    return x_augmented
 
 
-def get_augmented_sample_and_log_prob(x_original, key, K):
-    B, N, D = x_original.shape
-    x_augmented, log_p_a = CentreGravityGaussian(n_nodes=N, dim=D).sample_and_log_prob(seed=key, sample_shape=(K, B))
-    augmented_mean = jnp.mean(x_original, axis=-2, keepdims=True)
-    x_augmented = x_augmented + augmented_mean
+def get_augmented_sample_and_log_prob(x_original, global_centering, key, K):
+    x_augmented, log_p_a = get_conditional_gaussian_augmented_dist(
+        x=x_original, global_centering=global_centering).sample_and_log_prob(seed=key, sample_shape=(K,))
     return x_augmented, log_p_a
 
-def get_augmented_log_prob(x_augmented):
-    B, N, D = x_augmented.shape
-    log_p_a = CentreGravityGaussian(n_nodes=N, dim=D).log_prob(x_augmented)
+def get_augmented_log_prob(x_original, x_augmented, global_centering):
+    log_p_a = get_conditional_gaussian_augmented_dist(
+        x=x_original, global_centering=global_centering).log_prob(x_augmented)
     return log_p_a
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, K: int):
-    x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, key, K)
+def get_marginal_log_lik(log_prob_fn, x_original, key, global_centering, K: int):
+    x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, global_centering, key, K)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, x_augmented), axis=-1))
     chex.assert_equal_shape((log_p_a, log_q))
     return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
-def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, target_log_prob = None, batch_size=None,
+@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8))
+def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
+            global_centering: bool,
+            target_log_prob = None,
+            batch_size=None,
             K: int = 20, test_invariances: bool = True):
     if batch_size is None:
         batch_size = x.shape[0]
@@ -102,7 +103,8 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
 
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
         marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
-                                                      x_original=x_batch[..., :dim], key=key, K=K)
+                                                      x_original=x_batch[..., :dim], key=key, K=K,
+                                                      global_centering=global_centering)
         info.update(eval_log_lik = jnp.mean(log_prob_batch),
                     eval_marginal_log_lik=jnp.mean(marginal_log_lik_batch))
         return None, info
@@ -121,7 +123,8 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn, targe
 
     if target_log_prob is not None:
         # Calculate ESS
-        log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_aug) - log_prob_flow
+        log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_original, x_flow_aug,
+                                                                          global_centering) - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
             {"eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],

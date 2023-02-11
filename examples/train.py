@@ -64,10 +64,6 @@ def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_dat
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
     samples = flow_sample_fn(params, key, (n_samples,))
 
-    if False:
-        dim = samples.shape[-1] // 2
-        samples = samples.at[..., dim:].set(samples.at[..., dim:])
-
     for i, og_coords in enumerate([True, False]):
         plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples",
                          n_vertices=plotting_n_nodes)
@@ -110,6 +106,7 @@ class TrainConfig(NamedTuple):
     dim: int
     n_nodes: int
     flow_dist_config: EquivariantFlowDistConfig
+    target_global_centering: bool
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
     lr: float
     batch_size: int
@@ -179,7 +176,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         load_datasets=load_dataset,
         **training_config,
         logger=logger,
-        save_dir=save_path
+        save_dir=save_path,
+        target_global_centering=cfg.target.global_centering,
     )
     return experiment_config
 
@@ -226,10 +224,18 @@ def train(config: TrainConfig):
                             getattr(optax, config.optimizer_name)(config.lr))
     opt_state = optimizer.init(params)
 
-    train_data, test_data = config.load_datasets(config.batch_size, config.train_set_size, config.test_set_size)
+    train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
+                                                                   config.test_set_size)
 
-    print(f"training data shape of {train_data.shape}")
-    chex.assert_tree_shape_suffix(train_data, (config.n_nodes, config.dim*2))
+    print(f"training data shape of {train_data_original.shape}")
+    chex.assert_tree_shape_suffix(train_data_original, (config.n_nodes, config.dim))
+
+    # Load augmented coordinates.
+    key, subkey = jax.random.split(key)
+    train_data = original_dataset_to_joint_dataset(train_data_original, subkey,
+                                                   global_centering=config.target_global_centering)
+    test_data = original_dataset_to_joint_dataset(test_data_original, subkey,
+                                                   global_centering=config.target_global_centering)
 
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
@@ -248,7 +254,8 @@ def train(config: TrainConfig):
         train_data = jax.random.permutation(subkey, train_data, axis=0)
         if config.reload_aug_per_epoch:
             key, subkey = jax.random.split(key)
-            train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey)
+            train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey,
+                                                           global_centering=config.target_global_centering)
 
         if config.scan_run:
             batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
@@ -277,6 +284,7 @@ def train(config: TrainConfig):
             key, subkey = jax.random.split(key)
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
+                                global_centering=config.target_global_centering,
                                 key=subkey,
                                 batch_size=config.batch_size,
                                 K=config.K_marginal_log_lik)

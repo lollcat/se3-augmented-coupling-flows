@@ -4,13 +4,13 @@ import jax
 import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, bijector_test
-from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
 from flow.nets import HConfig, EgnnConfig, TransformerConfig
 
 
 _N_FLOW_LAYERS = 4
 _N_NODES = 16
-_FLOW_TYPE = "proj_v2"  # "nice", "proj", 'vector_scale_shift' 'vector_scale'
+_FLOW_TYPE = "nice"
 _FAST_COMPILE_FLOW = False
 _IDENTITY_INIT = False
 
@@ -21,12 +21,18 @@ def test_distribution(dim = 3):
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
+    base_config = BaseConfig(double_centrered_gaussian=False, global_centering=False,
+                             trainable_augmented_scale=False)
+
+
     config = EquivariantFlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=_IDENTITY_INIT,
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
             linear_softmax=True, share_h=True)),
-        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2)
+        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2),
+        base_config=base_config,
+        act_norm=True
     )
 
 
@@ -67,12 +73,16 @@ def test_distribution(dim = 3):
 def test_flow(dim=3):
     n_nodes = _N_NODES
 
+    base_config = BaseConfig(double_centrered_gaussian=False, global_centering=False,
+                             trainable_augmented_scale=False)
+
     config = EquivariantFlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, flow_identity_init=_IDENTITY_INIT,
+        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
             linear_softmax=True, share_h=True)),
-        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2)
+        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2),
+        base_config=base_config
     )
 
     @hk.without_apply_rng

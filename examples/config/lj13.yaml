@@ -5,6 +5,9 @@ hydra:
   job:
     chdir: false
 
+target:
+  global_centering: false
+
 flow:
   dim: 3
   nodes: 13

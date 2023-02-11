@@ -179,7 +179,7 @@ def make_conditioner(
             # If global frame we only have one set of reference axis for the space we will project into.
             origin = jnp.mean(origin, axis=0)
             change_of_basis_matrix = jnp.mean(change_of_basis_matrix, axis=0)
-            inv_change_of_basis = jnp.linalg.inv(change_of_basis_matrix)
+            inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
             x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
                                        in_axes=(0, None, None))(x, inv_change_of_basis, origin)
             x_proj_feat = jnp.concatenate([x_proj, h], axis=-1)
@@ -190,7 +190,7 @@ def make_conditioner(
             origin = jnp.repeat(origin[None, ...], n_nodes, axis=0)
             change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], n_nodes, axis=0)
         else:
-            inv_change_of_basis = jax.vmap(jnp.linalg.inv)(change_of_basis_matrix)
+            inv_change_of_basis = jax.vmap(lambda x: x.T)(change_of_basis_matrix)
 
             if process_flow_params_jointly:
                 x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
