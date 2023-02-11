@@ -20,7 +20,7 @@ flow:
       process_flow_params_jointly: false
       gram_schmidt: false
       mlp_function_units: [16,]
-  act_norm: true
+  act_norm: false
   fast_compile: true
   compile_n_unroll: 1
   egnn:

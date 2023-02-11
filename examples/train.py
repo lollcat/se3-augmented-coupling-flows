@@ -32,6 +32,18 @@ FlowSampleFn = Callable[[hk.Params, chex.PRNGKey, chex.Shape], chex.Array]
 Plotter = Callable[[hk.Params, FlowSampleFn, TestData, TrainData], List[plt.Figure]]
 
 
+def plot_orig_aug_centre_mass_diff_hist(samples,
+                                        ax, max_distance=10,
+                                        *args, **kwargs):
+    dim = samples.shape[-1] // 2
+    centre_mass_original = jnp.mean(samples[..., :dim], axis=-2)
+    centre_mass_augmented = jnp.mean(samples[..., dim:], axis=-2)
+    d = jnp.linalg.norm(centre_mass_original - centre_mass_augmented, axis=-1)
+    d = d[jnp.isfinite(d)]
+    d = d.clip(max=max_distance)  # Clip keep plot reasonable.
+    ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
+
+
 def plot_sample_hist(samples,
                      ax,
                      original_coords,  # or augmented
@@ -61,7 +73,9 @@ def plot_original_aug_norms_sample_hist(samples, ax, max_distance=10, *args, **k
 
 def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_data,
                     plotting_n_nodes: Optional[int] = None):
-    fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+
+    # Plot interatomic distance histograms.
+    fig1, axs = plt.subplots(2, 3, figsize=(15, 10))
     samples = flow_sample_fn(params, key, (n_samples,))
 
     for i, og_coords in enumerate([True, False]):
@@ -84,8 +98,21 @@ def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_dat
     axs[0, 2].set_title(f"norms between original-aug pairs")
     axs[0, 0].legend()
     axs[1, 0].legend()
-    plt.tight_layout()
-    return [fig]
+    fig1.tight_layout()
+
+    # Plot histogram for centre of mean
+    fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))
+    plot_orig_aug_centre_mass_diff_hist(samples, ax=axs2[0], label='flow samples')
+    plot_orig_aug_centre_mass_diff_hist(train_data, ax=axs2[0], label='train samples')
+    plot_orig_aug_centre_mass_diff_hist(samples, ax=axs2[1], label='flow samples')
+    plot_orig_aug_centre_mass_diff_hist(test_data, ax=axs2[1], label='test samples')
+    axs2[0].legend()
+    axs2[1].legend()
+    axs2[0].set_title("norms between original - aug centre of mass histogram")
+    axs2[1].set_title("norms between original - aug centre of mass histogram")
+    fig2.tight_layout()
+
+    return [fig1, fig2]
 
 
 def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_data, test_data, epoch_n,
@@ -96,7 +123,7 @@ def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_
         if save:
             figure.savefig(os.path.join(plots_dir, f"{j}_iter_{epoch_n}.png"))
         else:
-            plt.show()
+            figure.show()
         plt.close(figure)
 
 
@@ -161,10 +188,13 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
 
     training_config = dict(cfg.training)
     save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
-    if hasattr(cfg.logger, "wandb"):
-        # if using wandb then save to wandb path
-        save_path = os.path.join(wandb.run.dir, save_path)
-    pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+    if cfg.training.save:
+        if hasattr(cfg.logger, "wandb"):
+            # if using wandb then save to wandb path
+            save_path = os.path.join(wandb.run.dir, save_path)
+        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+    else:
+        save_path = ''
 
 
     flow_config = create_flow_config(cfg.flow)
@@ -190,10 +220,14 @@ def train(config: TrainConfig):
     assert config.flow_dist_config.dim == config.dim
     assert config.flow_dist_config.nodes == config.n_nodes
 
-    plots_dir = os.path.join(config.save_dir, f"plots")
-    pathlib.Path(plots_dir).mkdir(exist_ok=False)
-    checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
-    pathlib.Path(checkpoints_dir).mkdir(exist_ok=False)
+    if config.save:
+        plots_dir = os.path.join(config.save_dir, f"plots")
+        pathlib.Path(plots_dir).mkdir(exist_ok=False)
+        checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
+        pathlib.Path(checkpoints_dir).mkdir(exist_ok=False)
+    else:
+        plots_dir = None
+        checkpoints_dir = None
 
     checkpoint_iter = list(np.linspace(0, config.n_epoch - 1, config.n_checkpoints, dtype="int"))
     eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))

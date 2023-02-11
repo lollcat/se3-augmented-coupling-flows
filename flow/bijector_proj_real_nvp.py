@@ -16,7 +16,7 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
     go back into the original space."""
     chex.assert_rank(point, 1)
     chex.assert_equal_shape((point, scale, shift))
-    point_in_new_space = jnp.linalg.inv(change_of_basis_matrix) @ (point - origin)
+    point_in_new_space = change_of_basis_matrix.T @ (point - origin)
     transformed_point_in_new_space = point_in_new_space * scale + shift
     new_point_original_space = change_of_basis_matrix @ transformed_point_in_new_space + origin
     return new_point_original_space
@@ -24,7 +24,7 @@ def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, 
 def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
     """Inverse of `affine_transform_in_new_space`."""
     chex.assert_rank(point, 1)
-    point_in_new_space = jnp.linalg.inv(change_of_basis_matrix)  @ (point - origin)
+    point_in_new_space = change_of_basis_matrix.T  @ (point - origin)
     transformed_point_in_new_space = (point_in_new_space - shift) / scale
     new_point_original_space = change_of_basis_matrix @ transformed_point_in_new_space + origin
     return new_point_original_space

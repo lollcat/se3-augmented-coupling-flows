@@ -14,7 +14,7 @@ flow:
   n_layers: 8
   identity_init: true
   type: [proj,]  # vector_scale_shift  vector_scale nice proj
-  act_norm: true
+  act_norm: false
   kwargs:
     proj_v2:
       global_frame: false
