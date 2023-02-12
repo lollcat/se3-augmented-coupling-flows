@@ -123,7 +123,7 @@ def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_
         if save:
             figure.savefig(os.path.join(plots_dir, f"{j}_iter_{epoch_n}.png"))
         else:
-            figure.show()
+            plt.show()
         plt.close(figure)
 
 
