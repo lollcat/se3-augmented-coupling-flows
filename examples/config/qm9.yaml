@@ -46,7 +46,7 @@ flow:
 
 
 training:
-  lr: 8e-5
+  lr: 2e-4
   use_64_bit: false
   optimizer_name: adam
   n_epoch: 100
