@@ -6,7 +6,8 @@ hydra:
     chdir: false
 
 target:
-  global_centering: false
+  aug_global_centering: false
+  aug_scale: 1.0
   custom_samples: true
   temperature: 0.1  # 0.1 or 1 are two good options
 

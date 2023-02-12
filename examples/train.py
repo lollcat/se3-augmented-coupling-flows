@@ -133,7 +133,8 @@ class TrainConfig(NamedTuple):
     dim: int
     n_nodes: int
     flow_dist_config: EquivariantFlowDistConfig
-    target_global_centering: bool
+    aug_target_global_centering: bool
+    aug_target_scale: float
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
     lr: float
     batch_size: int
@@ -207,7 +208,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         **training_config,
         logger=logger,
         save_dir=save_path,
-        target_global_centering=cfg.target.global_centering,
+        aug_target_global_centering=cfg.target.aug_global_centering,
+        aug_target_scale=cfg.target.aug_scale
     )
     return experiment_config
 
@@ -267,9 +269,11 @@ def train(config: TrainConfig):
     # Load augmented coordinates.
     key, subkey = jax.random.split(key)
     train_data = original_dataset_to_joint_dataset(train_data_original, subkey,
-                                                   global_centering=config.target_global_centering)
+                                                   global_centering=config.aug_target_global_centering,
+                                                   aug_scale=config.aug_target_scale)
     test_data = original_dataset_to_joint_dataset(test_data_original, subkey,
-                                                   global_centering=config.target_global_centering)
+                                                  global_centering=config.aug_target_global_centering,
+                                                  aug_scale=config.aug_target_scale)
 
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
@@ -289,7 +293,8 @@ def train(config: TrainConfig):
         if config.reload_aug_per_epoch:
             key, subkey = jax.random.split(key)
             train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey,
-                                                           global_centering=config.target_global_centering)
+                                                           global_centering=config.aug_target_global_centering,
+                                                           aug_scale=config.aug_target_scale)
 
         if config.scan_run:
             batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
@@ -318,7 +323,8 @@ def train(config: TrainConfig):
             key, subkey = jax.random.split(key)
             eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
                                 flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
-                                global_centering=config.target_global_centering,
+                                global_centering=config.aug_target_global_centering,
+                                aug_scale=config.aug_target_scale,
                                 key=subkey,
                                 batch_size=config.batch_size,
                                 K=config.K_marginal_log_lik)

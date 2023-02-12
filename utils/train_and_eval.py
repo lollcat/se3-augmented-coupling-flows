@@ -25,59 +25,42 @@ def ml_step(params, x, opt_state, log_prob_fn, optimizer):
     return new_params, new_opt_state, info
 
 
-def load_dataset(path, batch_size, train_test_split_ratio: float = 0.8, seed = 0):
-    """Load dataset and add augmented dataset N(0, 1). """
-    # Make length divisible by batch size also.
-    key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
-
-    dataset = np.load(path)
-    dataset = original_dataset_to_joint_dataset(dataset, key1)
-
-    dataset = jax.random.permutation(key2, dataset, axis=0)
-
-    train_index = int(dataset.shape[0] * train_test_split_ratio)
-    train_set = dataset[:train_index]
-    test_set = dataset[train_index:]
-
-    train_set = train_set[:train_set.shape[0] - (train_set.shape[0] % batch_size)]
-    test_set = test_set[:train_set.shape[0] - (test_set.shape[0] % batch_size)]
-    return train_set, test_set
-
-
-def original_dataset_to_joint_dataset(dataset, key, global_centering):
-    augmented_dataset = get_target_augmented_variables(dataset, key, global_centering)
+def original_dataset_to_joint_dataset(dataset, key, global_centering, aug_scale):
+    augmented_dataset = get_target_augmented_variables(dataset, key, global_centering, aug_scale)
     dataset = jnp.concatenate((dataset, augmented_dataset), axis=-1)
     return dataset
 
-def get_target_augmented_variables(x_original, key, global_centering):
+def get_target_augmented_variables(x_original, key, global_centering, aug_scale):
     x_augmented = get_conditional_gaussian_augmented_dist(
-        x=x_original, scale=1,
+        x=x_original, scale=aug_scale,
         global_centering=global_centering).sample(seed=key)
     return x_augmented
 
 
-def get_augmented_sample_and_log_prob(x_original, global_centering, key, K):
+def get_augmented_sample_and_log_prob(x_original, global_centering, aug_scale, key, K):
     x_augmented, log_p_a = get_conditional_gaussian_augmented_dist(
-        x=x_original, global_centering=global_centering).sample_and_log_prob(seed=key, sample_shape=(K,))
+        x=x_original, global_centering=global_centering, scale=aug_scale).sample_and_log_prob(seed=key, sample_shape=(K,))
     return x_augmented, log_p_a
 
-def get_augmented_log_prob(x_original, x_augmented, global_centering):
+def get_augmented_log_prob(x_original, x_augmented, global_centering, aug_scale):
     log_p_a = get_conditional_gaussian_augmented_dist(
-        x=x_original, global_centering=global_centering).log_prob(x_augmented)
+        x=x_original, global_centering=global_centering, scale=aug_scale).log_prob(x_augmented)
     return log_p_a
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, global_centering, K: int):
-    x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, global_centering, key, K)
+def get_marginal_log_lik(log_prob_fn, x_original, key, global_centering, aug_scale, K: int):
+    x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, global_centering, aug_scale,
+                                                             key, K)
     x_original = jnp.stack([x_original]*K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, x_augmented), axis=-1))
     chex.assert_equal_shape((log_p_a, log_q))
     return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8))
+@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8, 9))
 def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
             global_centering: bool,
+            aug_scale: float,
             target_log_prob = None,
             batch_size=None,
             K: int = 20, test_invariances: bool = True):
@@ -104,7 +87,8 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
         marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
                                                       x_original=x_batch[..., :dim], key=key, K=K,
-                                                      global_centering=global_centering)
+                                                      global_centering=global_centering,
+                                                      aug_scale=aug_scale)
         info.update(eval_log_lik = jnp.mean(log_prob_batch),
                     eval_marginal_log_lik=jnp.mean(marginal_log_lik_batch))
         return None, info
@@ -124,7 +108,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
     if target_log_prob is not None:
         # Calculate ESS
         log_w = target_log_prob(x_flow_original) + get_augmented_log_prob(x_flow_original, x_flow_aug,
-                                                                          global_centering) - log_prob_flow
+                                                                          global_centering, aug_scale) - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
             {"eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],

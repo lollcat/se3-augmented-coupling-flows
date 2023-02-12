@@ -6,7 +6,8 @@ hydra:
     chdir: false
 
 target:
-  global_centering: false
+  aug_global_centering: false
+  aug_scale: 1.0
 
 flow:
   dim: 3

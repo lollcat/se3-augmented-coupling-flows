@@ -6,7 +6,8 @@ hydra:
     chdir: false
 
 target:
-  global_centering: false
+  aug_global_centering: false
+  aug_scale: 0.1
 
 flow:
   dim: 3
@@ -66,7 +67,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_AUG_CHANGES
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]

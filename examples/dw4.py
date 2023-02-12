@@ -41,7 +41,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
-    cfg.flow.act_norm = True
+    cfg.flow.act_norm = False
     cfg.flow.type = ['proj']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)

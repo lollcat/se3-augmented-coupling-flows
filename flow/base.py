@@ -10,7 +10,7 @@ import haiku as hk
 import distrax
 
 
-def get_conditional_gaussian_augmented_dist(x, global_centering: bool, scale: float = 1.):
+def get_conditional_gaussian_augmented_dist(x, global_centering: bool, scale: float):
     scale_diag = jnp.zeros_like(x) + scale
     loc = jnp.zeros_like(x)
     if global_centering:
