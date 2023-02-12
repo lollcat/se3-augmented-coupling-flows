@@ -42,8 +42,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = False
-
-    cfg.target.aug_scale = 0.1
     cfg.target.aug_global_centering = False
     cfg.flow.type = ['nice']
     cfg.flow.egnn.mlp_units = (8,)

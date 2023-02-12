@@ -14,6 +14,7 @@ class BaseConfig(NamedTuple):
     double_centrered_gaussian: bool = False
     global_centering: bool = False
     trainable_augmented_scale: bool = True
+    aug_scale_init: float = 1.0
 
 
 class EquivariantFlowDistConfig(NamedTuple):
@@ -64,7 +65,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          compile_n_unroll: int = 2,
                                          transformer_config: Optional[TransformerConfig] = None,
                                          act_norm: bool = True,
-                                         base_config: BaseConfig =  BaseConfig(),
+                                         base_config: BaseConfig = BaseConfig(),
                                          kwargs: dict = {}):
     if not "proj_v2" in kwargs.keys():
         if not kwargs == {}:
@@ -76,6 +77,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
         base = CentreGravitryGaussianAndCondtionalGuassian(
             dim=dim, n_nodes=nodes, global_centering=base_config.global_centering,
             trainable_augmented_scale=base_config.trainable_augmented_scale,
+            augmented_scale_init=base_config.aug_scale_init
         )
 
     def bijector_fn():

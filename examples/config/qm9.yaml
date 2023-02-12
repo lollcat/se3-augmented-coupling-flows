@@ -7,9 +7,12 @@ hydra:
 
 target:
   aug_global_centering: false
-  aug_scale: 0.1
+  aug_scale: 1.0
 
 flow:
+  base:
+    aug_scale_init: ${target.aug_scale}
+    double_centrered_gaussian: false
   dim: 3
   nodes: 19
   n_layers: 8
@@ -46,10 +49,10 @@ flow:
 
 
 training:
-  lr: 2e-4
+  lr: 8e-5
   use_64_bit: false
   optimizer_name: adam
-  n_epoch: 100
+  n_epoch: 300
   batch_size: 32
   plot_batch_size: 32
   max_global_norm: 12_000

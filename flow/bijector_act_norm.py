@@ -106,10 +106,10 @@ def make_act_norm(layer_number, dim, swap, identity_init):
 
     get_scale_fn = lambda: hk.get_parameter(name=f'global_scaling_lay{layer_number}_swap{swap}',
                                             shape=(),
-                                            init=jnp.zeros if identity_init else hk.initializers.VarianceScaling(0.01))
+                                            init=jnp.zeros if identity_init else jnp.ones)
     get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
                                             shape=(),
-                                            init=jnp.zeros if identity_init else hk.initializers.VarianceScaling(0.01))
+                                            init=jnp.zeros if identity_init else jnp.ones)
 
     conditioner = make_conditioner(get_scale_fn, get_shift_fn)
     return distrax.SplitCoupling(

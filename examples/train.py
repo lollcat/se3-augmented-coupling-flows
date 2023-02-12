@@ -16,7 +16,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 
-from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig
+from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
 from flow.nets import EgnnConfig, TransformerConfig, HConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
@@ -177,11 +177,16 @@ def create_flow_config(flow_cfg: DictConfig):
     transformer_cfg = dict(flow_cfg.pop("transformer"))
     transformer_config = TransformerConfig(**dict(transformer_cfg))
     egnn_cfg = EgnnConfig(**egnn_cfg, h_config=HConfig(**h_cfg))
+    base_config = dict(flow_cfg.pop("base"))
+    base_config = BaseConfig(**base_config)
+
 
     flow_dist_config = EquivariantFlowDistConfig(
         **flow_cfg,
         egnn_config=egnn_cfg,
-        transformer_config=transformer_config)
+        transformer_config=transformer_config,
+        base_config=base_config
+    )
     return flow_dist_config
 
 def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainConfig:

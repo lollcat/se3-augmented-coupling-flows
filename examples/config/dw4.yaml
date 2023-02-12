@@ -13,6 +13,9 @@ target:
 
 
 flow:
+  base:
+    aug_scale_init: ${target.aug_scale}
+    double_centrered_gaussian: false
   dim: 2
   nodes: 4
   n_layers: 4

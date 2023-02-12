@@ -33,7 +33,7 @@ class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
             self.augmented_scale_logit = hk.get_parameter(name='agumented_scale_logit', shape=(),
                                                           init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
         else:
-            self.augmented_scale_logit = jnp.zeros(())
+            self.augmented_scale_logit = jnp.log(augmented_scale_init)
 
 
     def get_augmented_dist(self, x) -> distrax.Distribution:
