@@ -42,7 +42,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.lr = 1e-3
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = False
-    cfg.flow.type = ['proj']
+
+    cfg.target.aug_scale = 0.1
+    cfg.target.aug_global_centering = False
+    cfg.flow.type = ['nice']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.transformer.mlp_units = (4,)
@@ -51,7 +54,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.batch_size = 32
     cfg.training.n_epoch = 150
     cfg.training.save = False
-    cfg.training.n_plots = 3
+    cfg.training.n_plots = 4
     cfg.training.plot_batch_size = 128
     cfg.training.K_marginal_log_lik = 5
     cfg.logger = DictConfig({"list_logger": None})
