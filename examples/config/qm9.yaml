@@ -22,7 +22,7 @@ flow:
   kwargs:
     proj_v2:
       global_frame: false
-      process_flow_params_jointly: false
+      process_flow_params_jointly: true
       gram_schmidt: false
       mlp_function_units: [64,64]
   fast_compile: true
@@ -70,7 +70,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_transformer${flow.kwargs.proj_v2.process_flow_params_jointly}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]
