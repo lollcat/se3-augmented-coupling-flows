@@ -7,7 +7,7 @@ hydra:
 
 target:
   aug_global_centering: false
-  aug_scale: 1.0
+  aug_scale: 0.1
 
 flow:
   base:
@@ -21,7 +21,7 @@ flow:
   act_norm: false
   kwargs:
     proj_v2:
-      global_frame: true
+      global_frame: false
       process_flow_params_jointly: true
       condition_on_x_proj: false
       gram_schmidt: false
@@ -51,10 +51,10 @@ flow:
 
 
 training:
-  lr: 2e-4
+  lr: 1e-4
   use_64_bit: false
   optimizer_name: adam
-  n_epoch: 300
+  n_epoch: 30
   batch_size: 32
   plot_batch_size: 32
   max_global_norm: 12_000
