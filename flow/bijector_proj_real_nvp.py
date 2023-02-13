@@ -111,31 +111,32 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def get_new_space_basis(x, various_x_points, gram_schmidt):
+def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
     various_x_points = jnp.swapaxes(various_x_points, 0, 1)
 
+    origin = various_x_points[0]
+    basis_vectors = various_x_points[1:] - origin[None, ...]
+
+    if global_frame:
+        basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
+        origin = jnp.mean(origin, axis=0, keepdims=True)
+
     if gram_schmidt:
-        chex.assert_tree_shape_suffix(various_x_points, (dim+1, n_nodes, dim))
-        origin = various_x_points[0]
-        basis_vectors = various_x_points[1:] - origin[None, ...]
         basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim, axis=0))
         assert len(basis_vectors) == dim
 
         orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
         change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
-        return origin, change_of_basis_matrix
     else:
         chex.assert_tree_shape_suffix(various_x_points, (dim, n_nodes, dim))
-        origin = various_x_points[0]
-        basis_vectors = various_x_points[1:] - origin[None, ...]
+
         z_basis_vector = basis_vectors[0]
         if dim == 3:
             chex.assert_tree_shape_suffix(x, (3,))
             x_basis_vector = basis_vectors[1]
-
             # Compute reference axes.
             x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
             y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
@@ -149,9 +150,17 @@ def get_new_space_basis(x, various_x_points, gram_schmidt):
         change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
                                                                           keepdims=True)
 
+
+    if global_frame:
+        origin = jnp.squeeze(origin, axis=0)
+        change_of_basis_matrix = jnp.squeeze(change_of_basis_matrix, axis=0)
+        chex.assert_equal_shape((origin, x[0]))
+        chex.assert_shape(change_of_basis_matrix, (dim, dim))
+    else:
         chex.assert_equal_shape((origin, x))
         chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
-        return origin, change_of_basis_matrix
+    return origin, change_of_basis_matrix
+
 
 def make_conditioner(
         global_frame: bool,
@@ -173,12 +182,9 @@ def make_conditioner(
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
 
-        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt)
+        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame)
 
         if global_frame:
-            # If global frame we only have one set of reference axis for the space we will project into.
-            origin = jnp.mean(origin, axis=0)
-            change_of_basis_matrix = jnp.mean(change_of_basis_matrix, axis=0)
             inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
             x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
                                        in_axes=(0, None, None))(x, inv_change_of_basis, origin)

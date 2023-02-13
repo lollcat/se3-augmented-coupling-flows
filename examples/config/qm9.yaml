@@ -21,7 +21,7 @@ flow:
   act_norm: false
   kwargs:
     proj_v2:
-      global_frame: false
+      global_frame: true
       process_flow_params_jointly: true
       gram_schmidt: false
       mlp_function_units: [64,64]
@@ -41,7 +41,7 @@ flow:
       linear_softmax: true
       share_h: true
   transformer: # for proj flow
-    mlp_units: [32,32]
+    mlp_units: [64,64]
     num_heads: 6
     key_size: 16
     w_init_scale: 0.1
@@ -49,7 +49,7 @@ flow:
 
 
 training:
-  lr: 8e-5
+  lr: 2e-4
   use_64_bit: false
   optimizer_name: adam
   n_epoch: 300
@@ -70,7 +70,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_transformer${flow.kwargs.proj_v2.process_flow_params_jointly}
+    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_transformer${flow.kwargs.proj_v2.process_flow_params_jointly}_globframe${flow.kwargs.proj_v2.global_frame}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]

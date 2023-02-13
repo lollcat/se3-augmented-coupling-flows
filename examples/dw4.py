@@ -43,10 +43,12 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = False
     cfg.target.aug_global_centering = False
-    cfg.flow.type = ['nice']
+    cfg.flow.type = ['proj']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
-    cfg.flow.transformer.mlp_units = (4,)
+    cfg.flow.kwargs.proj_v2.global_frame = False
+    cfg.flow.kwargs.proj_v2.process_flow_params_jointly = True
+    cfg.flow.transformer.mlp_units = (16,)
     cfg.flow.transformer.n_layers = 2
     cfg.flow.n_layers = 3
     cfg.training.batch_size = 32
