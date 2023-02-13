@@ -15,7 +15,7 @@ flow:
     double_centrered_gaussian: false
   dim: 3
   nodes: 19
-  n_layers: 8
+  n_layers: 12
   identity_init: true
   type: [proj,]  # vector_scale_shift  vector_scale nice proj
   act_norm: false
@@ -30,7 +30,7 @@ flow:
   compile_n_unroll: 1
   egnn:
     emile_net: false
-    mlp_units: [128,128]
+    mlp_units: [64,64]
     n_layers: 3
     normalize_by_norms: true
     variance_scaling_init: 0.001
@@ -41,7 +41,7 @@ flow:
     h:
       linear_softmax: true
       share_h: true
-      h_embedding_dim: 16
+      h_embedding_dim: 64
   transformer: # for proj flow
     mlp_units: [64,64]
     num_heads: 6
@@ -53,10 +53,10 @@ flow:
 training:
   lr: 1e-4
   use_64_bit: false
-  optimizer_name: adam
-  n_epoch: 60
-  batch_size: 32
-  plot_batch_size: 32
+  optimizer_name: adamw
+  n_epoch: 200
+  batch_size: 64
+  plot_batch_size: 64
   max_global_norm: 12_000
   seed: 0
   reload_aug_per_epoch: true
@@ -72,7 +72,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_transformer${flow.kwargs.proj_v2.process_flow_params_jointly}_globframe${flow.kwargs.proj_v2.global_frame}
+    name: qm9pos_${flow.type}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_opt${training.optimizer_name}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]

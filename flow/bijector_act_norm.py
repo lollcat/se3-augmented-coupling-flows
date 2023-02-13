@@ -31,11 +31,11 @@ class GlobalScaling(distrax.Bijector):
     def __init__(self, log_global_scale,
                  log_centre_shift_interp,
                  alt_coords_global_mean,
-                 activation = jax.nn.softplus):
+                 activation = jnp.exp):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
         self.alt_coords_global_mean = alt_coords_global_mean
         if activation == jnp.exp:
-            self._global_scale = jnp.exp(log_global_scale )
+            self._global_scale = jnp.exp(log_global_scale)
             self._centre_shift_interp = jnp.exp(log_centre_shift_interp)
             self._log_scale_overall = log_global_scale + log_centre_shift_interp
         else:
