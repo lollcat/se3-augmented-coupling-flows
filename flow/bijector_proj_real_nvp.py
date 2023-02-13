@@ -256,7 +256,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
                                        identity_init_x=False, zero_init_h=identity_init,
                                        h_config=egnn_config.h_config._replace(h_out=True,
-                                            h_out_dim=egnn_config.h_config.h_embedding_dim))
+                                       h_out_dim=egnn_config.h_config.h_embedding_dim))
     multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=n_heads)
     multi_egnn = multi_se_equivariant_net(multi_egnn_config)
 
