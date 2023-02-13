@@ -10,7 +10,9 @@ def global_scaling_and_shift_forward(x, global_scaling, centre_shift_interp, alt
     """
     Global scaling:
     x = (x - global_mean)*scaling + global_mean -> x = scaling*x + (1 - global_scaling) global_mean
-    Shift centre of mass along vector between aug-original centre of masses
+
+    Shift centre of mass along vector between aug-original centre of masses:
+    x = (x - alt_coords_global_mean)*centre_shift_interp + alt_coords_global_mean.
     """
     chex.assert_rank(x, 2)
     global_mean = jnp.mean(x, axis=-2, keepdims=True)
