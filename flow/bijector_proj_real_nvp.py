@@ -169,6 +169,7 @@ def make_conditioner(
         permutation_equivariant_fn: Optional[Callable] = None,
         mlp_function: Optional[Callable] = None,
         gram_schmidt: bool = False,
+        condition_on_x_proj: bool = False,
                      ):
     if process_flow_params_jointly:
         assert permutation_equivariant_fn is not None
@@ -186,31 +187,39 @@ def make_conditioner(
 
         if global_frame:
             inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
-            x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
-                                       in_axes=(0, None, None))(x, inv_change_of_basis, origin)
-            x_proj_feat = jnp.concatenate([x_proj, h], axis=-1)
-            if process_flow_params_jointly:
-                log_scale_and_shift = permutation_equivariant_fn(x_proj_feat)
+            if condition_on_x_proj:
+                x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
+                                  in_axes=(0, None, None))(x, inv_change_of_basis, origin)
+                bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
             else:
-                log_scale_and_shift = mlp_function(x_proj_feat)
+                bijector_feat_in = h
+            if process_flow_params_jointly:
+                log_scale_and_shift = permutation_equivariant_fn(bijector_feat_in)
+            else:
+                log_scale_and_shift = mlp_function(bijector_feat_in)
             origin = jnp.repeat(origin[None, ...], n_nodes, axis=0)
             change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], n_nodes, axis=0)
         else:
             inv_change_of_basis = jax.vmap(lambda x: x.T)(change_of_basis_matrix)
-
             if process_flow_params_jointly:
-                x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
-                                  in_axes=(0, None, None)), in_axes=(None, 0, 0))(
-                    x, inv_change_of_basis, origin)
-                x_proj_feat = jnp.concatenate([x_proj, jnp.repeat(h[None, ...], n_nodes, axis=0)], axis=-1)
-                log_scale_and_shift = jax.vmap(permutation_equivariant_fn)(x_proj_feat)
-                log_scale_and_shift = log_scale_and_shift[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])]
+                if condition_on_x_proj:
+                    x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
+                                      in_axes=(0, None, None)), in_axes=(None, 0, 0))(
+                        x, inv_change_of_basis, origin)
+                    bijector_feat_in = jnp.concatenate([x_proj, jnp.repeat(h[None, ...], n_nodes, axis=0)], axis=-1)
+                    log_scale_and_shift = jax.vmap(permutation_equivariant_fn)(bijector_feat_in)
+                    log_scale_and_shift = log_scale_and_shift[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])]
+                else:
+                    bijector_feat_in = h
+                    log_scale_and_shift = permutation_equivariant_fn(bijector_feat_in)
             else:
-                x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
-                                           in_axes=(0, 0, 0))(x, inv_change_of_basis, origin)
-                x_proj_feat = jnp.concatenate([x_proj, h], axis=-1)
-                log_scale_and_shift = mlp_function(x_proj_feat)
-
+                if condition_on_x_proj:
+                    x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
+                                               in_axes=(0, 0, 0))(x, inv_change_of_basis, origin)
+                    bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
+                else:
+                    bijector_feat_in = h
+                log_scale_and_shift = mlp_function(bijector_feat_in)
 
         log_scale, shift = jnp.split(log_scale_and_shift, indices_or_sections=2, axis=-1)
 
@@ -234,6 +243,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
                                                        process_flow_params_jointly: bool = True,
+                                                       condition_on_x_proj: bool = False,
                                                        mlp_function_units: Optional[Sequence[int]] = None,
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -272,7 +282,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         mlp_function=mlp_function,
         multi_x_equivariant_fn=multi_egnn,
         permutation_equivariant_fn=permutation_equivariant_fn,
-        gram_schmidt=gram_schmidt
+        gram_schmidt=gram_schmidt,
+        condition_on_x_proj=condition_on_x_proj
     )
 
     return distrax.SplitCoupling(

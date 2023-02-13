@@ -23,6 +23,7 @@ flow:
     proj_v2:
       global_frame: true
       process_flow_params_jointly: true
+      condition_on_x_proj: false
       gram_schmidt: false
       mlp_function_units: [64,64]
   fast_compile: true
@@ -40,6 +41,7 @@ flow:
     h:
       linear_softmax: true
       share_h: true
+      h_embedding_dim: 16
   transformer: # for proj flow
     mlp_units: [64,64]
     num_heads: 6
