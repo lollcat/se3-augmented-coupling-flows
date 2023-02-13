@@ -48,7 +48,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.kwargs.proj_v2.global_frame = False
     cfg.flow.kwargs.proj_v2.process_flow_params_jointly = True
-    cfg.flow.kwargs.proj_v2.condition_on_x_proj = True
+    cfg.flow.kwargs.proj_v2.condition_on_x_proj = False
     cfg.flow.transformer.mlp_units = (16,)
     cfg.flow.transformer.n_layers = 2
     cfg.flow.n_layers = 3

@@ -19,7 +19,8 @@ def make_se_equivariant_nice(layer_number, dim, swap, egnn_config: EgnnConfig, i
                            identity_init_x=identity_init,
                            h_config=egnn_config.h_config._replace(h_out=False)))
 
-    def bijector_fn(shift):
+    def bijector_fn(params):
+        shift = params
         return distrax.ScalarAffine(log_scale=jnp.zeros_like(shift), shift=shift)
 
     conditioner = make_conditioner(ref_equivariant_fn)

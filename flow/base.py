@@ -21,6 +21,9 @@ def get_conditional_gaussian_augmented_dist(x, global_centering: bool, scale: fl
                                                               scale_diag=scale_diag), reinterpreted_batch_ndims=1)
     return dist
 
+
+
+
 class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
     """x ~ CentreGravityGaussian, a ~ Normal(x, I)"""
     def __init__(self, dim, n_nodes, global_centering: bool = False,
