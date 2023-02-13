@@ -11,10 +11,14 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
     # First need to run `qm9.download_data`
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
-    data_dir = "target/data/qm9_"
-    train_data = np.load(data_dir + "train.npy")
-    test_data = np.load(data_dir + "test.npy")
-    valid_data = np.load(data_dir + "valid.npy")
+    try:
+        data_dir = "target/data/qm9_"
+        train_data = np.load(data_dir + "train.npy")
+        test_data = np.load(data_dir + "test.npy")
+        valid_data = np.load(data_dir + "valid.npy")
+    except:
+        print("Data directory not found. Try running `dataset.py` in the `qm9` dir, otherwise speak to Laurence :)")
+        raise Exception
 
     if train_data_n_points is not None:
         train_data = train_data[:train_data_n_points]
