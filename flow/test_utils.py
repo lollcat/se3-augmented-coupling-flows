@@ -2,18 +2,18 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.numerical import rotate_translate_2d, rotate_translate_3d
+from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 
 def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
     x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
-    x_rot = rotate_translate_2d(x, theta, translation)
-    a_rot = rotate_translate_2d(a, theta, translation)
+    x_rot = rotate_translate_permute_2d(x, theta, translation)
+    a_rot = rotate_translate_permute_2d(a, theta, translation)
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
     x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
-    x_rot = rotate_translate_3d(x, theta, phi, translation)
-    a_rot = rotate_translate_3d(a, theta, phi, translation)
+    x_rot = rotate_translate_permute_3d(x, theta, phi, translation)
+    a_rot = rotate_translate_permute_3d(a, theta, phi, translation)
     return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 
@@ -44,9 +44,6 @@ def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
 
     x_and_a_rot = group_action(x_and_a)
 
-    chex.assert_trees_all_close(get_pairwise_distances(x_and_a_rot),
-                                get_pairwise_distances(x_and_a), rtol=rtol)
-
     # Compute equivariant_fn of both the original and rotated matrices.
     x_and_a_new = equivariant_fn(x_and_a)
     x_and_a_new_rot = equivariant_fn(x_and_a_rot)
@@ -54,9 +51,6 @@ def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
     # Check that rotating x_and_a_new gives x_and_a_new_rot
 
     chex.assert_trees_all_close(x_and_a_new_rot, group_action(x_and_a_new), rtol=rtol)
-
-    chex.assert_trees_all_close(get_pairwise_distances(x_and_a_new_rot),
-                                get_pairwise_distances(x_and_a_new), rtol=rtol)
 
 
 def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):

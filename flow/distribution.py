@@ -3,6 +3,7 @@ import distrax
 
 from flow.base import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
 from flow.bijector_act_norm import make_act_norm
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
@@ -82,7 +83,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
 
     def bijector_fn():
         bijectors = []
-        kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+        kwargs_proj = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
 
         for swap in (True, False):  # For swap False we condition augmented on original.
             if act_norm:
@@ -101,7 +102,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config,
                                                                               transformer_config=transformer_config,
-                                                                              **kwargs_proj_v2)
+                                                                              **kwargs_proj)
                 bijectors.append(bijector)
 
             if "nice" in type:
@@ -109,6 +110,17 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                     identity_init=flow_identity_init,
                                                     egnn_config=egnn_config)
                 bijectors.append(bijector)
+            if "proj_v2" in type:
+                kwargs_proj_v2 = dict(kwargs_proj)
+                if "global_frame" in kwargs_proj.keys():
+                    kwargs_proj_v2.pop("global_frame")
+                bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
+                                                                  identity_init=flow_identity_init,
+                                                                  egnn_config=egnn_config,
+                                                                  transformer_config=transformer_config,
+                                                                  **kwargs_proj_v2)
+                bijectors.append(bijector)
+
         return distrax.Chain(bijectors)
     flow = Chain(bijector_fn=bijector_fn, n_layers=n_layers, compile_n_unroll=compile_n_unroll)
     if act_norm:

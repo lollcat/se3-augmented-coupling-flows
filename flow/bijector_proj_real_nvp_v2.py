@@ -9,7 +9,7 @@ import haiku as hk
 
 from flow.nets import EgnnConfig, Transformer, TransformerConfig
 from flow.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
-from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
+from flow.bijector_proj_real_nvp import get_new_space_basis
 
 def perform_low_rank_matmul(points, scale, vectors):
     """Assumes points are 1D with shape (number of nodes * dimensionality of euclidian space,)."""
@@ -27,7 +27,6 @@ def perform_low_rank_matmul_inverse(points, scale, vectors):
     chex.assert_equal_shape((points, scale, vectors[:, 0]))
 
     n_vectors = vectors.shape[-1]
-    event_dim = points.shape[0]  # n_nodes * d
 
     scaled_point = points / scale
     matrix_to_invert = (vectors.T * scale[None, :]**(-1)) @ vectors + jnp.eye(n_vectors)
@@ -120,6 +119,7 @@ class ProjectedScalarAffine(distrax.Bijector):
             log_scale_param = log_scale + inverse_softplus(jnp.array(1.0))
             self._scale = jax.nn.softplus(log_scale_param)
             self._inv_scale = 1. / self._scale
+            self._log_scale = jnp.log(self._scale)
 
 
 
@@ -146,19 +146,30 @@ class ProjectedScalarAffine(distrax.Bijector):
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
         if len(x.shape) == 2:
-            return jax.vmap(matmul_in_invariant_space)(x, self._change_of_basis_matrix, self._origin, self._scale,
-                                                       self._shift)
+            return matmul_in_invariant_space(x, self._change_of_basis_matrix, self._origin, self._scale,
+                                                       self._shift, self._vectors)
         elif len(x.shape) == 3:
-            return jax.vmap(jax.vmap(matmul_in_invariant_space))(x, self._change_of_basis_matrix, self._origin, self._scale,
-                                                                 self._shift)
+            return jax.vmap(matmul_in_invariant_space)(x, self._change_of_basis_matrix, self._origin, self._scale,
+                                                                 self._shift, self._vectors)
         else:
             raise Exception
 
-    def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
+    def forward_log_det_jacobian_single(self, vectors, scale, log_scale) -> chex.Array:
         """Computes log|det J(f)(x)|."""
-        s, log_det2 = jnp.linalg.slogdet(jnp.eye(self._n_vectors) +
-                                         self._vectors.T @ (self._vectors @ self._scale[:, None]))
-        return jnp.sum(self._log_scale, axis=-1) + log_det2
+        event_shape = vectors.shape[1:]
+        flattened_event_n_elements = np.prod(event_shape)
+        vectors = vectors.reshape((-1, np.prod(event_shape)))
+        scale = scale.flatten()
+        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors @ scale[:, None])
+        s, log_det2 = jnp.linalg.slogdet(slog_det_in)
+        return jnp.sum(log_scale, axis=-1) + log_det2
+
+    def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
+        if len(x.shape) == 2:
+            log_det = self.forward_log_det_jacobian_single(self._vectors, self._scale, self._log_scale)
+        else:
+            log_det = jax.vmap(self.forward_log_det_jacobian_single)(self._vectors, self._scale, self._log_scale)
+        return log_det
 
     def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
@@ -167,11 +178,11 @@ class ProjectedScalarAffine(distrax.Bijector):
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
         if len(y.shape) == 2:
-            return jax.vmap(inverse_matmul_in_invariant_space)(y, self._change_of_basis_matrix, self._origin, self._scale,
-                                                               self._shift)
+            return inverse_matmul_in_invariant_space(y, self._change_of_basis_matrix, self._origin, self._scale,
+                                                               self._shift, self._vectors)
         elif len(y.shape) == 3:
-            return jax.vmap(jax.vmap(inverse_matmul_in_invariant_space))(
-                y, self._change_of_basis_matrix, self._origin, self._scale, self._shift)
+            return jax.vmap(inverse_matmul_in_invariant_space)(
+                y, self._change_of_basis_matrix, self._origin, self._scale, self._shift, self._vectors)
         else:
             raise Exception
 
@@ -184,59 +195,7 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
-    n_nodes, dim = x.shape
-
-    # Calculate new basis for the affine transform
-    various_x_points = jnp.swapaxes(various_x_points, 0, 1)
-
-    origin = various_x_points[0]
-    basis_vectors = various_x_points[1:] - origin[None, ...]
-
-    if global_frame:
-        basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
-        origin = jnp.mean(origin, axis=0, keepdims=True)
-
-    if gram_schmidt:
-        basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim, axis=0))
-        assert len(basis_vectors) == dim
-
-        orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
-        change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
-    else:
-        chex.assert_tree_shape_suffix(various_x_points, (dim, n_nodes, dim))
-
-        z_basis_vector = basis_vectors[0]
-        if dim == 3:
-            chex.assert_tree_shape_suffix(x, (3,))
-            x_basis_vector = basis_vectors[1]
-            # Compute reference axes.
-            x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
-            y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
-
-        else:
-            chex.assert_tree_shape_suffix(x, (2,))
-            y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
-
-        change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
-                                                                          keepdims=True)
-
-
-    if global_frame:
-        origin = jnp.squeeze(origin, axis=0)
-        change_of_basis_matrix = jnp.squeeze(change_of_basis_matrix, axis=0)
-        chex.assert_equal_shape((origin, x[0]))
-        chex.assert_shape(change_of_basis_matrix, (dim, dim))
-    else:
-        chex.assert_equal_shape((origin, x))
-        chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
-    return origin, change_of_basis_matrix
-
-
 def make_conditioner(
-        global_frame: bool,
         process_flow_params_jointly: bool,
         multi_x_equivariant_fn: Callable,
         permutation_equivariant_fn: Optional[Callable] = None,
@@ -256,49 +215,29 @@ def make_conditioner(
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
 
-        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame)
+        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame=True)
 
-        if global_frame:
-            inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
-            if condition_on_x_proj:
-                x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
-                                  in_axes=(0, None, None))(x, inv_change_of_basis, origin)
-                bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
-            else:
-                bijector_feat_in = h
-            if process_flow_params_jointly:
-                log_scale_and_shift = permutation_equivariant_fn(bijector_feat_in)
-            else:
-                log_scale_and_shift = mlp_function(bijector_feat_in)
-            origin = jnp.repeat(origin[None, ...], n_nodes, axis=0)
-            change_of_basis_matrix = jnp.repeat(change_of_basis_matrix[None, ...], n_nodes, axis=0)
+        inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
+        if condition_on_x_proj:
+            x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
+                              in_axes=(0, None, None))(x, inv_change_of_basis, origin)
+            bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
         else:
-            inv_change_of_basis = jax.vmap(lambda x: x.T)(change_of_basis_matrix)
-            if process_flow_params_jointly:
-                if condition_on_x_proj:
-                    x_proj = jax.vmap(jax.vmap(lambda x, inv_change_of_basis, origin:  inv_change_of_basis @ (x - origin),
-                                      in_axes=(0, None, None)), in_axes=(None, 0, 0))(
-                        x, inv_change_of_basis, origin)
-                    bijector_feat_in = jnp.concatenate([x_proj, jnp.repeat(h[None, ...], n_nodes, axis=0)], axis=-1)
-                    log_scale_and_shift = jax.vmap(permutation_equivariant_fn)(bijector_feat_in)
-                    log_scale_and_shift = log_scale_and_shift[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])]
-                else:
-                    bijector_feat_in = h
-                    log_scale_and_shift = permutation_equivariant_fn(bijector_feat_in)
-            else:
-                if condition_on_x_proj:
-                    x_proj = jax.vmap(lambda x, inv_change_of_basis, origin: inv_change_of_basis @ (x - origin),
-                                               in_axes=(0, 0, 0))(x, inv_change_of_basis, origin)
-                    bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
-                else:
-                    bijector_feat_in = h
-                log_scale_and_shift = mlp_function(bijector_feat_in)
+            bijector_feat_in = h
+        if process_flow_params_jointly:
+            invariant_bijector_params = permutation_equivariant_fn(bijector_feat_in)
+        else:
+            invariant_bijector_params = mlp_function(bijector_feat_in)
 
-        log_scale, shift = jnp.split(log_scale_and_shift, indices_or_sections=2, axis=-1)
+        log_scale = invariant_bijector_params[..., :dim]
+        shift = invariant_bijector_params[..., dim:dim*2]
+        vectors_params = invariant_bijector_params[..., dim*2:]
+        vectors = jnp.reshape(vectors_params, (-1, n_nodes, dim))
 
-        chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
-        chex.assert_trees_all_equal_shapes(origin, log_scale, shift, x)
-        return change_of_basis_matrix, origin, log_scale, shift
+        chex.assert_shape(change_of_basis_matrix, (dim, dim))
+        chex.assert_trees_all_equal_shapes(log_scale, shift, x, vectors[0])
+        chex.assert_trees_all_equal_shapes(origin, x[0])
+        return change_of_basis_matrix, origin, log_scale, shift, vectors
 
     def conditioner(x):
         if len(x.shape) == 2:
@@ -310,20 +249,23 @@ def make_conditioner(
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
+                                                       egnn_config: EgnnConfig,
                                                        transformer_config: Optional[TransformerConfig] = None,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
-                                                       global_frame: bool = False,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
                                                        mlp_function_units: Optional[Sequence[int]] = None,
+                                                       n_vectors: Optional[int] = None,
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
+    n_vectors = n_vectors if n_vectors else 12
+    n_invariant_params = dim*2 + dim*n_vectors
 
     def bijector_fn(params):
-        change_of_basis_matrix, origin, log_scale, shift = params
-        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
+        change_of_basis_matrix, origin, log_scale, shift, vectors = params
+        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift, vectors)
 
     n_heads = dim + (1 if gram_schmidt else 0)
     egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
@@ -335,7 +277,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
 
 
     if process_flow_params_jointly:
-        transformer_config = transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
+        transformer_config = transformer_config._replace(output_dim=n_invariant_params, zero_init=identity_init)
         permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
                                                  config=transformer_config)
         mlp_function = None
@@ -344,14 +286,14 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         mlp_function = hk.Sequential([
             hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1),
             hk.nets.MLP(mlp_function_units, activate_final=True),
-            hk.Linear(dim*2, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
-            hk.Linear(dim*2,
+            hk.Linear(n_invariant_params, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
+            hk.Linear(n_invariant_params,
                       b_init=hk.initializers.VarianceScaling(0.01),
                       w_init=hk.initializers.VarianceScaling(0.01))
                                       ])
 
     conditioner = make_conditioner(
-        global_frame=global_frame, process_flow_params_jointly=process_flow_params_jointly,
+        process_flow_params_jointly=process_flow_params_jointly,
         mlp_function=mlp_function,
         multi_x_equivariant_fn=multi_egnn,
         permutation_equivariant_fn=permutation_equivariant_fn,

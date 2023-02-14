@@ -6,7 +6,7 @@ import chex
 
 
 from flow.test_utils import bijector_test
-from utils.numerical import rotate_translate_2d, rotate_translate_3d
+from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
 from flow.nets import EgnnConfig, TransformerConfig
@@ -51,18 +51,21 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
 
     def group_action(x, theta=theta, translation=translation):
         if dim == 2:
-            x_rot = rotate_translate_2d(x, theta, translation)
+            x_rot = rotate_translate_permute_2d(x, theta, translation, permute=False)
         else:  #  dim == 3:
-            x_rot = rotate_translate_3d(x, theta, phi, translation)
+            x_rot = rotate_translate_permute_3d(x, theta, phi, translation, permute=False)
         return x_rot
 
     def group_action_to_column_matrix_of_vecs(change_of_basis_matrix, theta=theta):
         if dim == 2:
-            change_of_basis_matrix_rot = rotate_translate_2d(change_of_basis_matrix.T,
-                                                             theta, jnp.zeros_like(translation)).T
+            change_of_basis_matrix_rot = rotate_translate_permute_2d(
+                change_of_basis_matrix.T, theta, jnp.zeros_like(translation),
+                permute=False
+            ).T
         else:  #  dim == 3:
-            change_of_basis_matrix_rot = rotate_translate_3d(change_of_basis_matrix.T, theta, phi,
-                                                             jnp.zeros_like(translation)).T
+            change_of_basis_matrix_rot = rotate_translate_permute_3d(
+                change_of_basis_matrix.T, theta, phi, jnp.zeros_like(translation),
+                permute=False).T
         return change_of_basis_matrix_rot
 
     # Apply group action to relevant things.
@@ -70,11 +73,13 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
     origin = group_action(origin)
 
     change_of_basis_matrix = jax.vmap(group_action_to_column_matrix_of_vecs, in_axes=0)(change_of_basis_matrix)
+
     x_g_out = jax.vmap(affine_transform_in_new_space)(x_g, change_of_basis_matrix, origin, scale, shift)
 
     x_out_g = group_action(x_out)
 
     chex.assert_trees_all_close(x_g_out, x_out_g)
+
 
 def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
                             gram_schmidt: bool = False,
@@ -118,7 +123,7 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
 
 
 if __name__ == '__main__':
-    USE_64_BIT = False  # Fails for 32-bit
+    USE_64_BIT = True  # Fails for 32-bit
     gram_schmidt = False
 
     test_matmul_transform_in_new_space()

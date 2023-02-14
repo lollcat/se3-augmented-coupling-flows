@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from utils.numerical import rotate_translate_2d
+from utils.numerical import rotate_translate_permute_2d
 from flow.nets import se_equivariant_net, HConfig, EgnnConfig
 
 
@@ -27,8 +27,8 @@ def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
     shift = jax.random.normal(subkey, shape=(batch_size, dim))
 
 
-    x_transformed = jax.vmap(rotate_translate_2d)(x, theta, shift)
-    x_untransformed = jax.vmap(partial(rotate_translate_2d, rotate_first=False))(x_transformed, -theta, -shift)
+    x_transformed = jax.vmap(rotate_translate_permute_2d)(x, theta, shift)
+    x_untransformed = jax.vmap(partial(rotate_translate_permute_2d, rotate_first=False))(x_transformed, -theta, -shift)
     chex.assert_trees_all_close(x_untransformed, x)
 
     if x.dtype == jnp.float64:
@@ -41,7 +41,7 @@ def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
 
     # Perform a forward pass.
     x_out, h_out = equivariant_fn.apply(params, x)
-    x_out_transformed = jax.vmap(rotate_translate_2d)(x_out, theta, shift)
+    x_out_transformed = jax.vmap(rotate_translate_permute_2d)(x_out, theta, shift)
     x_transformed_out, h_transformed_out = equivariant_fn.apply(params, x_transformed)
 
     # Check that rotate-translate THEN transform, is the same as transform THEN rotate-translate.
