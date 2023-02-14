@@ -1,11 +1,80 @@
 import distrax
 import haiku as hk
+import jax
+import jax.numpy as jnp
+import chex
 
 
 from flow.test_utils import bijector_test
-from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from utils.numerical import rotate_translate_2d, rotate_translate_3d
+from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
+    affine_transform_in_new_space, inverse_affine_transform_in_new_space
 from flow.nets import EgnnConfig, TransformerConfig
 
+
+def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
+    """Test equivariance and invertibility."""
+    if jnp.ones(()).dtype == jnp.float64:
+        rtol = 1e-6
+    else:
+        rtol = 1e-4
+
+
+    key = jax.random.PRNGKey(0)
+
+
+    key, subkey = jax.random.split(key)
+    x = jax.random.normal(subkey, (n_nodes, dim))
+    origin = x + jax.random.normal(subkey, (n_nodes, dim))*0.1
+    change_of_basis_matrix = jnp.repeat(jnp.eye(dim)[None, ...], n_nodes, axis=0)
+    key, subkey = jax.random.split(key)
+    shift = jax.random.normal(subkey, (n_nodes, dim))
+
+    key, subkey = jax.random.split(key)
+    scale = jnp.exp(jax.random.normal(subkey, (n_nodes, dim)))
+
+    x_out = jax.vmap(affine_transform_in_new_space)(x, change_of_basis_matrix, origin, scale, shift)
+    x_original = jax.vmap(inverse_affine_transform_in_new_space)(x_out, change_of_basis_matrix, origin, scale, shift)
+
+    # Test invertibility.
+    chex.assert_trees_all_close(x_original, x, rtol=rtol)
+    assert jnp.sum(jnp.abs(x - x_out)) > 1e-3
+
+    # Test equivariance.
+    # Get rotated version of x_and_a.
+    key, subkey = jax.random.split(key)
+    theta = jax.random.uniform(subkey) * 2 * jnp.pi
+    key, subkey = jax.random.split(key)
+    translation = jax.random.normal(subkey, shape=(dim,))
+    key, subkey = jax.random.split(key)
+    phi = jax.random.uniform(subkey) * 2 * jnp.pi
+
+    def group_action(x, theta=theta, translation=translation):
+        if dim == 2:
+            x_rot = rotate_translate_2d(x, theta, translation)
+        else:  #  dim == 3:
+            x_rot = rotate_translate_3d(x, theta, phi, translation)
+        return x_rot
+
+    def group_action_to_column_matrix_of_vecs(change_of_basis_matrix, theta=theta):
+        if dim == 2:
+            change_of_basis_matrix_rot = rotate_translate_2d(change_of_basis_matrix.T,
+                                                             theta, jnp.zeros_like(translation)).T
+        else:  #  dim == 3:
+            change_of_basis_matrix_rot = rotate_translate_3d(change_of_basis_matrix.T, theta, phi,
+                                                             jnp.zeros_like(translation)).T
+        return change_of_basis_matrix_rot
+
+    # Apply group action to relevant things.
+    x_g = group_action(x)
+    origin = group_action(origin)
+
+    change_of_basis_matrix = jax.vmap(group_action_to_column_matrix_of_vecs, in_axes=0)(change_of_basis_matrix)
+    x_g_out = jax.vmap(affine_transform_in_new_space)(x_g, change_of_basis_matrix, origin, scale, shift)
+
+    x_out_g = group_action(x_out)
+
+    chex.assert_trees_all_close(x_g_out, x_out_g)
 
 def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
                             gram_schmidt: bool = False,
@@ -51,6 +120,9 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
 if __name__ == '__main__':
     USE_64_BIT = False  # Fails for 32-bit
     gram_schmidt = False
+
+    test_matmul_transform_in_new_space()
+    print("affine transform passing tests")
 
     if USE_64_BIT:
         from jax.config import config

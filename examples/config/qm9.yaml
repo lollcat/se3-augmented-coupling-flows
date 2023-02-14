@@ -40,7 +40,7 @@ flow:
     normalization_constant: 1.0
     h:
       linear_softmax: true
-      share_h: true
+      share_h: true # old
       h_embedding_dim: 64
   transformer: # for proj flow
     mlp_units: [64,64]
@@ -53,7 +53,7 @@ flow:
 training:
   lr: 1e-4
   use_64_bit: false
-  optimizer_name: adamw
+  optimizer_name: adam
   n_epoch: 200
   batch_size: 64
   plot_batch_size: 64
@@ -75,5 +75,4 @@ logger:
     name: qm9pos_${flow.type}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_opt${training.optimizer_name}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos]
-
+    tags: [qm9pos,loll]
