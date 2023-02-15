@@ -11,6 +11,7 @@ from flow.nets import EgnnConfig, Transformer, TransformerConfig
 from flow.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
 from flow.bijector_proj_real_nvp import get_new_space_basis
 
+
 def perform_low_rank_matmul(points, scale, vectors):
     """Assumes points are 1D with shape (number of nodes * dimensionality of euclidian space,)."""
     chex.assert_rank(points, 1)
@@ -43,16 +44,13 @@ def un_project(points, origin, change_of_basis):
     return change_of_basis @ points + origin
 
 
-def reshape_things_for_low_rank_matmul(points, scale, vectors):
+def reshape_things_for_low_rank_matmul(points, scale):
     """Flatten along nodes and dimension in order to prepare for low rank matmul."""
     chex.assert_rank(points, 2)
-    chex.assert_rank(vectors, 3)
-    chex.assert_equal_shape((points, scale, vectors[0]))
+    chex.assert_equal_shape((points, scale))
     points = points.flatten()
     scale = scale.flatten()
-    vectors = vectors.reshape((-1, np.prod(points.shape)))
-    vectors = jnp.swapaxes(vectors, 0, 1)
-    return points, scale, vectors
+    return points, scale
 
 
 def matmul_in_invariant_space(points, change_of_basis_matrix, origin, scale, shift, vectors):
@@ -60,14 +58,14 @@ def matmul_in_invariant_space(points, change_of_basis_matrix, origin, scale, shi
     go back into the original space."""
     chex.assert_rank(points, 2)
     N, D = points.shape
-    chex.assert_rank(vectors, 3)
+    chex.assert_rank(vectors, 2)
     chex.assert_rank(change_of_basis_matrix, 2)
     chex.assert_equal_shape((points, scale, shift))
     chex.assert_equal_shape((points[0], origin))
 
     point_in_new_space = jax.vmap(project, in_axes=(0, None, None))(points, origin, change_of_basis_matrix)
     # Reshape.
-    point_in_new_space, scale, vectors = reshape_things_for_low_rank_matmul(point_in_new_space, scale, vectors)
+    point_in_new_space, scale = reshape_things_for_low_rank_matmul(point_in_new_space, scale)
     transformed_point_in_new_space = perform_low_rank_matmul(point_in_new_space, scale, vectors)
     # Unflatten and apply shift
     transformed_point_in_new_space = transformed_point_in_new_space.reshape((N, D)) + shift
@@ -80,15 +78,15 @@ def inverse_matmul_in_invariant_space(points, change_of_basis_matrix, origin, sc
     """Inverse of `matmul_in_invariant_space`."""
     chex.assert_rank(points, 2)
     N, D = points.shape
-    chex.assert_rank(vectors, 3)
+    chex.assert_rank(vectors, 2)
     chex.assert_rank(change_of_basis_matrix, 2)
     chex.assert_equal_shape((points, scale, shift))
     chex.assert_equal_shape((points[0], origin))
 
     point_in_new_space = jax.vmap(project, in_axes=(0, None, None))(points, origin, change_of_basis_matrix)
     # Inverse shift, and flatten things.
-    points_before_low_rank_matmul_inv, scale, vectors = reshape_things_for_low_rank_matmul(
-        point_in_new_space - shift, scale, vectors)
+    points_before_low_rank_matmul_inv, scale = reshape_things_for_low_rank_matmul(
+        point_in_new_space - shift, scale)
     transformed_point_in_new_space = perform_low_rank_matmul_inverse(points_before_low_rank_matmul_inv, scale, vectors)
 
     # Unflatten and project back into original space.
@@ -158,9 +156,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         """Computes log|det J(f)(x)|."""
         event_shape = vectors.shape[1:]
         flattened_event_n_elements = np.prod(event_shape)
-        vectors = vectors.reshape((-1, np.prod(event_shape)))
         scale = scale.flatten()
-        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors @ (scale[:, None] ** -1))
+        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors * (scale[:, None] ** -1))
         s, log_det2 = jnp.linalg.slogdet(slog_det_in)
         return jnp.sum(log_scale, axis=-1) + log_det2
 
@@ -196,6 +193,7 @@ class ProjectedScalarAffine(distrax.Bijector):
 
 
 def make_conditioner(
+        n_vectors: int,
         process_flow_params_jointly: bool,
         multi_x_equivariant_fn: Callable,
         permutation_equivariant_fn: Optional[Callable] = None,
@@ -232,10 +230,11 @@ def make_conditioner(
         log_scale = invariant_bijector_params[..., :dim]
         shift = invariant_bijector_params[..., dim:dim*2]
         vectors_params = invariant_bijector_params[..., dim*2:]
-        vectors = jnp.reshape(vectors_params, (-1, n_nodes, dim))
+        chex.assert_tree_shape_suffix(vectors_params, (dim*n_vectors,))
+        vectors = jnp.reshape(vectors_params, (n_nodes*dim, n_vectors))
 
         chex.assert_shape(change_of_basis_matrix, (dim, dim))
-        chex.assert_trees_all_equal_shapes(log_scale, shift, x, vectors[0])
+        chex.assert_trees_all_equal_shapes(log_scale, shift, x)
         chex.assert_trees_all_equal_shapes(origin, x[0])
         return change_of_basis_matrix, origin, log_scale, shift, vectors
 
@@ -260,7 +259,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
                                                        n_vectors: Optional[int] = None,
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
-    n_vectors = n_vectors if n_vectors else 12  # should not hardcode this and make it non-optional
+    n_vectors = n_vectors if n_vectors else 10  # should not hardcode this and make it non-optional
     n_invariant_params = dim*2 + dim*n_vectors
 
     def bijector_fn(params):
@@ -293,6 +292,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
                                       ])
 
     conditioner = make_conditioner(
+        n_vectors=n_vectors,
         process_flow_params_jointly=process_flow_params_jointly,
         mlp_function=mlp_function,
         multi_x_equivariant_fn=multi_egnn,

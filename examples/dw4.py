@@ -39,11 +39,11 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.training.lr = 1e-3
+    cfg.training.lr = 2e-4
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = True
     cfg.target.aug_global_centering = False
-    cfg.flow.type = ['proj_v2', 'proj']
+    cfg.flow.type = ['proj_v2']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.kwargs.proj_v2.global_frame = False
@@ -53,7 +53,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.transformer.n_layers = 2
     cfg.flow.n_layers = 2
     cfg.training.batch_size = 32
-    cfg.training.n_epoch = 100
+    cfg.training.n_epoch = 200
     cfg.training.save = False
     cfg.training.n_plots = 6
     cfg.training.plot_batch_size = 128
