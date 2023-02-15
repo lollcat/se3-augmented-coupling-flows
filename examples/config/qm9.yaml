@@ -15,7 +15,7 @@ flow:
     double_centrered_gaussian: false
   dim: 3
   nodes: 19
-  n_layers: 12
+  n_layers: 10
   identity_init: true
   type: [proj,]  # vector_scale_shift  vector_scale nice proj
   act_norm: false

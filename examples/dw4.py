@@ -45,7 +45,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.target.aug_global_centering = False
     cfg.flow.egnn.mlp_units = (8,)
 
-    cfg.flow.type = ['proj']
+    cfg.flow.type = ['proj_v2']
 
     # proj_v2 flow settings
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)

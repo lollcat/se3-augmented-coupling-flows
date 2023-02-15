@@ -17,7 +17,7 @@ def perform_low_rank_matmul(points, scale, vectors):
     chex.assert_rank(points, 1)
     chex.assert_rank(vectors, 2)
     chex.assert_equal_shape((points, scale, vectors[:, 0]))
-    result = points * scale + (points @ vectors) @ vectors.T
+    result = points * scale + (points @ vectors) @ vectors.T  # (num_particles*3, )
     chex.assert_equal_shape((result, points))
     return result
 
