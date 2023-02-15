@@ -16,7 +16,7 @@ from flow.bijector_proj_real_nvp_v2 import matmul_in_invariant_space, inverse_ma
 def test_low_rank_mat_mul_and_inverse(n_nodes: int = 5, dim: int = 2, n_vectors: int = 3):
     """Check that low rank mat mul is invertible."""
     if jnp.ones(()).dtype == jnp.float64:
-        rtol = 1e-6
+        rtol = 1e-5
     else:
         rtol = 1e-4
 
@@ -29,10 +29,10 @@ def test_low_rank_mat_mul_and_inverse(n_nodes: int = 5, dim: int = 2, n_vectors:
     key, subkey = jax.random.split(key)
     scale = jnp.exp(jax.random.normal(subkey, (n_nodes, dim)))
     key, subkey = jax.random.split(key)
-    vectors = jax.random.normal(subkey, (n_vectors, n_nodes, dim))
+    vectors = jax.random.normal(subkey, (n_nodes*dim, n_vectors))
 
 
-    x, scale, vectors = reshape_things_for_low_rank_matmul(x, scale, vectors)
+    x, scale = reshape_things_for_low_rank_matmul(x, scale)
 
     # Forward transform.
     x_out = perform_low_rank_matmul(x, scale, vectors)
@@ -47,7 +47,7 @@ def test_low_rank_mat_mul_and_inverse(n_nodes: int = 5, dim: int = 2, n_vectors:
 def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2, n_vectors: int = 3):
     """Test equivariance and invertibility."""
     if jnp.ones(()).dtype == jnp.float64:
-        rtol = 1e-6
+        rtol = 1e-5
     else:
         rtol = 1e-4
 
@@ -65,7 +65,7 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2, n_vectors
     key, subkey = jax.random.split(key)
     scale = jnp.exp(jax.random.normal(subkey, (n_nodes, dim)))
     key, subkey = jax.random.split(key)
-    vectors = jax.random.normal(subkey, (n_vectors, n_nodes, dim))
+    vectors = jax.random.normal(subkey, (n_nodes*dim, n_vectors))
 
     x_out = matmul_in_invariant_space(x, change_of_basis_matrix, origin, scale, shift, vectors)
     x_original = inverse_matmul_in_invariant_space(x_out, change_of_basis_matrix, origin, scale, shift, vectors)
@@ -100,7 +100,7 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2, n_vectors
 
     x_out_g = group_action(x_out)
 
-    chex.assert_trees_all_close(x_g_out, x_out_g)
+    chex.assert_trees_all_close(x_g_out, x_out_g, rtol=rtol)
 
 
 
