@@ -68,9 +68,13 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                          act_norm: bool = True,
                                          base_config: BaseConfig = BaseConfig(),
                                          kwargs: dict = {}):
-    if not "proj_v2" in kwargs.keys():
+    type = [type] if isinstance(type, str) else type
+
+    if not ("proj" in kwargs.keys() or "proj_v2" in kwargs.keys()):
         if not kwargs == {}:
             raise NotImplementedError
+    kwargs_proj = kwargs['proj'] if "proj" in kwargs.keys() else {}
+    kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
 
     if base_config.double_centrered_gaussian:
         base = DoubleCentreGravitryGaussian(dim=dim, n_nodes=nodes)
@@ -83,7 +87,6 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
 
     def bijector_fn():
         bijectors = []
-        kwargs_proj = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
 
         if act_norm:
             bijectors.append(make_pseudo_act_norm_bijector(
@@ -109,9 +112,6 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                                                     egnn_config=egnn_config)
                 bijectors.append(bijector)
             if "proj_v2" in type:
-                kwargs_proj_v2 = dict(kwargs_proj)
-                if "global_frame" in kwargs_proj.keys():
-                    kwargs_proj_v2.pop("global_frame")
                 bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
                                                                   egnn_config=egnn_config,
@@ -142,9 +142,13 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                          act_norm: bool = True,
                                          kwargs: dict = {},
                                          base_config: BaseConfig = BaseConfig()):
-    if not "proj_v2" in kwargs.keys():
+    type = [type] if isinstance(type, str) else type
+    if not ("proj" in kwargs.keys() or "proj_v2" in kwargs.keys()):
         if not kwargs == {}:
             raise NotImplementedError
+    kwargs_proj = kwargs['proj'] if "proj" in kwargs.keys() else {}
+    kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
+
 
     if base_config.double_centrered_gaussian:
         base = DoubleCentreGravitryGaussian(dim=dim, n_nodes=nodes)
@@ -155,13 +159,14 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
         )
 
     bijectors = []
-    kwargs_proj_v2 = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
-
 
     for i in range(n_layers):
+        if act_norm:
+            bijectors.append(
+                make_pseudo_act_norm_bijector(layer_number=0, dim=dim,
+                                              flow_identity_init=flow_identity_init))
+
         for swap in (True, False):
-            if act_norm:
-                bijectors.append(make_coupled_global_scaling(layer_number=0, swap=swap, dim=dim, identity_init=flow_identity_init))
             if "vector_scale" in type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
@@ -173,7 +178,14 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                                                                               identity_init=flow_identity_init,
                                                                               egnn_config=egnn_config,
                                                                               transformer_config=transformer_config,
-                                                                              **kwargs_proj_v2)
+                                                                              **kwargs_proj)
+                bijectors.append(bijector)
+            if "proj_v2" in type:
+                bijector = proj_v2(layer_number=0, dim=dim, swap=swap,
+                                                                  identity_init=flow_identity_init,
+                                                                  egnn_config=egnn_config,
+                                                                  transformer_config=transformer_config,
+                                                                  **kwargs_proj_v2)
                 bijectors.append(bijector)
             if "nice" in type:
                 bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,
@@ -182,8 +194,8 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                 bijectors.append(bijector)
 
     if act_norm:
-        bijectors.append(make_coupled_global_scaling(layer_number=-1, swap=True, dim=dim, identity_init=flow_identity_init))
-        bijectors.append(make_coupled_global_scaling(layer_number=-1, swap=False, dim=dim, identity_init=flow_identity_init))
+        bijectors.append(make_pseudo_act_norm_bijector(layer_number=-1, dim=dim,
+                                                       flow_identity_init=flow_identity_init))
 
     flow = distrax.Chain(bijectors)
     distribution = distrax.Transformed(base, flow)
