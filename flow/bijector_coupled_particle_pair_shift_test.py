@@ -2,7 +2,7 @@ import haiku as hk
 import distrax
 
 from flow.test_utils import bijector_test
-from flow.bijector_act_norm import make_act_norm
+from flow.bijector_coupled_particle_pair_shift import make_per_particle_pair_shift_layer
 
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 11):
@@ -11,7 +11,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 11):
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_act_norm(layer_number=i, dim=dim, swap=swap, identity_init=False)
+            bijector = make_per_particle_pair_shift_layer(layer_number=i, dim=dim, swap=swap, identity_init=False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow

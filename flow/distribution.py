@@ -5,7 +5,7 @@ from flow.base import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCon
 from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijector_nice import make_se_equivariant_nice
-from flow.bijector_act_norm import make_act_norm
+from flow.bijector_pseudo_act_norm import make_pseudo_act_norm_bijector
 from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
 from flow.nets import EgnnConfig, TransformerConfig
 from flow.fast_hk_chain import Chain
@@ -85,13 +85,11 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
         bijectors = []
         kwargs_proj = kwargs['proj_v2'] if "proj_v2" in kwargs.keys() else {}
 
-        for swap in (True, False):  # For swap False we condition augmented on original.
-            if act_norm:
-                bijectors.append(make_act_norm(layer_number=0, swap=True, dim=dim,
-                                               identity_init=flow_identity_init))
-                bijectors.append(make_act_norm(layer_number=0, swap=False, dim=dim,
-                                               identity_init=flow_identity_init))
+        if act_norm:
+            bijectors.append(make_pseudo_act_norm_bijector(
+                layer_number=0, dim=dim, flow_identity_init=flow_identity_init))
 
+        for swap in (True, False):  # For swap False we condition augmented on original.
             if "vector_scale" in type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=0, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
@@ -122,12 +120,11 @@ def make_equivariant_augmented_flow_dist_fast_compile(dim,
                 bijectors.append(bijector)
 
         return distrax.Chain(bijectors)
+
     flow = Chain(bijector_fn=bijector_fn, n_layers=n_layers, compile_n_unroll=compile_n_unroll)
     if act_norm:
-        final_act_norm = distrax.Chain([make_act_norm(layer_number=-1, swap=True, dim=dim,
-                                                      identity_init=flow_identity_init),
-                                        make_act_norm(layer_number=-1, swap=False, dim=dim,
-                                                      identity_init=flow_identity_init)])
+        final_act_norm = make_pseudo_act_norm_bijector(layer_number=-1, dim=dim,
+                                                       flow_identity_init=flow_identity_init)
         flow = distrax.Chain([flow, final_act_norm])
     distribution = distrax.Transformed(base, flow)
     return distribution
@@ -164,7 +161,7 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
     for i in range(n_layers):
         for swap in (True, False):
             if act_norm:
-                bijectors.append(make_act_norm(layer_number=0, swap=swap, dim=dim, identity_init=flow_identity_init))
+                bijectors.append(make_coupled_global_scaling(layer_number=0, swap=swap, dim=dim, identity_init=flow_identity_init))
             if "vector_scale" in type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=i, dim=dim, swap=swap,
                                                                   identity_init=flow_identity_init,
@@ -185,8 +182,8 @@ def make_equivariant_augmented_flow_dist_distrax_chain(dim,
                 bijectors.append(bijector)
 
     if act_norm:
-        bijectors.append(make_act_norm(layer_number=-1, swap=True, dim=dim, identity_init=flow_identity_init))
-        bijectors.append(make_act_norm(layer_number=-1, swap=False, dim=dim, identity_init=flow_identity_init))
+        bijectors.append(make_coupled_global_scaling(layer_number=-1, swap=True, dim=dim, identity_init=flow_identity_init))
+        bijectors.append(make_coupled_global_scaling(layer_number=-1, swap=False, dim=dim, identity_init=flow_identity_init))
 
     flow = distrax.Chain(bijectors)
     distribution = distrax.Transformed(base, flow)

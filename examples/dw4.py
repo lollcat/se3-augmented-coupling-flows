@@ -43,7 +43,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.egnn.tanh = False
     cfg.flow.act_norm = True
     cfg.target.aug_global_centering = False
-    cfg.flow.type = ['proj_v2']
+    cfg.flow.type = ['nice']
     cfg.flow.egnn.mlp_units = (8,)
     cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
     cfg.flow.kwargs.proj_v2.global_frame = False
