@@ -160,7 +160,7 @@ class ProjectedScalarAffine(distrax.Bijector):
         flattened_event_n_elements = np.prod(event_shape)
         vectors = vectors.reshape((-1, np.prod(event_shape)))
         scale = scale.flatten()
-        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors @ scale[:, None])
+        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors @ (scale[:, None] ** -1))
         s, log_det2 = jnp.linalg.slogdet(slog_det_in)
         return jnp.sum(log_scale, axis=-1) + log_det2
 
@@ -260,7 +260,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
                                                        n_vectors: Optional[int] = None,
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
-    n_vectors = n_vectors if n_vectors else 12
+    n_vectors = n_vectors if n_vectors else 12  # should not hardcode this and make it non-optional
     n_invariant_params = dim*2 + dim*n_vectors
 
     def bijector_fn(params):
