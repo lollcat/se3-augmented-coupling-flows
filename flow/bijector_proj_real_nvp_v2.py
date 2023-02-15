@@ -154,10 +154,9 @@ class ProjectedScalarAffine(distrax.Bijector):
 
     def forward_log_det_jacobian_single(self, vectors, scale, log_scale) -> chex.Array:
         """Computes log|det J(f)(x)|."""
-        event_shape = vectors.shape[1:]
-        flattened_event_n_elements = np.prod(event_shape)
+        n_vectors = vectors.shape[1]
         scale = scale.flatten()
-        slog_det_in = jnp.eye(flattened_event_n_elements) + vectors.T @ (vectors * (scale[:, None] ** -1))
+        slog_det_in = jnp.eye(n_vectors) + vectors.T @ (vectors * (scale[:, None] ** -1))
         s, log_det2 = jnp.linalg.slogdet(slog_det_in)
         return jnp.sum(log_scale, axis=-1) + log_det2
 
