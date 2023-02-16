@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from functools import partial
 import optax
 
-from flow.base import get_conditional_gaussian_augmented_dist
+from flow.base_dist import get_conditional_gaussian_augmented_dist
 from flow.test_utils import get_max_diff_log_prob_invariance_test
 
 

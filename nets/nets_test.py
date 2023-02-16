@@ -5,18 +5,16 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils.numerical import rotate_translate_permute_2d
-from flow.nets_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig, EgnnConfig
+from nets.en_gnn import se_equivariant_net, HConfig, EgnnConfig
 
 
-def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
-                        n_heads: int = 2):
+def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
     """Run the EGNN forward pass, and check that it is equivariant."""
     h_config = HConfig(h_embedding_dim=3, h_out=True, h_out_dim=2, share_h=True, linear_softmax=True)
-    eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2,
-                                  h_config=h_config, zero_init_h=False)
-    multi_x_config = MultiEgnnConfig(n_heads=n_heads, egnn_config=eggn_config)
+    eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2, h_config=h_config,
+                             zero_init_h=False)
 
-    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: multi_se_equivariant_net(multi_x_config)(x)))
+    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: se_equivariant_net(eggn_config)(x)))
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
@@ -43,8 +41,7 @@ def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
 
     # Perform a forward pass.
     x_out, h_out = equivariant_fn.apply(params, x)
-    x_out_transformed = jax.vmap(jax.vmap(rotate_translate_permute_2d), in_axes=(2, None, None), out_axes=2)(
-        x_out, theta, shift)
+    x_out_transformed = jax.vmap(rotate_translate_permute_2d)(x_out, theta, shift)
     x_transformed_out, h_transformed_out = equivariant_fn.apply(params, x_transformed)
 
     # Check that rotate-translate THEN transform, is the same as transform THEN rotate-translate.

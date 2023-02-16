@@ -2,8 +2,8 @@ import haiku as hk
 import distrax
 
 from flow.test_utils import bijector_test
-from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
-from flow.nets import EgnnConfig
+from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
+from nets.en_gnn import EgnnConfig
 
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 8):

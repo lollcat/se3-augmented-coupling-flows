@@ -1,4 +1,4 @@
-from typing import NamedTuple, Sequence, Optional, Callable
+from typing import NamedTuple, Sequence, Callable
 
 import chex
 import jax
@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import haiku as hk
 import numpy as np
 
-from flow.nets import EgnnConfig
+from nets.en_gnn import EgnnConfig
 
 
 def get_norms_sqrd(x):

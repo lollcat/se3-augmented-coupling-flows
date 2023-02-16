@@ -37,7 +37,6 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   egnn:
-    emile_net: false
     mlp_units: [32,32]
     n_layers: 3
     normalize_by_norms: true

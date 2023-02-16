@@ -4,12 +4,11 @@ import distrax
 import chex
 import jax
 import jax.numpy as jnp
-import numpy as np
 import haiku as hk
 
-from flow.nets import EgnnConfig, Transformer, TransformerConfig
-from flow.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
-from flow.bijector_proj_real_nvp import get_new_space_basis
+from nets.transformer import Transformer, TransformerConfig
+from nets.en_gnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
+from flow.bijectors.bijector_proj_real_nvp import get_new_space_basis
 
 
 def perform_low_rank_matmul(points, scale, vectors):
