@@ -7,7 +7,8 @@ from flow.bijectors.bijector_proj_real_nvp_v2 import make_se_equivariant_split_c
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
 from flow.bijectors.bijector_pseudo_act_norm import make_pseudo_act_norm_bijector
 from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
-from nets.nets import EgnnConfig, TransformerConfig
+from nets.egnn import EgnnConfig
+from nets.transformer import TransformerConfig
 from flow.fast_hk_chain import Chain
 
 

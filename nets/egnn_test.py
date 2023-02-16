@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils.numerical import rotate_translate_permute_2d
-from nets.nets_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig, EgnnConfig
+from nets.egnn_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig, EgnnConfig
 
 
 def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
