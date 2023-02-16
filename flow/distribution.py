@@ -2,12 +2,12 @@ from typing import NamedTuple, Optional, Sequence, Union
 import distrax
 
 from flow.base import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian
-from flow.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from flow.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
-from flow.bijector_nice import make_se_equivariant_nice
-from flow.bijector_pseudo_act_norm import make_pseudo_act_norm_bijector
-from flow.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
-from flow.nets import EgnnConfig, TransformerConfig
+from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.bijectors.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
+from flow.bijectors.bijector_nice import make_se_equivariant_nice
+from flow.bijectors.bijector_pseudo_act_norm import make_pseudo_act_norm_bijector
+from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
+from nets.nets import EgnnConfig, TransformerConfig
 from flow.fast_hk_chain import Chain
 
 

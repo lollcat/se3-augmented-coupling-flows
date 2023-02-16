@@ -2,7 +2,7 @@ import distrax
 import jax.nn
 import jax.numpy as jnp
 
-from flow.nets import se_equivariant_net, EgnnConfig
+from nets.nets import se_equivariant_net, EgnnConfig
 
 
 def make_conditioner(ref_and_scale_equivariant_fn, activation_fn):

@@ -17,7 +17,7 @@ from omegaconf import DictConfig
 import matplotlib as mpl
 
 from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
-from flow.nets import EgnnConfig, TransformerConfig, HConfig
+from nets.nets import EgnnConfig, TransformerConfig, HConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances

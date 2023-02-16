@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from flow.nets import EgnnConfig, Transformer, TransformerConfig
-from flow.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
+from nets.nets import EgnnConfig, Transformer, TransformerConfig
+from nets.nets_multi_x import MultiEgnnConfig, multi_se_equivariant_net
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
 
 
