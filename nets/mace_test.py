@@ -27,16 +27,20 @@ def test_mace(dim: int = 3, n_nodes: int = 4):
     @hk.without_apply_rng
     @hk.transform
     def mace_forward_fn(x: chex.Array):
-        return MaceNet(config)(x)
+        mace_net = MaceNet(config)
+        x = mace_net(x)
+        return x
 
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
-    x = jax.random.normal(key=subkey, shape=(n_nodes, dim))
+    x = jax.random.normal(key=subkey, shape=(n_nodes, dim))*0.5
 
     key, subkey = jax.random.split(key)
     params = mace_forward_fn.init(subkey, x)
-    h, x_out = mace_forward_fn.apply(params, x)
+    x_out, h = jax.jit(mace_forward_fn.apply)(params, x)
+    chex.assert_shape(x_out, (n_nodes, config.n_vectors_readout, dim))
+    chex.assert_shape(h, (n_nodes, config.n_invariant_feat_readout))
 
     # Test equivariance.
     key, subkey = jax.random.split(key)
@@ -53,12 +57,14 @@ def test_mace(dim: int = 3, n_nodes: int = 4):
         return x_rot
 
     x_g = group_action(x)
-    h_g, x_g_out = mace_forward_fn.apply(params, x_g)
+    x_g_out, h_g = mace_forward_fn.apply(params, x_g)
 
     x_out_g = jax.vmap(group_action)(x_out)
 
     chex.assert_trees_all_close(h, h_g, rtol=rtol)
     chex.assert_trees_all_close(x_out_g, x_g_out, rtol=rtol)
+
+    print(jnp.linalg.norm(x_out_g, axis=-1))
 
 
 

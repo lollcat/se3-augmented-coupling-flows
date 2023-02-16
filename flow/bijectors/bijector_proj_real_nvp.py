@@ -8,6 +8,7 @@ import haiku as hk
 
 from nets.transformer import Transformer, TransformerConfig
 from nets.en_gnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
+from nets.mace import MaceNet, MACEConfig
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
 
 
@@ -253,12 +254,26 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
     n_heads = dim + (1 if gram_schmidt else 0)
-    egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
-                                       identity_init_x=False, zero_init_h=identity_init,
-                                       h_config=egnn_config.h_config._replace(h_out=True,
-                                       h_out_dim=egnn_config.h_config.h_embedding_dim))
-    multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=n_heads)
-    multi_egnn = multi_se_equivariant_net(multi_egnn_config)
+    MACE = True
+    if MACE:
+        mace_config = MACEConfig(
+            name=f'layer_{layer_number}_swap{swap}_mace',
+            n_invariant_feat_readout=2,
+            n_vectors_readout=n_heads,
+            n_vectors_hidden=n_heads*2,
+            n_invariant_feat_hidden=egnn_config.h_config.h_embedding_dim,
+            avg_num_neighbors=4,
+            r_max=10.0,
+            num_species=1,
+            n_interactions=2)
+        multi_egnn = MaceNet(mace_config)
+    else:
+        egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
+                                           identity_init_x=False, zero_init_h=identity_init,
+                                           h_config=egnn_config.h_config._replace(h_out=True,
+                                           h_out_dim=egnn_config.h_config.h_embedding_dim))
+        multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=n_heads)
+        multi_egnn = multi_se_equivariant_net(multi_egnn_config)
 
 
     if process_flow_params_jointly:
