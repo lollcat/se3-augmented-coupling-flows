@@ -33,6 +33,7 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       mlp_function_units: [32,]
+      n_vectors: 4
   act_norm: false
   fast_compile: true
   compile_n_unroll: 1
