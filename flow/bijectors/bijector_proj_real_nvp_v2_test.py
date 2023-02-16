@@ -76,7 +76,7 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2, n_vectors
     assert jnp.sum(jnp.abs(x - x_out)) > 1e-3
 
     # Test equivariance.
-    # Get rotated version of x_and_a.
+    # Get rotated version of x.
     key, subkey = jax.random.split(key)
     theta = jax.random.uniform(subkey) * 2 * jnp.pi
     key, subkey = jax.random.split(key)
