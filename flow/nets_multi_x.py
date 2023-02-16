@@ -9,10 +9,6 @@ import numpy as np
 from flow.nets import EgnnConfig
 
 
-# TODO: need to be careful of mean if number of nodes is varying? Could normalisation a parameter function of
-#  the number of nodes?
-
-
 def get_norms_sqrd(x):
     diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
     diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
@@ -140,16 +136,6 @@ class EGCL_Multi(hk.Module):
         return x_new, h_new
 
 
-class HConfig(NamedTuple):
-    """Config for h (node features), see https://arxiv.org/pdf/2105.09016.pdf."""
-    h_embedding_dim: int = 3   # Dimension of h embedding in the EGCL.
-    h_out: bool = False  # Whether to output h (it may be used as an invariant scale parameter for example).
-    h_out_dim: int = 1  # Number of dimensions of h output by the EGNN.
-    share_h: bool = True   # Whether to use the h from the EGCL for the computation of h-out.
-    linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
-    residual: bool = True
-
-
 class MultiEgnnConfig(NamedTuple):
     """Config of the EGNN."""
     n_heads: int
@@ -249,11 +235,10 @@ class multi_se_equivariant_net(hk.Module):
                                   activate_final=True, activation=self.egnn_config.activation_fn)(sq_norms)
             h_out = jnp.mean(mlp_out, axis=-2)
 
-            if self.egnn_config.h_config.share_h:
-                # Use h_egnn output from the EGNN as a feature for h-out.
-                if self.egnn_config.h_config.linear_softmax:
-                    h_egnn = jax.nn.softmax(h_egnn, axis=-1)
-                h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
+            # Use h_egnn output from the EGNN as a feature for h-out.
+            if self.egnn_config.h_config.linear_softmax:
+                h_egnn = jax.nn.softmax(h_egnn, axis=-1)
+            h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
             h_out = self.h_final_layer(h_out)
             return x_out, h_out

@@ -34,10 +34,13 @@ def rotate_3d(x, theta, phi):
     return x
 
 
-def rotate_translate_3d(x, theta, phi, translation, rotate_first=True):
+def rotate_translate_permute_3d(x, theta, phi, translation, rotate_first=True, permute=True):
     chex.assert_shape(theta, ())
     chex.assert_shape(phi, ())
     chex.assert_shape(translation, x.shape[-1:])
+
+    if permute:
+        x = jnp.roll(x, shift=1, axis=-2)
 
     if rotate_first:
         return rotate_3d(x, theta, phi) + translation[None, :]
@@ -57,9 +60,11 @@ def rotate_2d(x, theta):
         return jnp.matmul(rotation_matrix, x)
 
 
-def rotate_translate_2d(x, theta, translation, rotate_first=True):
+def rotate_translate_permute_2d(x, theta, translation, rotate_first=True, permute = True):
     chex.assert_shape(theta, ())
     chex.assert_shape(translation, x.shape[-1:])
+    if permute:
+        x = jnp.roll(x, shift=1, axis=-2)
 
     if rotate_first:
         return rotate_2d(x, theta) + translation[None, :]

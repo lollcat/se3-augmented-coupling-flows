@@ -122,7 +122,6 @@ class HConfig(NamedTuple):
     h_embedding_dim: int = 3   # Dimension of h embedding in the EGCL.
     h_out: bool = False  # Whether to output h (it may be used as an invariant scale parameter for example).
     h_out_dim: int = 1  # Number of dimensions of h output by the EGNN.
-    share_h: bool = True   # Whether to use the h from the EGCL for the computation of h-out.
     linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
     residual: bool = True
 
@@ -233,11 +232,12 @@ class _se_equivariant_net(hk.Module):
                                   activate_final=True, activation=self.config.activation_fn)(sq_norms)
             h_out = jnp.mean(mlp_out, axis=-2)
 
-            if self.config.h_config.share_h:
-                # Use h_egnn output from the EGNN as a feature for h-out.
-                if self.config.h_config.linear_softmax:
-                    h_egnn = jax.nn.softmax(h_egnn, axis=-1)
-                h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
+            # Use h_egnn output from the EGNN as a feature for h-out.
+            if self.config.h_config.linear_softmax:
+                h_egnn = jax.nn.softmax(h_egnn, axis=-1)
+
+            # passing h_out, and h_egnn into the final linear layer is a bit like a big skip connection.
+            h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
             h_out = self.h_final_layer(h_out)
             return x_out, h_out
