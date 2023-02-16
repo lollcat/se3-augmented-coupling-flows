@@ -5,7 +5,7 @@ import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, bijector_test
 from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
-from nets.egnn import HConfig, EgnnConfig, TransformerConfig
+from nets.en_gnn import HConfig, EgnnConfig, TransformerConfig
 
 
 _N_FLOW_LAYERS = 4

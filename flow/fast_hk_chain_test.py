@@ -2,7 +2,7 @@ import haiku as hk
 
 from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
 from flow.fast_hk_chain import Chain
-from nets.egnn import EgnnConfig
+from nets.en_gnn import EgnnConfig
 from flow.test_utils import bijector_test
 
 def test_chain(n_layers = 5):

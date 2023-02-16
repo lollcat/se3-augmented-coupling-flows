@@ -9,7 +9,7 @@ from flow.test_utils import bijector_test
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
-from nets.egnn import EgnnConfig
+from nets.en_gnn import EgnnConfig
 from nets.transformer import TransformerConfig
 
 

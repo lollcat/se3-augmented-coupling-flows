@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import haiku as hk
 import numpy as np
 
-from nets.egnn import EgnnConfig
+from nets.en_gnn import EgnnConfig
 
 
 def get_norms_sqrd(x):

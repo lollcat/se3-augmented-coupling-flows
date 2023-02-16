@@ -1,7 +1,7 @@
 import chex
 import jax
 
-from flow.base import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
+from flow.base_dist import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
 from flow.test_utils import test_fn_is_invariant
 
 

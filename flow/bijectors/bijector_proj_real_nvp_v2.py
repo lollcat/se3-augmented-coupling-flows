@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import haiku as hk
 
 from nets.transformer import Transformer, TransformerConfig
-from nets.egnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
+from nets.en_gnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
 from flow.bijectors.bijector_proj_real_nvp import get_new_space_basis
 
 

@@ -3,7 +3,7 @@ import distrax
 
 from flow.test_utils import bijector_test
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
-from nets.egnn import EgnnConfig
+from nets.en_gnn import EgnnConfig
 
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 11):

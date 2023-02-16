@@ -5,7 +5,7 @@ import distrax
 import haiku as hk
 
 from flow.test_utils import bijector_test
-from nets.egnn import EgnnConfig
+from nets.en_gnn import EgnnConfig
 from nets.transformer import TransformerConfig
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp_v2 import matmul_in_invariant_space, inverse_matmul_in_invariant_space,\
