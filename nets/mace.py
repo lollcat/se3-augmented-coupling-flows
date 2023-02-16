@@ -3,6 +3,8 @@ from typing import NamedTuple
 import haiku as hk
 import jax.numpy as jnp
 from mace_jax.modules.models import MACE
+from mace_jax.tools.gin_model import bessel_basis, soft_envelope
+import mace_jax
 import e3nn_jax as e3nn
 
 class MACEConfig(NamedTuple):
@@ -14,13 +16,9 @@ class MACEConfig(NamedTuple):
     n_vectors_hidden: int
     n_invariant_feat_hidden: int
     avg_num_neighbors: int
+    r_max: int
     num_species: int = 1
-
-
-def get_vectors(x):
-    vectors = x - x[None, ...]
-    vectors = vectors[jnp.tril(vectors.shape[0])]
-    return vectors
+    n_interactions: int = 2
 
 
 class MaceNet(hk.Module):
@@ -29,15 +27,14 @@ class MaceNet(hk.Module):
         super().__init__(name=config.name)
         self.mace = MACE(
             output_irreps=e3nn.Irreps(f"{config.n_invariant_feat_lay_out}x0e+{config.n_vectors_lay_out}x1e"),
-            r_max=10.0,
-            num_interactions=2,
+            r_max=config.r_max,
+            num_interactions=config.n_interactions,
             hidden_irreps=e3nn.Irreps(f"{config.n_invariant_feat_hidden}x0e+{config.n_vectors_hidden}x1e"),
             readout_mlp_irreps=e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e+{config.n_vectors_readout}x1e"),
             avg_num_neighbors=config.avg_num_neighbors,
             num_species=config.num_species,
-            radial_basis=jnp.array,
-            radial_envelope=jnp.array
-
+            radial_basis=bessel_basis,
+            radial_envelope=soft_envelope
         )
 
     def __call__(self, x):
@@ -45,5 +42,13 @@ class MaceNet(hk.Module):
         # node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
         # senders: jnp.ndarray,  # [n_edges]
         # receivers: jnp.ndarray,  # [n_edges]
+        vectors = tools.get_edge_relative_vectors(
+            positions=positions,
+            senders=graph.senders,
+            receivers=graph.receivers,
+            shifts=graph.edges.shifts,
+            cell=cell,
+            n_edge=graph.n_edge,
+        )
         vectors = get_vectors(x)
         node_specie = jnp.zeros(x.shape[0])

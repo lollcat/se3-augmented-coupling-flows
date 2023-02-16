@@ -58,7 +58,7 @@ training:
   lr: 6e-5
   use_64_bit: false
   optimizer_name: adamw
-  n_epoch: 800
+  n_epoch: 1600
   batch_size: 64
   plot_batch_size: 64
   max_global_norm: 12_000
@@ -68,7 +68,7 @@ training:
   test_set_size: null
   n_plots: 10
   n_checkpoints: 0
-  n_eval: 12
+  n_eval: 40
   K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
