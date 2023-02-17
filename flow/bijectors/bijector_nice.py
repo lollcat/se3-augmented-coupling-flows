@@ -18,7 +18,8 @@ def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, i
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
                                    nets_config=nets_config,
                                    n_equivariant_vectors_out=1,
-                                   n_invariant_feat_out=0)
+                                   n_invariant_feat_out=0,
+                                   zero_init_invariant_feat=False)
 
     # Used to for zero initialisation.
     get_scaling_weight_fn = lambda: hk.get_parameter(

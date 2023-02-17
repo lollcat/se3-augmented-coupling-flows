@@ -37,7 +37,7 @@ flow:
     mace:
       n_invariant_feat_hidden: 16
       n_vectors_hidden: 16
-      bessel_number: int  # Number of bessel functions.
+      bessel_number: 10  # Number of bessel functions.
       r_max: 5.
     egnn:
       mlp_units: [64,64]

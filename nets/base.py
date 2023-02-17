@@ -22,6 +22,7 @@ class NetsConfig(NamedTuple):
 def build_egnn_fn(
         name: str,
         nets_config: NetsConfig,
+        zero_init_invariant_feat: bool,
         n_invariant_feat_out: int,
         n_equivariant_vectors_out: int,
                   ):
@@ -33,7 +34,8 @@ def build_egnn_fn(
             mace_config = MACEConfig(name=name+"_mace",
                                      layer_config=nets_config.mace_lay_config,
                                      n_vectors_readout=n_equivariant_vectors_out,
-                                     n_invariant_feat_readout=n_invariant_feat_out)
+                                     n_invariant_feat_readout=n_invariant_feat_out,
+                                     zero_init_invariant_feat=zero_init_invariant_feat)
             x, h = MaceNet(mace_config)(x)
             if n_equivariant_vectors_out == 1:
                 x = jnp.squeeze(x, axis=-2)
@@ -41,13 +43,15 @@ def build_egnn_fn(
             if n_equivariant_vectors_out == 1:
                 egnn_config = EgnnConfig(name=name+"egnn",
                                          torso_config=nets_config.egnn_lay_config,
-                                         n_invariant_feat_out=n_invariant_feat_out)
+                                         n_invariant_feat_out=n_invariant_feat_out,
+                                         invariant_feat_zero_init=zero_init_invariant_feat)
                 x, h = se_equivariant_net(egnn_config)(x)
             else:
                 egnn_config = MultiEgnnConfig(name=name+"multi_x_egnn",
                                               torso_config=nets_config.egnn_lay_config,
                                               n_invariant_feat_out=n_invariant_feat_out,
-                                              n_equivariant_vectors_out=n_equivariant_vectors_out
+                                              n_equivariant_vectors_out=n_equivariant_vectors_out,
+                                              invariant_feat_zero_init=zero_init_invariant_feat
                                               )
                 x, h = multi_se_equivariant_net(egnn_config)(x)
 
