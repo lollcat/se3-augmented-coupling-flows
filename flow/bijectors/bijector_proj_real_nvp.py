@@ -252,6 +252,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
     n_heads = dim + (1 if gram_schmidt else 0)
+    n_invariant_params = dim*2
+
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
                                    nets_config=nets_config,
                                    n_equivariant_vectors_out=n_heads,
@@ -260,7 +262,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
                                    else nets_config.egnn_lay_config.h_embedding_dim)
 
     if process_flow_params_jointly:
-        transformer_config = nets_config.transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
+        transformer_config = nets_config.transformer_config._replace(output_dim=n_invariant_params, zero_init=identity_init)
         permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
                                                  config=transformer_config)
         mlp_function = None
@@ -269,8 +271,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
         mlp_function = hk.Sequential([
             hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1),
             hk.nets.MLP(nets_config.mlp_head_config.mlp_units, activate_final=True),
-            hk.Linear(dim*2, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
-            hk.Linear(dim*2,
+            hk.Linear(n_invariant_params, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
+            hk.Linear(n_invariant_params,
                       b_init=hk.initializers.VarianceScaling(0.01),
                       w_init=hk.initializers.VarianceScaling(0.01))
                                       ])
