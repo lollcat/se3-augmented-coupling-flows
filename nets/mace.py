@@ -3,12 +3,14 @@ from functools import partial
 
 import haiku as hk
 import jax.numpy as jnp
-from nets.mace_net_adjusted import MACE
+import jax
 from mace_jax.tools.gin_model import bessel_basis, soft_envelope
 from mace_jax.data import get_neighborhood
 from mace_jax import tools
 import e3nn_jax as e3nn
 import chex
+
+from nets.mace_net_adjusted import MACE
 
 class MACELayerConfig(NamedTuple):
     n_vectors_hidden: int
@@ -51,7 +53,15 @@ class MaceNet(hk.Module):
         # TODO: setting lay out irreps to match read out. That makes sense?
         # TODO: Add an MLP type of thing at the end of this?
 
+
+
     def __call__(self, x):
+        if len(x.shape) == 2:
+            return self.call_single(x)
+        else:
+            return hk.vmap(self.call_single, split_rng=False)(x)
+
+    def call_single(self, x):
         """We manually keep track of the centre of mass to ensure translation equivariance."""
         centre_of_mass = jnp.mean(x, axis=-2)
         chex.assert_rank(x, 2)

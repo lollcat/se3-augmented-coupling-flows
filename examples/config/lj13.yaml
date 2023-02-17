@@ -42,14 +42,15 @@ flow:
   egnn:
     mlp_units: [32,32]
     n_layers: 3
-    h:
-      linear_softmax: true
-      h_embedding_dim: 16
+    h_linear_softmax: true
+    h_embedding_dim: 16
   transformer: # for proj_v2 flow.
     mlp_units: [32,32]
     num_heads: 3
     key_size: 4
     w_init_scale: 1.0
+  mlp_head_config:
+    mlp_units: [ 32, 32 ]
 
 
 training:

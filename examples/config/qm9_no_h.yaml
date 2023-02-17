@@ -48,15 +48,16 @@ flow:
     agg: mean
     phi_x_max: 1.0
     normalization_constant: 1.0
-    h:
-      linear_softmax: true
-      h_embedding_dim: 16
+    h_linear_softmax: true
+    h_embedding_dim: 16
   transformer: # for proj_v2 flow.
     mlp_units: [32,32]
     num_heads: 6
     key_size: 16
     w_init_scale: 0.1
     n_layers: 3
+  mlp_head_config:
+    mlp_units: [ 32, 32 ]
 
 
 training:
@@ -81,7 +82,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_no_h_${flow.type}_tanh${flow.egnn.tanh}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}
+    name: qm9pos_no_h_${flow.type}_batchsize${training.batch_size}_lr${training.lr}_layers${flow.n_layers}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos]

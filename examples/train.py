@@ -17,7 +17,8 @@ from omegaconf import DictConfig
 import matplotlib as mpl
 
 from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
-from nets.en_gnn import EgnnConfig, HConfig
+from nets.base import NetsConfig, MLPHeadConfig
+from nets.en_gnn import EgnnTorsoConfig
 from nets.transformer import TransformerConfig
 from nets.mace import MACELayerConfig
 from utils.plotting import plot_history
@@ -170,28 +171,31 @@ def setup_logger(cfg: DictConfig) -> Logger:
                         "pandas logger to the config file.")
     return logger
 
+def create_nets_config(nets_config: DictConfig):
+    """Configure nets (MACE, EGNN, Transformer, MLP)."""
+    egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
+    mace_config = MACELayerConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
+    transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
+    transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
+    mlp_head_config = MLPHeadConfig(**nets_config.mlp_head_config) if "mlp_head_config" in nets_config.keys() else None
+    nets_config = NetsConfig(use_mace=nets_config.use_mace,
+                             egnn_lay_config=egnn_cfg,
+                             mace_lay_config=mace_config,
+                             transformer_config=transformer_config,
+                             mlp_head_config=mlp_head_config)
+    return nets_config
 
 def create_flow_config(flow_cfg: DictConfig):
+    """Create config for building the flow."""
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
-    egnn_cfg = dict(flow_cfg.pop("egnn")) if "egnn" in flow_cfg.keys() else None
-    if egnn_cfg is not None:
-        h_cfg = dict(egnn_cfg.pop("h"))
-        egnn_cfg = EgnnConfig(**egnn_cfg, h_config=HConfig(**h_cfg))
-    mace_config = MACELayerConfig(**dict(flow_cfg.pop("mace"))) if "mace" in flow_cfg.keys() else None
-    transformer_cfg = dict(flow_cfg.pop("transformer")) if "transformer" in flow_cfg.keys() else None
-    transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
-
+    nets_config = create_nets_config(flow_cfg.pop("nets"))
     base_config = dict(flow_cfg.pop("base"))
     base_config = BaseConfig(**base_config)
-
-
     flow_dist_config = EquivariantFlowDistConfig(
         **flow_cfg,
-        egnn_config=egnn_cfg,
-        transformer_config=transformer_config,
+        nets_config=nets_config,
         base_config=base_config,
-        mace_config=mace_config
     )
     return flow_dist_config
 

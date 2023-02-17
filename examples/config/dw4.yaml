@@ -50,9 +50,8 @@ flow:
       tanh: false
       agg: mean
       phi_x_max: 1.0
-      h:
-        linear_softmax: true
-        h_embedding_dim: 16
+      h_linear_softmax: true
+      h_embedding_dim: 16
     transformer: # for proj and proj_v2 flows.
       mlp_units: [32,32]
       num_heads: 3
