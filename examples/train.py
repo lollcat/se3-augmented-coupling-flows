@@ -19,6 +19,7 @@ import matplotlib as mpl
 from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
 from nets.en_gnn import EgnnConfig, HConfig
 from nets.transformer import TransformerConfig
+from nets.mace import MACELayerConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances
@@ -173,11 +174,14 @@ def setup_logger(cfg: DictConfig) -> Logger:
 def create_flow_config(flow_cfg: DictConfig):
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
-    egnn_cfg = dict(flow_cfg.pop("egnn"))
-    h_cfg = dict(egnn_cfg.pop("h"))
-    transformer_cfg = dict(flow_cfg.pop("transformer"))
-    transformer_config = TransformerConfig(**dict(transformer_cfg))
-    egnn_cfg = EgnnConfig(**egnn_cfg, h_config=HConfig(**h_cfg))
+    egnn_cfg = dict(flow_cfg.pop("egnn")) if "egnn" in flow_cfg.keys() else None
+    if egnn_cfg is not None:
+        h_cfg = dict(egnn_cfg.pop("h"))
+        egnn_cfg = EgnnConfig(**egnn_cfg, h_config=HConfig(**h_cfg))
+    mace_config = MACELayerConfig(**dict(flow_cfg.pop("mace"))) if "mace" in flow_cfg.keys() else None
+    transformer_cfg = dict(flow_cfg.pop("transformer")) if "transformer" in flow_cfg.keys() else None
+    transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
+
     base_config = dict(flow_cfg.pop("base"))
     base_config = BaseConfig(**base_config)
 
@@ -186,7 +190,8 @@ def create_flow_config(flow_cfg: DictConfig):
         **flow_cfg,
         egnn_config=egnn_cfg,
         transformer_config=transformer_config,
-        base_config=base_config
+        base_config=base_config,
+        mace_config=mace_config
     )
     return flow_dist_config
 

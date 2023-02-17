@@ -34,6 +34,11 @@ flow:
       n_vectors: 10
   fast_compile: true
   compile_n_unroll: 1
+  mace:
+    n_invariant_feat_hidden: 16
+    n_vectors_hidden: 16
+    bessel_number: int  # Number of bessel functions.
+    r_max: 5.
   egnn:
     mlp_units: [64,64]
     n_layers: 3

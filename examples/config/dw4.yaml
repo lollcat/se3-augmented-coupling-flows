@@ -27,33 +27,40 @@ flow:
       process_flow_params_jointly: false
       condition_on_x_proj: false
       gram_schmidt: false
-      mlp_function_units: [32,]
     proj_v2:
       process_flow_params_jointly: true # if True then specify transformer config lower down.
       condition_on_x_proj: true
       gram_schmidt: false
-      mlp_function_units: [32,]
       n_vectors: 4
   act_norm: false
   fast_compile: true
   compile_n_unroll: 1
-  egnn:
-    mlp_units: [32,32]
-    n_layers: 3
-    normalize_by_norms: true
-    variance_scaling_init: 0.001
-    tanh: false
-    agg: mean
-    phi_x_max: 1.0
-    h:
-      linear_softmax: true
-      h_embedding_dim: 16
-  transformer: # for proj and proj_v2 flows.
-    mlp_units: [32,32]
-    num_heads: 3
-    key_size: 4
-    w_init_scale: 0.1
-    n_layers: 3
+  nets:
+    use_mace:
+    mace:
+      n_invariant_feat_hidden: 16
+      n_vectors_hidden: 16
+      bessel_number: int  # Number of bessel functions.
+      r_max: 5.
+    egnn:
+      mlp_units: [32,32]
+      n_layers: 3
+      normalize_by_norms: true
+      variance_scaling_init: 0.001
+      tanh: false
+      agg: mean
+      phi_x_max: 1.0
+      h:
+        linear_softmax: true
+        h_embedding_dim: 16
+    transformer: # for proj and proj_v2 flows.
+      mlp_units: [32,32]
+      num_heads: 3
+      key_size: 4
+      w_init_scale: 0.1
+      n_layers: 3
+    mlp_head_config:
+      mlp_units: [32, 32]
 
 
 training:

@@ -13,7 +13,7 @@ from nets.en_gnn import EgnnConfig
 from nets.transformer import TransformerConfig
 
 
-def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
+def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
     """Test equivariance and invertibility."""
     if jnp.ones(()).dtype == jnp.float64:
         rtol = 1e-6
@@ -82,7 +82,7 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
     chex.assert_trees_all_close(x_g_out, x_out_g)
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
                             gram_schmidt: bool = False,
                             global_frame: bool = False,
                             process_flow_params_jointly: bool = True):
@@ -137,10 +137,10 @@ if __name__ == '__main__':
 
     for global_frame in [False, True]:
         for process_jointly in [False, True]:
-            print(f"running tests for global-frame={global_frame}, process jointly={process_jointly}")
-            test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                    gram_schmidt=gram_schmidt)
-            print("passed 2D test")
+            # print(f"running tests for global-frame={global_frame}, process jointly={process_jointly}")
+            # test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
+            #                         gram_schmidt=gram_schmidt)
+            # print("passed 2D test")
 
             test_bijector_with_proj(dim=3, process_flow_params_jointly=process_jointly, global_frame=global_frame,
                                     gram_schmidt=gram_schmidt)

@@ -265,7 +265,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
             avg_num_neighbors=4,
             r_max=10.0,
             num_species=1,
-            n_interactions=2)
+            n_interactions=2,
+            bessel_number=5,
+        )
         multi_egnn = MaceNet(mace_config)
     else:
         egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",

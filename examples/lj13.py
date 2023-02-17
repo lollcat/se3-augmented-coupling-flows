@@ -1,6 +1,5 @@
 import hydra
 from omegaconf import DictConfig
-import jax
 import jax.numpy as jnp
 import numpy as np
 
