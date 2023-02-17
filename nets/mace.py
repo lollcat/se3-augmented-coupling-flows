@@ -30,6 +30,7 @@ class MACEConfig(NamedTuple):
     name: str
     n_invariant_feat_readout: int
     n_vectors_readout: int
+    zero_init_invariant_feat: bool
     layer_config: MACELayerConfig
 
 
@@ -105,5 +106,11 @@ class MaceNet(hk.Module):
             vectors=vectors, node_specie=node_specie, senders=senders, receivers=receivers)
         vector_features = mace_output_irreps.filter(keep=f"{self.config.n_vectors_readout}x1e")
         vector_features = vector_features.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
+        vector_features = vector_features.array
         invariant_features = mace_output_irreps.filter(keep=f"{self.config.n_invariant_feat_readout}x0e")
-        return vector_features.array + centre_of_mass, invariant_features.array
+
+        invariant_features = hk.Linear(invariant_features.shape[-1],
+                                       w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
+                                       )(jax.nn.elu(invariant_features.array))
+
+        return vector_features+ centre_of_mass, invariant_features
