@@ -6,9 +6,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from nets.transformer import Transformer, TransformerConfig
-from nets.en_gnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
-from nets.mace import MaceNet, MACEConfig
+from nets.transformer import Transformer
+from nets.base import NetsConfig, build_egnn_fn
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
 
 
@@ -238,14 +237,13 @@ def make_conditioner(
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
-                                                       transformer_config: Optional[TransformerConfig] = None,
+def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
+                                                       nets_config: NetsConfig,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
-                                                       mlp_function_units: Optional[Sequence[int]] = None,
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
@@ -254,32 +252,15 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
     n_heads = dim + (1 if gram_schmidt else 0)
-    MACE = True
-    if MACE:
-        mace_config = MACEConfig(
-            name=f'layer_{layer_number}_swap{swap}_mace',
-            n_invariant_feat_readout=2,
-            n_vectors_readout=n_heads,
-            n_vectors_hidden=n_heads*2,
-            n_invariant_feat_hidden=egnn_config.h_config.h_embedding_dim,
-            avg_num_neighbors=4,
-            r_max=10.0,
-            num_species=1,
-            n_interactions=2,
-            bessel_number=5,
-        )
-        multi_egnn = MaceNet(mace_config)
-    else:
-        egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
-                                           identity_init_x=False, zero_init_h=identity_init,
-                                           h_config=egnn_config.h_config._replace(h_out=True,
-                                           h_out_dim=egnn_config.h_config.h_embedding_dim))
-        multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=n_heads)
-        multi_egnn = multi_se_equivariant_net(multi_egnn_config)
-
+    equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
+                                   nets_config=nets_config,
+                                   n_equivariant_vectors_out=n_heads,
+                                   n_invariant_feat_out=nets_config.mace_lay_config.n_invariant_feat_hidden
+                                   if nets_config.use_mace
+                                   else nets_config.egnn_lay_config.h_embedding_dim)
 
     if process_flow_params_jointly:
-        transformer_config = transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
+        transformer_config = nets_config.transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
         permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
                                                  config=transformer_config)
         mlp_function = None
@@ -287,7 +268,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         permutation_equivariant_fn = None
         mlp_function = hk.Sequential([
             hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1),
-            hk.nets.MLP(mlp_function_units, activate_final=True),
+            hk.nets.MLP(nets_config.mlp_head_config.mlp_units, activate_final=True),
             hk.Linear(dim*2, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
             hk.Linear(dim*2,
                       b_init=hk.initializers.VarianceScaling(0.01),
@@ -297,7 +278,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     conditioner = make_conditioner(
         global_frame=global_frame, process_flow_params_jointly=process_flow_params_jointly,
         mlp_function=mlp_function,
-        multi_x_equivariant_fn=multi_egnn,
+        multi_x_equivariant_fn=equivariant_fn,
         permutation_equivariant_fn=permutation_equivariant_fn,
         gram_schmidt=gram_schmidt,
         condition_on_x_proj=condition_on_x_proj
