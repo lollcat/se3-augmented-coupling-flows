@@ -173,12 +173,15 @@ def setup_logger(cfg: DictConfig) -> Logger:
 
 def create_nets_config(nets_config: DictConfig):
     """Configure nets (MACE, EGNN, Transformer, MLP)."""
+    nets_config = dict(nets_config)
     egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
     mace_config = MACELayerConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
     transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
     transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
-    mlp_head_config = MLPHeadConfig(**nets_config.mlp_head_config) if "mlp_head_config" in nets_config.keys() else None
-    nets_config = NetsConfig(use_mace=nets_config.use_mace,
+    mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
+                                                                             nets_config.keys() else None
+    use_mace = nets_config['use_mace']
+    nets_config = NetsConfig(use_mace=use_mace,
                              egnn_lay_config=egnn_cfg,
                              mace_lay_config=mace_config,
                              transformer_config=transformer_config,
