@@ -130,6 +130,34 @@ def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_
         plt.close(figure)
 
 
+class OptimizerConfig(NamedTuple):
+    init_lr: float
+    use_schedule: bool
+    optimizer_name: str = "adam"
+    max_global_norm: Optional[float] = None
+    peak_lr: Optional[float] = None
+    end_lr: Optional[float] = None
+    warmup_n_epoch: Optional[int] = None
+
+def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
+    if optimizer_config.use_schedule:
+        lr = optax.warmup_cosine_decay_schedule(
+            init_value=optimizer_config.init_lr,
+            peak_value=optimizer_config.peak_lr,
+            end_value=optimizer_config.end_lr,
+            warmup_steps=optimizer_config.warmup_n_epoch * n_iter_per_epoch,
+            decay_steps=n_iter_per_epoch*total_n_epoch
+                                                     )
+
+    else:
+        lr = optimizer_config.init_lr
+    optimizer = optax.chain(optax.zero_nans(),
+                            optax.clip_by_global_norm(optimizer_config.max_global_norm if
+                                                      optimizer_config.max_global_norm else jnp.inf),
+                            getattr(optax, optimizer_config.optimizer_name)(lr))
+
+    return optimizer, lr
+
 
 class TrainConfig(NamedTuple):
     n_epoch: int
@@ -139,7 +167,7 @@ class TrainConfig(NamedTuple):
     aug_target_global_centering: bool
     aug_target_scale: float
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
-    lr: float
+    optimizer_config: OptimizerConfig
     batch_size: int
     max_global_norm: float
     K_marginal_log_lik: int
@@ -157,7 +185,6 @@ class TrainConfig(NamedTuple):
     save_dir: str = "/tmp"
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
-    optimizer_name: str = 'adam'
     use_64_bit: bool = False
 
 
@@ -218,11 +245,14 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
 
     flow_config = create_flow_config(cfg.flow)
 
+    optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
+
     experiment_config = TrainConfig(
         dim=dim,
         n_nodes=n_nodes,
         flow_dist_config=flow_config,
         load_datasets=load_dataset,
+        optimizer_config=optimizer_config,
         **training_config,
         logger=logger,
         save_dir=save_path,
@@ -273,10 +303,6 @@ def train(config: TrainConfig):
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, config.n_nodes, config.dim*2)))
 
-    optimizer = optax.chain(optax.zero_nans(),
-                            optax.clip_by_global_norm(config.max_global_norm if config.max_global_norm else jnp.inf),
-                            getattr(optax, config.optimizer_name)(config.lr))
-    opt_state = optimizer.init(params)
 
     train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
                                                                    config.test_set_size)
@@ -295,6 +321,11 @@ def train(config: TrainConfig):
 
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
+
+    optimizer, lr = get_optimizer(config.optimizer_config,
+                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
+                              total_n_epoch=config.n_epoch)
+    opt_state = optimizer.init(params)
 
     if config.scan_run:
         def scan_fn(carry, xs):
@@ -321,6 +352,9 @@ def train(config: TrainConfig):
             for batch_index in range(batched_data.shape[0]):
                 info = jax.tree_map(lambda x: x[batch_index], infos)
                 info.update(epoch=i)
+                info.update(n_optimizer_steps=opt_state[-1][0].count)
+                if hasattr(lr, "__call__"):
+                    info.update(lr=lr(info["n_optimizer_steps"]))
                 config.logger.write(info)
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
