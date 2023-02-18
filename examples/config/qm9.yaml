@@ -87,7 +87,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.type}_batchsize${training.batch_size}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}_opt${training.optimizer_name}
+    name: qm9pos_${flow.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]
