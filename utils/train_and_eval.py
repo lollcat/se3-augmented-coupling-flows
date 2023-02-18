@@ -15,13 +15,27 @@ def ml_loss_fn(params, x, log_prob_fn):
     info = {"loss": loss}
     return loss, info
 
+def get_tree_leaf_norm_info(tree):
+    norms = jax.tree_util.tree_map(jnp.linalg.norm, tree)
+    norms = jnp.stack(jax.tree_util.tree_flatten(norms)[0])
+    max_norm = jnp.max(norms)
+    min_norm = jnp.min(norms)
+    mean_norm = jnp.mean(norms)
+    median_norm = jnp.median(norms)
+    info = {}
+    info.update(per_layer_max_norm=max_norm, per_layer_min_norm=min_norm,
+                per_layer_mean_norm=mean_norm, per_layer_median_norm=median_norm)
+    return info
 
 
 def ml_step(params, x, opt_state, log_prob_fn, optimizer):
     grad, info = jax.grad(ml_loss_fn, has_aux=True)(params, x, log_prob_fn)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
     new_params = optax.apply_updates(params, updates)
-    info.update(grad_norm=optax.global_norm(grad))
+    info.update(grad_norm=optax.global_norm(grad),
+                update_norm=optax.global_norm(updates))
+    info.update({"grad_" + key: value for key, value in get_tree_leaf_norm_info(grad).items()})
+    info.update({"update_" + key: value for key, value in get_tree_leaf_norm_info(updates).items()})
     return new_params, new_opt_state, info
 
 

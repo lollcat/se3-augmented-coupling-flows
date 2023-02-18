@@ -135,9 +135,12 @@ class OptimizerConfig(NamedTuple):
     use_schedule: bool
     optimizer_name: str = "adam"
     max_global_norm: Optional[float] = None
+    clip_by_block_rms_threshold: Optional[float] = None
+    adaptive_clip_lambda: Optional[float] = None
     peak_lr: Optional[float] = None
     end_lr: Optional[float] = None
     warmup_n_epoch: Optional[int] = None
+
 
 def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
     if optimizer_config.use_schedule:
@@ -148,14 +151,27 @@ def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_e
             warmup_steps=optimizer_config.warmup_n_epoch * n_iter_per_epoch,
             decay_steps=n_iter_per_epoch*total_n_epoch
                                                      )
-
     else:
         lr = optimizer_config.init_lr
-    optimizer = optax.chain(optax.zero_nans(),
-                            optax.clip_by_global_norm(optimizer_config.max_global_norm if
-                                                      optimizer_config.max_global_norm else jnp.inf),
-                            getattr(optax, optimizer_config.optimizer_name)(lr))
 
+    grad_transforms = [optax.zero_nans()]
+
+    if optimizer_config.adaptive_clip_lambda:
+        clipping_fn = optax.adaptive_grad_clip(optimizer_config.adaptive_clip_lambda)
+        assert (optimizer_config.max_global_norm is None and optimizer_config.clip_by_block_rms_threshold is None)
+        grad_transforms.append(clipping_fn)
+    elif optimizer_config.max_global_norm:
+        clipping_fn = optax.clip_by_global_norm(optimizer_config.max_global_norm)
+        assert optimizer_config.clip_by_block_rms_threshold is None
+        grad_transforms.append(clipping_fn)
+    elif optimizer_config.clip_by_block_rms_threshold:
+        clipping_fn = optax.clip_by_block_rms(optimizer_config.clip_by_block_rms_threshold)
+        grad_transforms.append(clipping_fn)
+    else:
+        pass
+
+    grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
+    optimizer = optax.chain(*grad_transforms)
     return optimizer, lr
 
 
@@ -169,7 +185,6 @@ class TrainConfig(NamedTuple):
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
     optimizer_config: OptimizerConfig
     batch_size: int
-    max_global_norm: float
     K_marginal_log_lik: int
     logger: Logger
     seed: int
