@@ -69,8 +69,6 @@ training:
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.5
-    clip_by_block_rms_threshold: null
-    adaptive_clip_lambda: null # 0.001
   use_64_bit: false
   n_epoch: 60
   batch_size: 64
