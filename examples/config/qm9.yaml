@@ -7,7 +7,7 @@ hydra:
 
 target:
   aug_global_centering: false
-  aug_scale: 1.0
+  aug_scale: 0.1
 
 flow:
   base:
@@ -70,7 +70,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
   use_64_bit: false
-  n_epoch: 128
+  n_epoch: 256
   batch_size: 64
   plot_batch_size: 64
   seed: 0
