@@ -70,7 +70,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
   use_64_bit: false
-  n_epoch: 60
+  n_epoch: 128
   batch_size: 64
   plot_batch_size: 64
   seed: 0
