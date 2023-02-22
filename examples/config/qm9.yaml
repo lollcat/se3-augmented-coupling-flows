@@ -33,12 +33,12 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    use_mace: false
+    use_mace: true
     mace:
-      n_invariant_feat_hidden: 16
-      n_vectors_hidden: 16
+      n_invariant_feat_hidden: 64
+      n_vectors_hidden: 24
       bessel_number: 10  # Number of bessel functions.
-      r_max: 5.
+      r_max: 10.
     egnn:
       mlp_units: [64,64]
       n_layers: 3
@@ -70,7 +70,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
   use_64_bit: false
-  n_epoch: 512
+  n_epoch: 64
   batch_size: 64
   plot_batch_size: 64
   seed: 0
