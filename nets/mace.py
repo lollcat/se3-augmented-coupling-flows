@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Union
 from functools import partial
 
 import haiku as hk
@@ -24,6 +24,7 @@ class MACELayerConfig(NamedTuple):
     cut_off: float = 1.e6  # No cutoff by default for fully connected graph. Currently unused.
     # Average number of neighbours. Used for normalization. Defaults to n-nodes (fully connected).
     avg_num_neighbors: Optional[int] = None
+    interaction_irreps: Union[str, e3nn.Irreps] = "o3_restricted",  # or o3_full
 
 
 class MACEConfig(NamedTuple):
@@ -59,7 +60,8 @@ class MaceNet(hk.Module):
         node_specie = jnp.zeros(x.shape[0], dtype=int)
 
         # avg_num_neighbors defaults to fully connected.
-        avg_num_neighbors = self.config.layer_config.avg_num_neighbors if self.config.layer_config.avg_num_neighbors else x.shape[0]
+        avg_num_neighbors = self.config.layer_config.avg_num_neighbors if self.config.layer_config.avg_num_neighbors \
+            else x.shape[0]
         mace_fn = MACE(
             output_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1o"),
             r_max=self.config.layer_config.r_max,
@@ -70,9 +72,10 @@ class MaceNet(hk.Module):
             num_species=self.config.layer_config.num_species,
             radial_basis=lambda length, max_length: e3nn.bessel(length, x_max=max_length,
                                                                 n=self.config.layer_config.bessel_number),
-            radial_envelope=e3nn.soft_envelope
-        )
+            radial_envelope=e3nn.soft_envelope,
+            interaction_irreps=self.config.layer_config.interaction_irreps
 
+        )
         # senders, receivers, shifts = get_neighborhood(
         #     positions=x, cutoff=self.config.layer_config.cut_off, pbc=None, cell=None
         # )

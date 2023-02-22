@@ -35,10 +35,12 @@ flow:
   nets:
     use_mace: true
     mace:
-      n_invariant_feat_hidden: 64
-      n_vectors_hidden: 24
+      n_invariant_feat_hidden: 32
+      n_vectors_hidden: 16
       bessel_number: 10  # Number of bessel functions.
       r_max: 10.
+      n_iteractions: 3
+      interaction_irreps: o3_full  # "o3_restricted",  # or o3_full
     egnn:
       mlp_units: [64,64]
       n_layers: 3
