@@ -4,13 +4,13 @@ from functools import partial
 import haiku as hk
 import jax.numpy as jnp
 import jax
-from mace_jax.tools.gin_model import bessel_basis, soft_envelope
 from mace_jax.data import get_neighborhood
 from mace_jax import tools
 import e3nn_jax as e3nn
 import chex
 
 from nets.mace_net_adjusted import MACE
+from utils.graph import get_senders_and_receivers_fully_connected
 
 class MACELayerConfig(NamedTuple):
     n_vectors_hidden: int
@@ -33,18 +33,6 @@ class MACEConfig(NamedTuple):
     zero_init_invariant_feat: bool
     layer_config: MACELayerConfig
 
-
-
-
-
-def get_senders_and_receivers(n_nodes: int):
-    senders = []
-    receivers = []
-    for i in range(n_nodes):
-        for j in range(n_nodes - 1):
-            senders.append(i)
-            receivers.append((i + 1 + j) % n_nodes)
-    return jnp.array(senders), jnp.array(receivers)
 
 class MaceNet(hk.Module):
     """A wrapper for MACE."""
@@ -80,8 +68,9 @@ class MaceNet(hk.Module):
             readout_mlp_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1e"),
             avg_num_neighbors=avg_num_neighbors,
             num_species=self.config.layer_config.num_species,
-            radial_basis=partial(bessel_basis, number=self.config.layer_config.bessel_number),
-            radial_envelope=soft_envelope
+            radial_basis=lambda length, max_length: e3nn.bessel(length, x_max=max_length,
+                                                                n=self.config.layer_config.bessel_number),
+            radial_envelope=e3nn.soft_envelope
         )
 
         # senders, receivers, shifts = get_neighborhood(
@@ -89,7 +78,7 @@ class MaceNet(hk.Module):
         # )
         # TODO: Above doesn't jit, so do manually below. Also need to understand what shifts is, and the arguments
         # into the above function.
-        senders, receivers = get_senders_and_receivers(x.shape[0])
+        senders, receivers = get_senders_and_receivers_fully_connected(x.shape[0])
         # As cell is set to None, shifts is not used in
         shifts = jnp.zeros_like(x) * jnp.nan
 
@@ -113,4 +102,4 @@ class MaceNet(hk.Module):
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(jax.nn.elu(invariant_features.array))
 
-        return vector_features+ centre_of_mass, invariant_features
+        return vector_features + centre_of_mass, invariant_features

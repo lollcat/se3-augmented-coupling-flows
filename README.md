@@ -11,3 +11,12 @@
 ListLogger that can may used if you don't want to use wandb.
 - `qmp.py` the whole folder is a copy and paste (with some small adjustments). The key file is `dataset.py` which 
 **MUST** be run before running `examples/qm9.py`.
+
+
+# TODO:
+    - Big rewrite: with jgraph and e3nn
+    - e3nn outputs are typically shift **invariant** rather than equivariant. 
+    The flow transforms should use this, which also allows for simplification. 
+        - For example, we no longer need to calculate vectors in such a hacky way, as this is the typical output. 
+        - For the projected flow, we can set the origin to the "current point" and then do (x + shift)*scale as 
+          our transform. This completely the pesky calculation of origin, and basis vectors - origin etc.  
