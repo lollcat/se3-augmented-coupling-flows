@@ -61,11 +61,11 @@ class MaceNet(hk.Module):
         # avg_num_neighbors defaults to fully connected.
         avg_num_neighbors = self.config.layer_config.avg_num_neighbors if self.config.layer_config.avg_num_neighbors else x.shape[0]
         mace_fn = MACE(
-            output_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1e"),
+            output_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1o"),
             r_max=self.config.layer_config.r_max,
             num_interactions=self.config.layer_config.n_interactions,
-            hidden_irreps=e3nn.Irreps(f"{self.config.layer_config.n_invariant_feat_hidden}x0e+{self.config.layer_config.n_vectors_hidden}x1e"),
-            readout_mlp_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1e"),
+            hidden_irreps=e3nn.Irreps(f"{self.config.layer_config.n_invariant_feat_hidden}x0e+{self.config.layer_config.n_vectors_hidden}x1o"),
+            readout_mlp_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1o"),
             avg_num_neighbors=avg_num_neighbors,
             num_species=self.config.layer_config.num_species,
             radial_basis=lambda length, max_length: e3nn.bessel(length, x_max=max_length,
@@ -93,7 +93,7 @@ class MaceNet(hk.Module):
 
         mace_output_irreps = mace_fn(
             vectors=vectors, node_specie=node_specie, senders=senders, receivers=receivers)
-        vector_features = mace_output_irreps.filter(keep=f"{self.config.n_vectors_readout}x1e")
+        vector_features = mace_output_irreps.filter(keep=f"{self.config.n_vectors_readout}x1o")
         vector_features = vector_features.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
         vector_features = vector_features.array
         invariant_features = mace_output_irreps.filter(keep=f"{self.config.n_invariant_feat_readout}x0e")
