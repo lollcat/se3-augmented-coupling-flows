@@ -14,6 +14,9 @@ ListLogger that can may used if you don't want to use wandb.
 
 
 # TODO:
+    - Move shift to come before scale.  
+    - Add small identity to basis vectors.
+    - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude
     - Big rewrite: with jgraph and e3nn
     - e3nn outputs are typically shift **invariant** rather than equivariant. 
     The flow transforms should use this, which also allows for simplification. 
