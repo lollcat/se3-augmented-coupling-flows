@@ -80,8 +80,9 @@ class EnTransformerBlock(hk.Module):
 
         radial_embedding = jax.vmap(self.radial_embedding, in_axes=-2)(lengths).axis_to_mul()
         if self.raw_distance_in_radial_embedding:
+            raw_dist_info = jax.nn.softmax(lengths, axis=-2)
             scalar_edge_features = e3nn.concatenate([radial_embedding, e3nn.IrrepsArray(f"{self.n_vectors_hidden}x0e",
-                                                                                    lengths)]).simplify()
+                                                                                    raw_dist_info)]).simplify()
         else:
             scalar_edge_features = radial_embedding
         if self.node_feat_as_edge_feat:
