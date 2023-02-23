@@ -38,7 +38,7 @@ flow:
       n_blocks: 3
       mlp_units: [32, 32]
       n_vectors_hidden: 8
-      n_invariant_feat_hidden: 64
+      n_invariant_feat_hidden: 16
       bessel_number: 10  # Number of bessel functions.
       r_max: 5.
     mace:
