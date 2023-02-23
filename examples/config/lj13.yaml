@@ -33,11 +33,18 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    use_mace: false
+    type: e3transformer # mace or egnn or e3transformer
+    e3transformer:
+      n_blocks: 3
+      mlp_units: [32, 32]
+      n_vectors_hidden: 8
+      n_invariant_feat_hidden: 64
+      bessel_number: 10  # Number of bessel functions.
+      r_max: 5.
     mace:
       n_invariant_feat_hidden: 16
       n_vectors_hidden: 16
-      bessel_number: int  # Number of bessel functions.
+      bessel_number: 10  # Number of bessel functions.
       r_max: 5.
     egnn:
       mlp_units: [32,32]
