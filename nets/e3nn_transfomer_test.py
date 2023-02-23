@@ -1,6 +1,7 @@
 import jax
 import haiku as hk
 import e3nn_jax as e3nn
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from nets.e3nn_transformer import EnTransformerConfig, EnTransformerBlock, \
@@ -28,13 +29,13 @@ def layer_test():
 
     layer_config = {}
     layer_config.update(
-        num_heads=2, n_vectors_hidden=n_vectors_hidden, n_invariant_feat_hidden=n_invariant_feat_hidden,
+        num_heads=1, n_vectors_hidden=n_vectors_hidden, n_invariant_feat_hidden=n_invariant_feat_hidden,
         bessel_number=3, r_max=max_radius, mlp_units=(4,))
 
     @hk.without_apply_rng
     @hk.transform
     def layer_fn(positions, features):
-        return EnTransformerBlock(*layer_config)(positions, features)
+        return EnTransformerBlock(**layer_config)(positions, features)
 
 
 
@@ -71,10 +72,18 @@ def transformer_test():
 
     params = forward_fn.init(subkey, positions)
     x_out, h_out = forward_fn.apply(params, positions)
-    plot_points_and_vectors(x_out[:, 0])
-    plot_points_and_vectors(x_out[:, 1])
-    plot_points_and_vectors(x_out[:, 2])
-    print(positions - x_out[:, 0])
+    origin = positions
+    vectors = x_out - origin[:, None, :]
+    vectors = vectors / jnp.linalg.norm(vectors, axis=-1, keepdims=True)
+    vec1 = vectors[:, 0]
+    vec2 = vectors[:, 1]
+    vec3 = vectors[:, 2]
+    vec4 = vectors[:, 4]
+    plot_points_and_vectors(vec1)
+    plot_points_and_vectors(vec2)
+    plot_points_and_vectors(vec3)
+    plot_points_and_vectors(vec4)
+    print(vec1)
     print((x_out[:, 0] - x_out[:, 2]) == 0)
     print((x_out[:, 1] - x_out[:, 2]) == 0)
     pass

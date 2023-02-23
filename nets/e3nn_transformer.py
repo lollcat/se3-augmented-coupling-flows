@@ -22,6 +22,8 @@ class EnTransformerBlock(hk.Module):
                 n_invariant_feat_hidden: int,
                 bessel_number: int,  # Number of bessel functions.
                 r_max: float,  # Used in bessel function.
+                raw_distance_in_radial_embedding: bool = True,
+                node_feat_as_edge_feat: bool = True,
                 activation_fn: Callable = jax.nn.selu,
                 num_species: int = 1,
                 sh_irreps_max_ell: int = 3):
@@ -32,6 +34,10 @@ class EnTransformerBlock(hk.Module):
         self.n_invariant_feat_hidden = n_invariant_feat_hidden
         self.bessel_number = bessel_number
         self.r_max = r_max
+        # Allows node featuers to go into edge MLP, similar to egnn.
+        self.node_feat_as_edge_feat = node_feat_as_edge_feat
+        # Whether to also pass in the length as 0e edge info.
+        self.raw_distance_in_radial_embedding = raw_distance_in_radial_embedding
         self.activation_fn = activation_fn
         self.num_species = num_species
         self.sh_irreps_max_ell = sh_irreps_max_ell
@@ -73,8 +79,22 @@ class EnTransformerBlock(hk.Module):
         sph_harmon = sph_harmon.axis_to_mul()
 
         radial_embedding = jax.vmap(self.radial_embedding, in_axes=-2)(lengths).axis_to_mul()
+        if self.raw_distance_in_radial_embedding:
+            scalar_edge_features = e3nn.concatenate([radial_embedding, e3nn.IrrepsArray(f"{self.n_vectors_hidden}x0e",
+                                                                                    lengths)]).simplify()
+        else:
+            scalar_edge_features = radial_embedding
+        if self.node_feat_as_edge_feat:
+            scalar_edge_features = e3nn.concatenate([
+                scalar_edge_features,
+                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", features[senders]),
+                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", features[receivers]),
+            ]).simplify()
+        scalar_edge_features = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
+                                                           act=self.activation_fn,
+                                                           output_activation=self.activation_fn)(scalar_edge_features)
 
-        edge_attr = e3nn.concatenate([radial_embedding, sph_harmon])
+        edge_attr = e3nn.concatenate([scalar_edge_features, sph_harmon]).simplify()
 
         # Setup as fully connected for now.
         edge_weight_cutoff = jnp.ones(vectors.shape[:1])  # e3nn.soft_envelope(vectors, x_max=self.r_max)
@@ -108,6 +128,8 @@ class EnTransformerTorsoConfig(NamedTuple):
     n_invariant_feat_hidden: int
     bessel_number: int  # Number of bessel functions.
     r_max: float  # Used in bessel function.
+    raw_distance_in_radial_embedding: bool = True
+    node_feat_as_edge_feat: bool = True
     num_heads: int = 1
     activation_fn: Callable = jax.nn.selu
     num_species: int = 1
@@ -124,7 +146,9 @@ class EnTransformerTorsoConfig(NamedTuple):
                         r_max = self.r_max,
                         activation_fn = self.activation_fn,
                         num_species = self.num_species,
-                        sh_irreps_max_ell= self.sh_irreps_max_ell
+                        sh_irreps_max_ell= self.sh_irreps_max_ell,
+                        raw_distance_in_radial_embedding=self.raw_distance_in_radial_embedding,
+                        node_feat_as_edge_feat=self.node_feat_as_edge_feat
         )
         return kwargs
 
