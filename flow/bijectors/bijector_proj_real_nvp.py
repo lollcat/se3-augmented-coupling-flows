@@ -119,6 +119,8 @@ def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
 
     origin = various_x_points[0]
     basis_vectors = various_x_points[1:] - origin[None, ...]
+    # Add independant vectors to try help improve numerical stability
+    basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]]*1e-6
 
     if global_frame:
         basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)

@@ -86,7 +86,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
                             global_frame: bool = False,
                             process_flow_params_jointly: bool = True,
                             use_mace: bool = True):
-    nets_config = NetsConfig(use_mace=use_mace,
+    nets_config = NetsConfig(type='mace' if use_mace else "egnn",
                              mace_lay_config=MACELayerConfig(
                                  bessel_number=5,
                                  n_vectors_hidden=3,
