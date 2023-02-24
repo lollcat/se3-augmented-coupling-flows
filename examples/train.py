@@ -16,7 +16,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 
-from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
+from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig
 from nets.en_gnn import EgnnTorsoConfig
 from nets.transformer import TransformerConfig
@@ -169,7 +169,7 @@ class TrainConfig(NamedTuple):
     n_epoch: int
     dim: int
     n_nodes: int
-    flow_dist_config: EquivariantFlowDistConfig
+    flow_dist_config: FlowDistConfig
     aug_target_global_centering: bool
     aug_target_scale: float
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
@@ -229,7 +229,7 @@ def create_flow_config(flow_cfg: DictConfig):
     nets_config = create_nets_config(flow_cfg.pop("nets"))
     base_config = dict(flow_cfg.pop("base"))
     base_config = BaseConfig(**base_config)
-    flow_dist_config = EquivariantFlowDistConfig(
+    flow_dist_config = FlowDistConfig(
         **flow_cfg,
         nets_config=nets_config,
         base_config=base_config,

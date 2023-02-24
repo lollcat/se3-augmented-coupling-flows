@@ -51,7 +51,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Flow
     cfg.target.aug_global_centering = False
-    cfg.flow.type = ['proj']
+    cfg.flow.type = ['realnvp_non_eq']
     cfg.flow.n_layers = 4
     cfg.flow.act_norm = False
 

@@ -4,7 +4,7 @@ import jax
 import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, bijector_test
-from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
+from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
 from nets.en_gnn import HConfig, EgnnConfig, TransformerConfig
 
 
@@ -25,7 +25,7 @@ def test_distribution(dim = 3):
                              trainable_augmented_scale=False)
 
 
-    config = EquivariantFlowDistConfig(
+    config = FlowDistConfig(
         dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
@@ -76,7 +76,7 @@ def test_flow(dim=3):
     base_config = BaseConfig(double_centrered_gaussian=False, global_centering=False,
                              trainable_augmented_scale=False)
 
-    config = EquivariantFlowDistConfig(
+    config = FlowDistConfig(
         dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
         egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(

@@ -7,6 +7,7 @@ from flow.bijectors.bijector_proj_real_nvp_v2 import make_se_equivariant_split_c
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
 from flow.bijectors.bijector_pseudo_act_norm import make_pseudo_act_norm_bijector
 from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
+from flow.bijectors.bijector_real_nvp_non_equivariant import make_realnvp
 from nets.base import NetsConfig
 from flow.fast_hk_chain import Chain
 
@@ -18,7 +19,7 @@ class BaseConfig(NamedTuple):
     aug_scale_init: float = 1.0
 
 
-class EquivariantFlowDistConfig(NamedTuple):
+class FlowDistConfig(NamedTuple):
     dim: int
     nodes: int
     n_layers: int
@@ -33,14 +34,14 @@ class EquivariantFlowDistConfig(NamedTuple):
 
 
 
-def make_equivariant_augmented_flow_dist(config: EquivariantFlowDistConfig):
+def make_equivariant_augmented_flow_dist(config: FlowDistConfig):
     if config.fast_compile:
         return make_equivariant_augmented_flow_dist_fast_compile(config)
     else:
         return make_equivariant_augmented_flow_dist_distrax_chain(config)
 
 
-def make_equivariant_augmented_flow_dist_fast_compile(config: EquivariantFlowDistConfig):
+def make_equivariant_augmented_flow_dist_fast_compile(config: FlowDistConfig):
     flow_type = [config.type] if isinstance(config.type, str) else config.type
 
     if not ("proj" in config.kwargs.keys() or "proj_v2" in config.kwargs.keys()):
@@ -66,6 +67,12 @@ def make_equivariant_augmented_flow_dist_fast_compile(config: EquivariantFlowDis
                 layer_number=layer_number, dim=config.dim, flow_identity_init=config.identity_init))
 
         for swap in (True, False):  # For swap False we condition augmented on original.
+            if 'realnvp_non_eq' in flow_type:
+                assert len(flow_type) == 1
+                bijector = make_realnvp(layer_number=layer_number, dim=config.dim, swap=swap,
+                                        nets_config=config.nets_config,
+                                        identity_init=config.identity_init)
+                bijectors.append(bijector)
             if "vector_scale" in flow_type:
                 bijector = make_se_equivariant_scale_along_vector(layer_number=layer_number, dim=config.dim, swap=swap,
                                                                   identity_init=config.identity_init,
@@ -103,7 +110,7 @@ def make_equivariant_augmented_flow_dist_fast_compile(config: EquivariantFlowDis
 
 
 
-def make_equivariant_augmented_flow_dist_distrax_chain(config: EquivariantFlowDistConfig):
+def make_equivariant_augmented_flow_dist_distrax_chain(config: FlowDistConfig):
     flow_type = [config.type] if isinstance(config.type, str) else config.type
 
     if not ("proj" in config.kwargs.keys() or "proj_v2" in config.kwargs.keys()):

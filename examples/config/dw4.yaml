@@ -8,7 +8,7 @@ hydra:
 target:
   aug_global_centering: false
   aug_scale: 1.0
-  custom_samples: true
+  custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
 
@@ -20,7 +20,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: [proj,]  # vector_scale  vector_scale nice proj   proj_v2
+  type: [proj,]  # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
   kwargs:
     proj:
       global_frame: false
