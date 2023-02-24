@@ -25,7 +25,7 @@ flow:
       process_flow_params_jointly: false
       condition_on_x_proj: true
       gram_schmidt: false
-      add_small_identity: false
+      add_small_identity: true
     proj_v2:
       process_flow_params_jointly: false
       condition_on_x_proj: true
@@ -73,6 +73,8 @@ flow:
 
 
 training:
+  use_equivariance_loss: true
+  equivariance_loss_weight: 1000.0
   optimizer:
     init_lr: 1e-5
     optimizer_name: adam

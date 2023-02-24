@@ -182,6 +182,8 @@ class TrainConfig(NamedTuple):
     n_eval: int
     n_checkpoints: int
     plot_batch_size: int
+    use_equivariance_loss: bool = False
+    equivariance_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
     reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
@@ -336,10 +338,12 @@ def train(config: TrainConfig):
 
     if config.scan_run:
         def scan_fn(carry, xs):
-            params, opt_state = carry
+            params, opt_state, key = carry
+            key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
-            return (params, opt_state), info
+            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer, subkey,
+                                              config.use_equivariance_loss, config.equivariance_loss_weight)
+            return (params, opt_state, key), info
 
     pbar = tqdm(range(config.n_epoch))
 
@@ -354,7 +358,7 @@ def train(config: TrainConfig):
 
         if config.scan_run:
             batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
-            (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=1)
+            (params, opt_state, key), infos = jax.lax.scan(scan_fn, (params, opt_state, key), batched_data, unroll=1)
 
             for batch_index in range(batched_data.shape[0]):
                 info = jax.tree_map(lambda x: x[batch_index], infos)
@@ -367,7 +371,11 @@ def train(config: TrainConfig):
                     print("nan grad")
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
+                key, subkey = jax.random.split(key)
+                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer,
+                                                  subkey,
+                                                  config.use_equivariance_loss, config.equivariance_loss_weight
+                                                  )
                 config.logger.write(info)
                 info.update(epoch=i)
                 if jnp.isnan(info["grad_norm"]):

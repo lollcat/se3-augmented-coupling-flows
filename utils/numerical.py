@@ -104,4 +104,16 @@ def gram_schmidt_fn(vectors: List[chex.Array]):
     return orthonormal_vectors
 
 
+def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
+    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
+    x_rot = rotate_translate_permute_2d(x, theta, translation)
+    a_rot = rotate_translate_permute_2d(a, theta, translation)
+    return jnp.concatenate([x_rot, a_rot], axis=-1)
+
+def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
+    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
+    x_rot = rotate_translate_permute_3d(x, theta, phi, translation)
+    a_rot = rotate_translate_permute_3d(a, theta, phi, translation)
+    return jnp.concatenate([x_rot, a_rot], axis=-1)
+
 

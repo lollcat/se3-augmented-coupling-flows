@@ -7,13 +7,55 @@ import optax
 
 from flow.base_dist import get_conditional_gaussian_augmented_dist
 from flow.test_utils import get_max_diff_log_prob_invariance_test
+from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+
+
+
+def general_ml_loss_fn(params, x, log_prob_fn, key, use_equivariance_loss, weight):
+    if use_equivariance_loss:
+        loss, info = ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight)
+    else:
+        loss, info = ml_loss_fn(params, x, log_prob_fn)
+    return loss, info
 
 
 def ml_loss_fn(params, x, log_prob_fn):
     log_prob = log_prob_fn.apply(params, x)
     loss = - jnp.mean(log_prob)
-    info = {"loss": loss}
+    info = {"ml_loss": loss}
     return loss, info
+
+def ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight, batch_size_frac = 0.1):
+    batch_size, n_nodes, dim = x.shape
+    dim = dim // 2  # Account for augmentd coords.
+
+    # ML loss.
+    log_prob = log_prob_fn.apply(params, x)
+    ml_loss = - jnp.mean(log_prob)
+    info = {"loss_ml": ml_loss}
+
+    # Equivariance loss.
+    key1, key2, key3 = jax.random.split(key, 3)
+    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
+    translation = jax.random.normal(key2, shape=(batch_size, dim))
+    phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
+
+    def group_action(x_and_a):
+        if dim == 2:
+            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
+        else:
+            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
+        return x_and_a_rot
+
+    eq_batch_size = max(1, int(batch_size * batch_size_frac))
+    log_prob_g = log_prob_fn.apply(params, group_action(x[:eq_batch_size]))
+    eq_loss = jnp.mean((log_prob_g - log_prob[:eq_batch_size])**2)
+    info.update(loss_equivariance=eq_loss)
+
+    loss = eq_loss*weight + ml_loss
+    info.update(loss=loss)
+    return loss, info
+
 
 def get_tree_leaf_norm_info(tree):
     norms = jax.tree_util.tree_map(jnp.linalg.norm, tree)
@@ -28,8 +70,9 @@ def get_tree_leaf_norm_info(tree):
     return info
 
 
-def ml_step(params, x, opt_state, log_prob_fn, optimizer):
-    grad, info = jax.grad(ml_loss_fn, has_aux=True)(params, x, log_prob_fn)
+def ml_step(params, x, opt_state, log_prob_fn, optimizer, key, use_equivariance_loss, eq_loss_weight):
+    grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
+        params, x, log_prob_fn, key, use_equivariance_loss, eq_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
     new_params = optax.apply_updates(params, updates)
     info.update(grad_norm=optax.global_norm(grad),
