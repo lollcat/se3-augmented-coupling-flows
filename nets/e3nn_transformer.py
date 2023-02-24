@@ -22,8 +22,8 @@ class EnTransformerBlock(hk.Module):
                 n_invariant_feat_hidden: int,
                 bessel_number: int,  # Number of bessel functions.
                 r_max: float,  # Used in bessel function.
-                raw_distance_in_radial_embedding: bool = True,
-                node_feat_as_edge_feat: bool = True,
+                raw_distance_in_radial_embedding: bool = False,
+                node_feat_as_edge_feat: bool = False,
                 activation_fn: Callable = jax.nn.silu,
                 num_species: int = 1,
                 sh_irreps_max_ell: int = 3):
@@ -129,8 +129,8 @@ class EnTransformerTorsoConfig(NamedTuple):
     n_invariant_feat_hidden: int
     bessel_number: int  # Number of bessel functions.
     r_max: float  # Used in bessel function.
-    raw_distance_in_radial_embedding: bool = True
-    node_feat_as_edge_feat: bool = True
+    raw_distance_in_radial_embedding: bool = False
+    node_feat_as_edge_feat: bool = False
     num_heads: int = 1
     activation_fn: Callable = jax.nn.silu
     num_species: int = 1

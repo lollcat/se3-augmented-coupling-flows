@@ -40,7 +40,7 @@ flow:
       n_vectors_hidden: 8
       n_invariant_feat_hidden: 16
       bessel_number: 10  # Number of bessel functions.
-      r_max: 5.
+      r_max: 10.
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     mace:

@@ -14,8 +14,7 @@ ListLogger that can may used if you don't want to use wandb.
 
 
 # TODO:
-    - Passing both the node and edge 0e part into a MLP seems to make sense?
-    - Add non-equivariant flow. 
+    - Add non-equivariant flow.
     - Move shift to come before scale.  
     - Add small identity to basis vectors.
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude
