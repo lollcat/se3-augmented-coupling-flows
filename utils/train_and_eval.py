@@ -35,10 +35,11 @@ def ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight, batch_size_
     info = {"loss_ml": ml_loss}
 
     # Equivariance loss.
+    eq_batch_size = max(1, int(batch_size * batch_size_frac))
     key1, key2, key3 = jax.random.split(key, 3)
-    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
-    translation = jax.random.normal(key2, shape=(batch_size, dim))
-    phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
+    theta = jax.random.uniform(key1, shape=(eq_batch_size,)) * 2 * jnp.pi
+    translation = jax.random.normal(key2, shape=(eq_batch_size, dim))
+    phi = jax.random.uniform(key3, shape=(eq_batch_size,)) * 2 * jnp.pi
 
     def group_action(x_and_a):
         if dim == 2:
@@ -47,7 +48,7 @@ def ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight, batch_size_
             x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
         return x_and_a_rot
 
-    eq_batch_size = max(1, int(batch_size * batch_size_frac))
+
     log_prob_g = log_prob_fn.apply(params, group_action(x[:eq_batch_size]))
     eq_loss = jnp.mean((log_prob_g - log_prob[:eq_batch_size])**2)
     info.update(loss_equivariance=eq_loss)
