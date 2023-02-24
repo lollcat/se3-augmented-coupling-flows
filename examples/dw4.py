@@ -51,7 +51,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Flow
     cfg.target.aug_global_centering = False
-    cfg.flow.type = ['realnvp_non_eq']
+    # cfg.flow.type = ['realnvp_non_eq']
     cfg.flow.n_layers = 4
     cfg.flow.act_norm = False
 
@@ -82,6 +82,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
+    assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
     local_config = True
     if local_config:
         print("running locally")

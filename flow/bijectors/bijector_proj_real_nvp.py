@@ -111,7 +111,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
+def get_new_space_basis(x: chex.Array, various_x_points: chex.Array, gram_schmidt: bool, global_frame: bool,
+                        add_small_identity: bool = False):
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
@@ -119,8 +120,10 @@ def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
 
     origin = various_x_points[0]
     basis_vectors = various_x_points[1:] - origin[None, ...]
-    # Add independant vectors to try help improve numerical stability
-    basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]]*1e-6
+
+    if add_small_identity:
+        # Add independant vectors to try help improve numerical stability
+        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]][None, None, :]*1e-6
 
     if global_frame:
         basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
@@ -172,6 +175,7 @@ def make_conditioner(
         mlp_function: Optional[Callable] = None,
         gram_schmidt: bool = False,
         condition_on_x_proj: bool = False,
+        add_small_identity: bool = False,
                      ):
     if process_flow_params_jointly:
         assert permutation_equivariant_fn is not None
@@ -185,7 +189,8 @@ def make_conditioner(
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
 
-        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame)
+        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
+                                                             add_small_identity=add_small_identity)
 
         if global_frame:
             inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
@@ -239,13 +244,16 @@ def make_conditioner(
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
+def make_se_equivariant_split_coupling_with_projection(layer_number,
+                                                       dim,
+                                                       swap,
                                                        nets_config: NetsConfig,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
+                                                       add_small_identity: bool = False
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
@@ -292,7 +300,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
         multi_x_equivariant_fn=equivariant_fn,
         permutation_equivariant_fn=permutation_equivariant_fn,
         gram_schmidt=gram_schmidt,
-        condition_on_x_proj=condition_on_x_proj
+        condition_on_x_proj=condition_on_x_proj,
+        add_small_identity=add_small_identity
     )
 
     return distrax.SplitCoupling(

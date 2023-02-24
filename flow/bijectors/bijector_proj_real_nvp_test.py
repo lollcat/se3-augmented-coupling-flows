@@ -144,12 +144,14 @@ if __name__ == '__main__':
     for global_frame in [False, True]:
         for process_jointly in [False, True]:
             print(f"running tests for global-frame={global_frame}, process jointly={process_jointly}")
+            test_bijector_with_proj(dim=3, process_flow_params_jointly=process_jointly, global_frame=global_frame,
+                                    gram_schmidt=gram_schmidt, use_mace=use_mace)
+            print("passed 3D test")
+
             if not use_mace:
                 test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
                                         gram_schmidt=gram_schmidt, use_mace=use_mace)
                 print("passed 2D test")
 
-            test_bijector_with_proj(dim=3, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                    gram_schmidt=gram_schmidt, use_mace=use_mace)
-            print("passed 3D test")
+
 
