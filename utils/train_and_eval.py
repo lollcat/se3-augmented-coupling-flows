@@ -106,13 +106,21 @@ def get_augmented_log_prob(x_original, x_augmented, global_centering, aug_scale)
     return log_p_a
 
 
-def get_marginal_log_lik(log_prob_fn, x_original, key, global_centering, aug_scale, K: int):
+def get_marginal_log_lik_info(log_prob_fn, x_original, key, global_centering, aug_scale, K: int) -> dict:
     x_augmented, log_p_a = get_augmented_sample_and_log_prob(x_original, global_centering, aug_scale,
                                                              key, K)
-    x_original = jnp.stack([x_original]*K, axis=0)
+    x_original = jnp.repeat(x_original[None, ...], K, axis=0)
     log_q = jax.vmap(log_prob_fn)(jnp.concatenate((x_original, x_augmented), axis=-1))
     chex.assert_equal_shape((log_p_a, log_q))
-    return jnp.mean(jax.nn.logsumexp(log_q - log_p_a, axis=0) - jnp.log(jnp.array(K)))
+    log_w = log_q - log_p_a
+
+    info = {}
+    marginal_log_lik = jnp.mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)), axis=0)
+    info.update(marginal_log_lik=marginal_log_lik)
+
+    info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
+    info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]))
+    return info
 
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8, 9))
@@ -144,12 +152,12 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
             info.update(invariances_info)
 
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
-        marginal_log_lik_batch = get_marginal_log_lik(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
-                                                      x_original=x_batch[..., :dim], key=key, K=K,
-                                                      global_centering=global_centering,
-                                                      aug_scale=aug_scale)
-        info.update(eval_log_lik = jnp.mean(log_prob_batch),
-                    eval_marginal_log_lik=jnp.mean(marginal_log_lik_batch))
+        marginal_log_lik_info = get_marginal_log_lik_info(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
+                                                           x_original=x_batch[..., :dim], key=key, K=K,
+                                                           global_centering=global_centering,
+                                                           aug_scale=aug_scale)
+        info.update(eval_log_lik = jnp.mean(log_prob_batch))
+        info.update(marginal_log_lik_info)
         return None, info
 
     x_batched = jnp.reshape(x, (-1, batch_size, *x.shape[1:]))
