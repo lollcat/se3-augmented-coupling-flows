@@ -15,7 +15,7 @@ flow:
     double_centered_gaussian: false
   dim: 3
   nodes: 19
-  n_layers: 10
+  n_layers: 12
   identity_init: true
   type: [proj,]  # vector_scale_shift  vector_scale nice proj
   act_norm: false
@@ -73,8 +73,6 @@ flow:
 
 
 training:
-  use_equivariance_loss: true
-  equivariance_loss_weight: 1000.0
   optimizer:
     init_lr: 1e-5
     optimizer_name: adam
@@ -84,7 +82,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
   use_64_bit: false
-  n_epoch: 64
+  n_epoch: 128
   batch_size: 32
   plot_batch_size: 64
   seed: 0
@@ -97,11 +95,13 @@ training:
   K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
+  use_equivariance_loss: false
+  equivariance_loss_weight: 1000.0
 
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_proj_flow_with_identity # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

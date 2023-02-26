@@ -14,8 +14,10 @@ ListLogger that can may used if you don't want to use wandb.
 
 
 # TODO:
+    - Check variance of marginal log prob estimate. 
+    - Cut down number of forward passes during evaluation.
     - Move shift to come before scale?
-    - Add small identity to basis vectors.
+    - think of directly parameterizing the basis (3 free params) for the proj flow. 
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
     - Big rewrite: with jgraph and e3nn
     - e3nn outputs are typically shift **invariant** rather than equivariant. 

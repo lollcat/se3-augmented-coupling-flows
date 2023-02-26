@@ -122,6 +122,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
             target_log_prob = None,
             batch_size=None,
             K: int = 20, test_invariances: bool = True):
+    # TODO: Has excessive amount of forward passes currently, cut this down.
     if batch_size is None:
         batch_size = x.shape[0]
     else:

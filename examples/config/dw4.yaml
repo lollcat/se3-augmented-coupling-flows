@@ -71,8 +71,6 @@ flow:
 
 
 training:
-  use_equivariance_loss: false
-  equivariance_loss_weight: 1000.0
   optimizer:
     init_lr: 1e-5
     optimizer_name: adam
@@ -95,6 +93,8 @@ training:
   K_marginal_log_lik: 20
   save: true
   save_dir: dw4_results
+  use_equivariance_loss: false
+  equivariance_loss_weight: 1000.0
 
 logger:
 #  list_logger: null
