@@ -16,15 +16,18 @@ ListLogger that can may used if you don't want to use wandb.
 # TODO:
 
 ## Burning
+    - Add code that allows visualisation of what's happening in the flow.
     - Rewrite for e3nn
         1. Write EGNN with e3nn, retain MACE performance
         2. Let networks take in positional and feature info.
         3. Alanine dipeptide
     - Code diffusion/CNF
     - Rewrite with jgraph, generalise to varying number of nodes
+    - Add more augmented variables.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
 
 ## Less burning
+    - Spline flows
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
     - e3nn outputs are typically shift **invariant** rather than equivariant. 
     The flow transforms should use this, which also allows for simplification. 
