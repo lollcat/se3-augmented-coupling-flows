@@ -82,9 +82,9 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
   use_64_bit: false
-  n_epoch: 128
+  n_epoch: 256
   batch_size: 32
-  plot_batch_size: 64
+  plot_batch_size: 256
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null

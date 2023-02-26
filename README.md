@@ -14,14 +14,24 @@ ListLogger that can may used if you don't want to use wandb.
 
 
 # TODO:
-    - Check variance of marginal log prob estimate. 
-    - Cut down number of forward passes during evaluation.
-    - Move shift to come before scale?
-    - think of directly parameterizing the basis (3 free params) for the proj flow. 
+
+## Burning
+    - Rewrite for e3nn
+        1. Write EGNN with e3nn, retain MACE performance
+        2. Let networks take in positional and feature info.
+        3. Alanine dipeptide
+    - Code diffusion/CNF
+    - Rewrite with jgraph, generalise to varying number of nodes
+    - Think of directly parameterizing the basis (3 free params) for the proj flow. 
+
+## Less burning
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
-    - Big rewrite: with jgraph and e3nn
     - e3nn outputs are typically shift **invariant** rather than equivariant. 
     The flow transforms should use this, which also allows for simplification. 
         - For example, we no longer need to calculate vectors in such a hacky way, as this is the typical output. 
         - For the projected flow, we can set the origin to the "current point" and then do (x + shift)*scale as 
           our transform. This completely the pesky calculation of origin, and basis vectors - origin etc.  
+    - Cut down number of forward passes during evaluation.
+    - Move shift to come before scale?
+    - Seems like we could try enforce q(x, a) \propto p(a) = N(\mu=x, \sigma) in an additional loss?
+      This would help decrease the variance in the estimate of the marginal q(x) = E_{p(a)}[q(x, a)/p(a)]. 
