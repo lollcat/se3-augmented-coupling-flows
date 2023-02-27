@@ -53,7 +53,6 @@ class MaceNet(hk.Module):
 
     def call_single(self, x):
         """We manually keep track of the centre of mass to ensure translation equivariance."""
-        centre_of_mass = jnp.mean(x, axis=-2)
         chex.assert_rank(x, 2)
         # vectors: jnp.ndarray,  # [n_edges, 3]
         # node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
@@ -105,4 +104,4 @@ class MaceNet(hk.Module):
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(jax.nn.elu(invariant_features.array))
 
-        return vector_features + centre_of_mass[:, None], invariant_features
+        return vector_features, invariant_features

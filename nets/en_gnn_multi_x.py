@@ -240,4 +240,4 @@ class multi_se_equivariant_net(hk.Module):
         h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
         h_out = self.h_final_layer(h_out)
-        return x_out, h_out
+        return x_out - x_original[:, None], h_out

@@ -187,7 +187,7 @@ class EnGNN(hk.Module):
     
     def forward_single(self, x):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
-
+        x_in = x
         # Perform forward pass of EGNN.
 
         # No node feature, so initialise them invariant fn of x.
@@ -232,4 +232,4 @@ class EnGNN(hk.Module):
         h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
         h_out = self.h_final_layer(h_out)
-        return x_out, h_out
+        return x_out - x_in, h_out

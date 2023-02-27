@@ -145,10 +145,9 @@ class E3Gnn(hk.Module):
             return hk.vmap(self.call_single, split_rng=False)(x)
 
     def call_single(self, x):
-        center_of_mass = jnp.mean(x, axis=0, keepdims=True)
         n_nodes = x.shape[0]
         h = jnp.ones((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
-        vectors = x - center_of_mass
+        vectors = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
@@ -178,8 +177,8 @@ class E3Gnn(hk.Module):
         # Get vector features.
         vector_features = out.filter(keep=f"{self.config.n_vectors_readout}x1o")
         vector_features = vector_features.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
-        vector_features = vector_features.array
-        chex.assert_shape(vector_features, (n_nodes, self.config.n_vectors_readout, 3))
+        vectors_out = vector_features.array
+        chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
 
         # Get scalar features.
         invariant_features = out.filter(keep=f"{self.config.n_vectors_readout}x0e")
@@ -189,5 +188,4 @@ class E3Gnn(hk.Module):
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(invariant_features.array)
 
-        positions_out = vector_features + center_of_mass[:, None]
-        return positions_out, invariant_features
+        return vectors_out, invariant_features
