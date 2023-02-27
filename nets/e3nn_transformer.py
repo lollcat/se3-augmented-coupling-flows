@@ -26,8 +26,10 @@ class EnTransformerBlock(hk.Module):
                 node_feat_as_edge_feat: bool = False,
                 activation_fn: Callable = jax.nn.silu,
                 num_species: int = 1,
-                sh_irreps_max_ell: int = 3):
+                sh_irreps_max_ell: int = 3,
+                residual_h: bool = True):
         super().__init__()
+        self.residual_h = residual_h
         self.num_heads = num_heads
         self.mlp_units = mlp_units
         self.n_vectors_hidden = n_vectors_hidden
@@ -66,16 +68,16 @@ class EnTransformerBlock(hk.Module):
             num_heads=num_heads
         )
 
-    def __call__(self, positions, features):
-        chex.assert_tree_shape_suffix(features, (self.n_invariant_feat_hidden,))
-        chex.assert_tree_shape_suffix(positions, (self.n_vectors_hidden, 3))
-        senders, receivers = get_senders_and_receivers_fully_connected(positions.shape[0])
+    def __call__(self, node_vectors, node_features):
+        chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
+        chex.assert_tree_shape_suffix(node_vectors, (self.n_vectors_hidden, 3))
+        senders, receivers = get_senders_and_receivers_fully_connected(node_vectors.shape[0])
 
         # Prepare the edge attributes.
-        vectors = positions[senders] - positions[receivers]
-        lengths = safe_norm(vectors, axis=-1)
+        edge_vectors = node_vectors[senders] - node_vectors[receivers]
+        lengths = safe_norm(edge_vectors, axis=-1)
 
-        sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(vectors / lengths[..., None])
+        sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(edge_vectors / lengths[..., None])
         sph_harmon = sph_harmon.axis_to_mul()
 
         radial_embedding = jax.vmap(self.radial_embedding, in_axes=-2)(lengths).axis_to_mul()
@@ -88,8 +90,8 @@ class EnTransformerBlock(hk.Module):
         if self.node_feat_as_edge_feat:
             scalar_edge_features = e3nn.concatenate([
                 scalar_edge_features,
-                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", features[senders]),
-                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", features[receivers]),
+                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", node_features[senders]),
+                e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", node_features[receivers]),
             ]).simplify()
         scalar_edge_features = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
                                                            act=self.activation_fn,
@@ -98,9 +100,9 @@ class EnTransformerBlock(hk.Module):
         edge_attr = e3nn.concatenate([scalar_edge_features, sph_harmon]).simplify()
 
         # Setup as fully connected for now.
-        edge_weight_cutoff = jnp.ones(vectors.shape[:1])  # e3nn.soft_envelope(vectors, x_max=self.r_max)
+        edge_weight_cutoff = jnp.ones(edge_vectors.shape[:1])  # e3nn.soft_envelope(vectors, x_max=self.r_max)
 
-        transformer_feat_in = e3nn.IrrepsArray(self.feature_irreps, features)
+        transformer_feat_in = e3nn.IrrepsArray(self.feature_irreps, node_features)
         # Pass through transformer.
         transformer_out = self.transformer_fn(edge_src=senders, edge_dst=receivers,
                                               edge_weight_cutoff=edge_weight_cutoff,
@@ -116,9 +118,11 @@ class EnTransformerBlock(hk.Module):
         invariant_features = hk.nets.MLP((*self.mlp_units, self.n_invariant_feat_hidden),
                                          activation=self.activation_fn)(invariant_features.array)
 
-        # Residual connections, then output.
-        position_out = vector_features + positions
-        features_out = invariant_features + features
+        position_out = vector_features
+        if self.residual_h:
+            features_out = invariant_features + node_features
+        else:
+            features_out = invariant_features
         return position_out, features_out
 
 
@@ -136,6 +140,7 @@ class EnTransformerTorsoConfig(NamedTuple):
     num_species: int = 1
     sh_irreps_max_ell: int = 3
     layer_stack: bool = True
+    residual_h: bool = True
 
     def get_transformer_layer_kwargs(self):
         kwargs = {}
@@ -149,7 +154,8 @@ class EnTransformerTorsoConfig(NamedTuple):
                         num_species = self.num_species,
                         sh_irreps_max_ell= self.sh_irreps_max_ell,
                         raw_distance_in_radial_embedding=self.raw_distance_in_radial_embedding,
-                        node_feat_as_edge_feat=self.node_feat_as_edge_feat
+                        node_feat_as_edge_feat=self.node_feat_as_edge_feat,
+                        residual_h=self.residual_h
         )
         return kwargs
 
@@ -179,21 +185,22 @@ class EnTransformer(hk.Module):
             return hk.vmap(self.call_single, split_rng=False)(x)
 
     def call_single(self, x):
+        center_of_mass = jnp.mean(x, axis=0, keepdims=True)
         n_nodes = x.shape[0]
         h = jnp.ones((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
-        x = jnp.stack([x]*self.config.torso_config.n_vectors_hidden, axis=-2)
+        vectors = x - center_of_mass
+        vectors = jnp.repeat(vectors[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
         if self.config.torso_config.layer_stack:
             stack = hk.experimental.layer_stack(self.config.torso_config.n_blocks, with_per_layer_inputs=False,
                                                 name="EGCL_layer_stack")
-            x, h = stack(self.transformer_block_fn)(x, h)
+            vectors, h = stack(self.transformer_block_fn)(vectors, h)
         else:
             for i in range(self.config.torso_config.n_blocks):
-                x, h = self.transformer_block_fn(x, h)
+                vectors, h = self.transformer_block_fn(vectors, h)
 
         # Get vector features for final layer.
-        center_of_mass = jnp.mean(x, axis=-2, keepdims=True)
-        vector_feat = e3nn.IrrepsArray('1x1o', x - center_of_mass)
+        vector_feat = e3nn.IrrepsArray('1x1o', vectors)
         vector_feat = vector_feat.axis_to_mul(axis=-2)
         assert vector_feat.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
 
@@ -216,6 +223,6 @@ class EnTransformer(hk.Module):
         invariant_features = hk.Linear(invariant_features.shape[-1],
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(jax.nn.elu(invariant_features.array))
-        return vector_features + center_of_mass, invariant_features
+        return vector_features + center_of_mass[:, None, :], invariant_features
 
 

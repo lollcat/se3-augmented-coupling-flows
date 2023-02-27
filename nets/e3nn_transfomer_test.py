@@ -6,19 +6,7 @@ import matplotlib.pyplot as plt
 
 from nets.e3nn_transformer import EnTransformerConfig, EnTransformerBlock, \
     EnTransformer, EnTransformerTorsoConfig
-
-
-def plot_points_and_vectors(positions, max_radius = 1000.):
-    senders, receivers = e3nn.radius_graph(positions, r_max=max_radius)
-    vectors = positions[senders] - positions[receivers]
-
-    ax = plt.figure().add_subplot(projection='3d')
-    ax.scatter(positions[:, 0], positions[:, 1], positions[:, 2], s=20)
-    ax.quiver(positions[receivers, 0], positions[receivers, 1], positions[receivers, 2],
-              vectors[:, 0], vectors[:, 1], vectors[:, 2], alpha=0.4)
-              # headwidth=2, headlength=2)
-    plt.show()
-
+from utils.plotting import plot_points_and_vectors
 
 def layer_test():
     dim = 3
@@ -72,18 +60,13 @@ def transformer_test():
 
     params = forward_fn.init(subkey, positions)
     x_out, h_out = forward_fn.apply(params, positions)
-    origin = positions
-    vectors = x_out - origin[:, None, :]
-    vectors = vectors / jnp.linalg.norm(vectors, axis=-1, keepdims=True)
-    vec1 = vectors[:, 0]
-    vec2 = vectors[:, 1]
-    vec3 = vectors[:, 2]
-    vec4 = vectors[:, 4]
-    plot_points_and_vectors(vec1)
-    plot_points_and_vectors(vec2)
-    plot_points_and_vectors(vec3)
-    plot_points_and_vectors(vec4)
-    print(vec1)
+    vectors = x_out - jnp.mean(x_out, axis=(0, 1), keepdims=True)
+    fig, ax = plot_points_and_vectors(vectors)
+    ax.set_title("vectors out")
+    plt.show()
+    fig, ax = plot_points_and_vectors(vectors / jnp.linalg.norm(vectors, axis=-1, keepdims=True))
+    ax.set_title("vectors out normalised")
+    plt.show()
     print((x_out[:, 0] - x_out[:, 2]) == 0)
     print((x_out[:, 1] - x_out[:, 2]) == 0)
     pass

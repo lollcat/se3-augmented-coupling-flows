@@ -1,30 +1,12 @@
 import chex
 import jax
 import haiku as hk
-import e3nn_jax as e3nn
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from nets.e3_gnn import EGCL, E3GNNConfig, E3GNNTorsoConfig, E3Gnn
 from utils.numerical import rotate_translate_permute_3d
-
-def plot_points_and_vectors(positions, max_radius = 1000.):
-    senders, receivers = e3nn.radius_graph(positions, r_max=max_radius)
-    vectors = positions[senders] - positions[receivers]
-
-    ax = plt.figure().add_subplot(projection='3d')
-    if len(positions.shape) == 2:
-        ax.scatter(positions[:, 0], positions[:, 1], positions[:, 2], s=20)
-        ax.quiver(positions[receivers, 0], positions[receivers, 1], positions[receivers, 2],
-                  vectors[:, 0], vectors[:, 1], vectors[:, 2], alpha=0.4)
-    else:
-        assert len(positions.shape) == 3
-        c = ['red', 'green', 'blue', 'cyan']
-        for i in range(positions.shape[1]):
-            ax.scatter(positions[:, i, 0], positions[:, i, 1], positions[:, i, 2], s=20, color=c[i])
-            ax.quiver(positions[receivers, i, 0], positions[receivers, i, 1], positions[receivers, i, 2],
-                      vectors[:, i, 0], vectors[:, i, 1], vectors[:, i, 2], alpha=0.4, color=c[i])
-    plt.show()
+from utils.plotting import plot_points_and_vectors
 
 
 def layer_test():
@@ -68,18 +50,21 @@ def layer_test():
         x_rot = rotate_translate_permute_3d(x, theta, phi, translation, permute=False)
         return x_rot
 
-    positions_g = jax.vmap(group_action)(vectors)
-    positions_out_g, featuers_out_g = layer_fn.apply(params, positions_g, features)
+    vectors_g = jax.vmap(group_action)(vectors)
+    vectors_out_g, featuers_out_g = layer_fn.apply(params, vectors_g, features)
 
-    plot_points_and_vectors(positions_g)
-    plot_points_and_vectors(positions_out_g)
+    plot_points_and_vectors(vectors_g)
+    plot_points_and_vectors(vectors_out_g)
+
+    plot_points_and_vectors(vectors_g / jnp.linalg.norm(vectors, axis=-1, keepdims=True))
+    plot_points_and_vectors(vectors_out_g / jnp.linalg.norm(vectors, axis=-1, keepdims=True))
 
     if vectors.dtype == jnp.float64:
         rtol = 1e-5
     else:
         rtol = 1e-3
     chex.assert_tree_all_close(featuers_out_g, vectors_out)
-    chex.assert_trees_all_close(positions_out_g, jax.vmap(group_action)(positions_out), rtol=rtol)
+    chex.assert_trees_all_close(vectors_out_g, jax.vmap(group_action)(positions_out), rtol=rtol)
 
 
 def e3gnn_test():
@@ -112,9 +97,22 @@ def e3gnn_test():
     params = e3gnn_forward.init(subkey, positions)
     positions_out, featuers_out = e3gnn_forward.apply(params, positions)
 
-    plot_points_and_vectors(positions)
-    plot_points_and_vectors(positions_out)
+    # Visualise vectors.
+    vectors_in = positions - jnp.mean(positions, axis=(0, 1))
+    vectors_out = positions_out - jnp.mean(positions_out, axis=(0, 1))
+    fig, ax = plot_points_and_vectors(vectors_in / jnp.linalg.norm(vectors_in, axis=-1, keepdims=True))
+    ax.set_title('normalized vectors in')
+    plt.show()
+    fig, ax = plot_points_and_vectors(vectors_out / jnp.linalg.norm(vectors_out, axis=-1, keepdims=True))
+    ax.set_title('normalized vectors out')
+    plt.show()
 
+    fig, ax = plot_points_and_vectors(positions)
+    ax.set_title("postions in")
+    plt.show()
+    fig, ax = plot_points_and_vectors(positions_out)
+    ax.set_title("postions out")
+    plt.show()
 
     # Rotation then forward pass
     key, subkey = jax.random.split(key)
@@ -123,6 +121,7 @@ def e3gnn_test():
     translation = jax.random.normal(subkey, shape=(dim,)) * 0.1
     key, subkey = jax.random.split(key)
     phi = jax.random.uniform(subkey) * 2 * jnp.pi * 0.1
+
     def group_action(x, theta=theta, translation=translation):
         x_rot = rotate_translate_permute_3d(x, theta, phi, translation, permute=False)
         return x_rot
@@ -130,15 +129,12 @@ def e3gnn_test():
     positions_g = group_action(positions)
     positions_out_g, featuers_out_g = e3gnn_forward.apply(params, positions_g)
 
-    plot_points_and_vectors(positions_g)
-    plot_points_and_vectors(positions_out_g)
-
     if positions.dtype == jnp.float64:
         rtol = 1e-5
     else:
         rtol = 1e-3
     chex.assert_tree_all_close(featuers_out_g, featuers_out, rtol=rtol)
-    chex.assert_trees_all_close(positions_out_g, group_action(positions_out), rtol=rtol)
+    chex.assert_trees_all_close(positions_out_g, jax.vmap(group_action)(positions_out), rtol=rtol)
 
 
 
