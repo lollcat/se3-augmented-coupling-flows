@@ -98,7 +98,8 @@ class EGCL_Multi(hk.Module):
 
         # TODO: add "cross attention" shifting term also here.
         if self.normalize_by_x_norm:
-            norm = jnp.sqrt(sq_norms_nodes + 1e-8) + self.normalization_constant
+            # Get norm in safe way that prevents nans.
+            norm = jnp.sqrt(jnp.where(sq_norms_nodes == 0., 1., sq_norms_nodes)) + self.normalization_constant
             if self.stop_gradient_for_norm:
                 norm = jax.lax.stop_gradient(norm)
             norm_diff_combo = diff_combos_nodes / norm[..., None]
@@ -106,7 +107,7 @@ class EGCL_Multi(hk.Module):
             equivariant_shift = jnp.einsum('ijhd,ijh->ihd', norm_diff_combo, phi_x_out)
 
             # cross attention
-            norm = jnp.sqrt(sq_norms_heads + 1e-8) + self.normalization_constant
+            norm = jnp.sqrt(jnp.where(sq_norms_heads == 0., 1., sq_norms_heads)) + self.normalization_constant
             if self.stop_gradient_for_norm:
                 norm = jax.lax.stop_gradient(norm)
             norm_diff_combo = diff_combos_heads / norm[..., None]

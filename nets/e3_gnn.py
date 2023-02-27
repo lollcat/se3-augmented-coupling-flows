@@ -4,9 +4,8 @@ from functools import partial
 import haiku as hk
 import jax.numpy as jnp
 import jax
-from mace_jax import tools
 import e3nn_jax as e3nn
-from mace_jax.modules.models import LinearNodeEmbeddingBlock, RadialEmbeddingBlock, safe_norm
+from mace_jax.modules.models import safe_norm
 import chex
 
 from utils.graph import get_senders_and_receivers_fully_connected, e3nn_apply_activation
@@ -19,7 +18,8 @@ class EGCL(hk.Module):
                  n_invariant_feat_hidden: int,
                  activation_fn: Callable = jax.nn.silu,
                  sh_irreps_max_ell: int = 2,
-                 residual_h: bool = True
+                 residual_h: bool = True,
+                 normalization_constant: float = 1.0
                  ):
         super().__init__()
         self.mlp_units = mlp_units
@@ -27,6 +27,7 @@ class EGCL(hk.Module):
         self.n_vectors_hidden = n_vectors_hidden
         self.activation_fn = activation_fn
         self.residual_h = residual_h
+        self.normalization_constant = normalization_constant
 
         self.feature_irreps = e3nn.Irreps(f"{n_invariant_feat_hidden}x0e")
         self.vector_irreps = e3nn.Irreps(f"{n_vectors_hidden}x1o")
@@ -72,15 +73,17 @@ class EGCL(hk.Module):
 
         # Get positional output
         phi_x_out = self.phi_x(m_ij)
-        sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(vectors / lengths[..., None])
+        sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(
+            vectors / (self.normalization_constant + lengths[..., None]))
         sph_harmon = sph_harmon.axis_to_mul()
         vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
-        vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=senders, output_size=n_nodes)
+        vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=senders, output_size=n_nodes) / n_nodes
 
         # Get feature output
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
-        m_i = e3nn.scatter_sum(data=e3nn.tensor_product(m_ij, e), dst=senders, output_size=n_nodes)
+        m_i = e3nn.scatter_sum(data=e3nn.tensor_product(m_ij, e, irrep_normalization='norm'),
+                               dst=senders, output_size=n_nodes) / n_nodes
         phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)

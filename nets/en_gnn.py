@@ -5,7 +5,6 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-
 # TODO: need to be careful of mean if number of nodes is varying? Could normalisation a parameter function of
 #  the number of nodes?
 
@@ -88,7 +87,8 @@ class EGCL(hk.Module):
 
 
         if self.normalize_by_x_norm:
-            norm = jnp.sqrt(sq_norms + 1e-8) + self.normalization_constant
+            # Get norm in safe way that prevents nans.
+            norm = jnp.sqrt(jnp.where(sq_norms == 0., 1., sq_norms)) + self.normalization_constant
             if self.stop_gradient_for_norm:
                 norm = jax.lax.stop_gradient(norm)
             norm_diff_combo = diff_combos / norm[..., None]
