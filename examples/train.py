@@ -17,10 +17,9 @@ from omegaconf import DictConfig
 import matplotlib as mpl
 
 from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
-from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig
-from nets.en_gnn import EgnnTorsoConfig
+from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
+    MACETorsoConfig
 from nets.transformer import TransformerConfig
-from nets.mace import MACETorsoConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances
@@ -209,6 +208,7 @@ def create_nets_config(nets_config: DictConfig):
     """Configure nets (MACE, EGNN, Transformer, MLP)."""
     nets_config = dict(nets_config)
     egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
+    e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
     mace_config = MACETorsoConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
     e3transformer_cfg = EnTransformerTorsoConfig(**dict(nets_config.pop("e3transformer"))) if "e3transformer" in nets_config.keys() else None
     transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
@@ -217,8 +217,9 @@ def create_nets_config(nets_config: DictConfig):
                                                                              nets_config.keys() else None
     type = nets_config['type']
     nets_config = NetsConfig(type=type,
-                             egnn_lay_config=egnn_cfg,
-                             mace_lay_config=mace_config,
+                             egnn_torso_config=egnn_cfg,
+                             e3gnn_torso_config=e3gnn_config,
+                             mace_torso_config=mace_config,
                              e3transformer_lay_config=e3transformer_cfg,
                              transformer_config=transformer_config,
                              mlp_head_config=mlp_head_config)

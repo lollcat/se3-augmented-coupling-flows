@@ -265,11 +265,13 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
     n_invariant_params = dim*2
 
     if nets_config.type == "mace" :
-        n_invariant_feat_out = nets_config.mace_lay_config.n_invariant_feat_hidden
+        n_invariant_feat_out = nets_config.mace_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "egnn":
-        n_invariant_feat_out = nets_config.egnn_lay_config.h_embedding_dim
+        n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim
     elif nets_config.type == 'e3transformer':
         n_invariant_feat_out = nets_config.e3transformer_lay_config.n_invariant_feat_hidden
+    elif nets_config.type == "e3gnn":
+        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",

@@ -265,9 +265,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap,
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
                                    nets_config=nets_config,
                                    n_equivariant_vectors_out=n_heads,
-                                   n_invariant_feat_out=nets_config.mace_lay_config.n_invariant_feat_hidden
+                                   n_invariant_feat_out=nets_config.mace_torso_config.n_invariant_feat_hidden
                                    if nets_config.use_mace
-                                   else nets_config.egnn_lay_config.h_embedding_dim,
+                                   else nets_config.egnn_torso_config.h_embedding_dim,
                                    zero_init_invariant_feat=False)
 
     if process_flow_params_jointly:

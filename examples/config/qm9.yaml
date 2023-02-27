@@ -34,7 +34,12 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    type: egnn # mace or egnn or e3transformer
+    type: e3gnn # mace or egnn or e3transformer or e3gnn
+    e3gnn:
+      n_blocks: 3
+      mlp_units: [ 32, 32 ]
+      n_vectors_hidden: 8
+      n_invariant_feat_hidden: 64
     e3transformer:
       n_blocks: 3
       mlp_units: [32, 32]
@@ -77,7 +82,7 @@ training:
     init_lr: 1e-5
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 4e-4 # can be null
+    peak_lr: 6e-4 # can be null
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 0.25
