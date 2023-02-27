@@ -142,7 +142,7 @@ class EgnnConfig(NamedTuple):
     invariant_feat_zero_init: bool = True
 
 
-class se_equivariant_net(hk.Module):
+class EnGNN(hk.Module):
     def __init__(self, config: EgnnConfig):
         super().__init__(name=config.name + "_egnn")
         if config.torso_config.hk_layer_stack:

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from nets.e3nn_transformer import EnTransformerTorsoConfig, EnTransformer, EnTransformerConfig
 from nets.mace import MACELayerConfig, MACEConfig, MaceNet
-from nets.en_gnn import EgnnTorsoConfig, se_equivariant_net, EgnnConfig
+from nets.en_gnn import EgnnTorsoConfig, EnGNN, EgnnConfig
 from nets.en_gnn_multi_x import multi_se_equivariant_net, MultiEgnnConfig
 from nets.transformer import TransformerConfig
 
@@ -47,7 +47,7 @@ def build_egnn_fn(
                                          torso_config=nets_config.egnn_lay_config,
                                          n_invariant_feat_out=n_invariant_feat_out,
                                          invariant_feat_zero_init=zero_init_invariant_feat)
-                x, h = se_equivariant_net(egnn_config)(x)
+                x, h = EnGNN(egnn_config)(x)
             else:
                 egnn_config = MultiEgnnConfig(name=name+"multi_x_egnn",
                                               torso_config=nets_config.egnn_lay_config,

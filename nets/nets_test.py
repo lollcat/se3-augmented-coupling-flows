@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils.numerical import rotate_translate_permute_2d
-from nets.en_gnn import se_equivariant_net, HConfig, EgnnConfig
+from nets.en_gnn import EnGNN, HConfig, EgnnConfig
 
 
 def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
@@ -14,7 +14,7 @@ def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3):
     eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2, h_config=h_config,
                              zero_init_h=False)
 
-    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: se_equivariant_net(eggn_config)(x)))
+    equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: EnGNN(eggn_config)(x)))
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
