@@ -31,12 +31,12 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.egnn.mlp_units = (4,)
-    cfg.flow.transformer.mlp_units = (4,)
-    cfg.flow.transformer.num_heads = 2
-    cfg.flow.transformer.key_size = 2
-    cfg.flow.transformer.n_layers = 2
-    cfg.flow.egnn.n_layers = 2
+    cfg.flow.nets.egnn.mlp_units = (4,)
+    cfg.flow.nets.transformer.mlp_units = (4,)
+    cfg.flow.nets.transformer.num_heads = 2
+    cfg.flow.nets.transformer.key_size = 2
+    cfg.flow.nets.transformer.n_layers = 2
+    cfg.flow.nets.egnn.n_layers = 2
     cfg.flow.n_layers = 2
     cfg.training.batch_size = 2
     cfg.training.n_epoch = 32

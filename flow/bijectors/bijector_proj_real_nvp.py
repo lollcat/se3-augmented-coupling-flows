@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from nets.transformer import Transformer, TransformerConfig
-from nets.en_gnn_multi_x import MultiEgnnConfig, multi_se_equivariant_net, EgnnConfig
+from nets.transformer import Transformer
+from nets.base import NetsConfig, build_egnn_fn
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
 
 
@@ -111,7 +111,8 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
+def get_new_space_basis(x: chex.Array, various_x_points: chex.Array, gram_schmidt: bool, global_frame: bool,
+                        add_small_identity: bool = False):
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
@@ -119,6 +120,10 @@ def get_new_space_basis(x, various_x_points, gram_schmidt, global_frame):
 
     origin = various_x_points[0]
     basis_vectors = various_x_points[1:] - origin[None, ...]
+
+    if add_small_identity:
+        # Add independant vectors to try help improve numerical stability
+        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]][None, None, :]*1e-6
 
     if global_frame:
         basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
@@ -170,6 +175,7 @@ def make_conditioner(
         mlp_function: Optional[Callable] = None,
         gram_schmidt: bool = False,
         condition_on_x_proj: bool = False,
+        add_small_identity: bool = False,
                      ):
     if process_flow_params_jointly:
         assert permutation_equivariant_fn is not None
@@ -183,7 +189,8 @@ def make_conditioner(
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
 
-        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame)
+        origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
+                                                             add_small_identity=add_small_identity)
 
         if global_frame:
             inv_change_of_basis = change_of_basis_matrix.T  # jnp.linalg.inv(change_of_basis_matrix)
@@ -237,14 +244,16 @@ def make_conditioner(
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, egnn_config: EgnnConfig,
-                                                       transformer_config: Optional[TransformerConfig] = None,
+def make_se_equivariant_split_coupling_with_projection(layer_number,
+                                                       dim,
+                                                       swap,
+                                                       nets_config: NetsConfig,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
-                                                       mlp_function_units: Optional[Sequence[int]] = None,
+                                                       add_small_identity: bool = False
                                                        ):
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
@@ -253,16 +262,26 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
 
     n_heads = dim + (1 if gram_schmidt else 0)
-    egnn_config = egnn_config._replace(name=f"layer_{layer_number}_swap{swap}_multi_x_egnn",
-                                       identity_init_x=False, zero_init_h=identity_init,
-                                       h_config=egnn_config.h_config._replace(h_out=True,
-                                       h_out_dim=egnn_config.h_config.h_embedding_dim))
-    multi_egnn_config = MultiEgnnConfig(egnn_config=egnn_config, n_heads=n_heads)
-    multi_egnn = multi_se_equivariant_net(multi_egnn_config)
+    n_invariant_params = dim*2
 
+    if nets_config.type == "mace":
+        n_invariant_feat_out = nets_config.mace_torso_config.n_invariant_feat_hidden
+    elif nets_config.type == "egnn":
+        n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim
+    elif nets_config.type == 'e3transformer':
+        n_invariant_feat_out = nets_config.e3transformer_lay_config.n_invariant_feat_hidden
+    elif nets_config.type == "e3gnn":
+        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
+    else:
+        raise NotImplementedError
+    equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
+                                   nets_config=nets_config,
+                                   n_equivariant_vectors_out=n_heads,
+                                   n_invariant_feat_out=n_invariant_feat_out,
+                                   zero_init_invariant_feat=False)
 
     if process_flow_params_jointly:
-        transformer_config = transformer_config._replace(output_dim=dim*2, zero_init=identity_init)
+        transformer_config = nets_config.transformer_config._replace(output_dim=n_invariant_params, zero_init=identity_init)
         permutation_equivariant_fn = Transformer(name=f"layer_{layer_number}_swap{swap}_scale_shift",
                                                  config=transformer_config)
         mlp_function = None
@@ -270,9 +289,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
         permutation_equivariant_fn = None
         mlp_function = hk.Sequential([
             hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1),
-            hk.nets.MLP(mlp_function_units, activate_final=True),
-            hk.Linear(dim*2, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
-            hk.Linear(dim*2,
+            hk.nets.MLP(nets_config.mlp_head_config.mlp_units, activate_final=True),
+            hk.Linear(n_invariant_params, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
+            hk.Linear(n_invariant_params,
                       b_init=hk.initializers.VarianceScaling(0.01),
                       w_init=hk.initializers.VarianceScaling(0.01))
                                       ])
@@ -280,10 +299,11 @@ def make_se_equivariant_split_coupling_with_projection(layer_number, dim, swap, 
     conditioner = make_conditioner(
         global_frame=global_frame, process_flow_params_jointly=process_flow_params_jointly,
         mlp_function=mlp_function,
-        multi_x_equivariant_fn=multi_egnn,
+        multi_x_equivariant_fn=equivariant_fn,
         permutation_equivariant_fn=permutation_equivariant_fn,
         gram_schmidt=gram_schmidt,
-        condition_on_x_proj=condition_on_x_proj
+        condition_on_x_proj=condition_on_x_proj,
+        add_small_identity=add_small_identity
     )
 
     return distrax.SplitCoupling(

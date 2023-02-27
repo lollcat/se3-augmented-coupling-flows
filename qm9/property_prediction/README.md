@@ -33,7 +33,7 @@ x = torch.ones(batch_size * n_nodes, x_dim)
 edges, edge_attr = eg.get_edges_batch(n_nodes, batch_size)
 
 # Initialize EGNN
-egnn = eg.EGNN(in_node_nf=n_feat, hidden_nf=32, out_node_nf=1, in_edge_nf=1)
+egnn = eg.EnGNN(in_node_nf=n_feat, hidden_nf=32, out_node_nf=1, in_edge_nf=1)
 
 # Run EGNN
 h, x = egnn(h, x, edges, edge_attr)

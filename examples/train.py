@@ -16,8 +16,9 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 
-from flow.distribution import make_equivariant_augmented_flow_dist, EquivariantFlowDistConfig, BaseConfig
-from nets.en_gnn import EgnnConfig, HConfig
+from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
+from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
+    MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
@@ -128,18 +129,51 @@ def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_
         plt.close(figure)
 
 
+class OptimizerConfig(NamedTuple):
+    init_lr: float
+    use_schedule: bool
+    optimizer_name: str = "adam"
+    max_global_norm: Optional[float] = None
+    peak_lr: Optional[float] = None
+    end_lr: Optional[float] = None
+    warmup_n_epoch: Optional[int] = None
+
+
+def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
+    if optimizer_config.use_schedule:
+        lr = optax.warmup_cosine_decay_schedule(
+            init_value=optimizer_config.init_lr,
+            peak_value=optimizer_config.peak_lr,
+            end_value=optimizer_config.end_lr,
+            warmup_steps=optimizer_config.warmup_n_epoch * n_iter_per_epoch,
+            decay_steps=n_iter_per_epoch*total_n_epoch
+                                                     )
+    else:
+        lr = optimizer_config.init_lr
+
+    grad_transforms = [optax.zero_nans()]
+
+    if optimizer_config.max_global_norm:
+        clipping_fn = optax.clip_by_global_norm(optimizer_config.max_global_norm)
+        grad_transforms.append(clipping_fn)
+    else:
+        pass
+
+    grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
+    optimizer = optax.chain(*grad_transforms)
+    return optimizer, lr
+
 
 class TrainConfig(NamedTuple):
     n_epoch: int
     dim: int
     n_nodes: int
-    flow_dist_config: EquivariantFlowDistConfig
+    flow_dist_config: FlowDistConfig
     aug_target_global_centering: bool
     aug_target_scale: float
     load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
-    lr: float
+    optimizer_config: OptimizerConfig
     batch_size: int
-    max_global_norm: float
     K_marginal_log_lik: int
     logger: Logger
     seed: int
@@ -147,6 +181,8 @@ class TrainConfig(NamedTuple):
     n_eval: int
     n_checkpoints: int
     plot_batch_size: int
+    use_equivariance_loss: bool = False
+    equivariance_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
     reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
@@ -155,7 +191,6 @@ class TrainConfig(NamedTuple):
     save_dir: str = "/tmp"
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
-    optimizer_name: str = 'adam'
     use_64_bit: bool = False
 
 
@@ -169,24 +204,38 @@ def setup_logger(cfg: DictConfig) -> Logger:
                         "pandas logger to the config file.")
     return logger
 
+def create_nets_config(nets_config: DictConfig):
+    """Configure nets (MACE, EGNN, Transformer, MLP)."""
+    nets_config = dict(nets_config)
+    egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
+    e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
+    mace_config = MACETorsoConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
+    e3transformer_cfg = EnTransformerTorsoConfig(**dict(nets_config.pop("e3transformer"))) if "e3transformer" in nets_config.keys() else None
+    transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
+    transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
+    mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
+                                                                             nets_config.keys() else None
+    type = nets_config['type']
+    nets_config = NetsConfig(type=type,
+                             egnn_torso_config=egnn_cfg,
+                             e3gnn_torso_config=e3gnn_config,
+                             mace_torso_config=mace_config,
+                             e3transformer_lay_config=e3transformer_cfg,
+                             transformer_config=transformer_config,
+                             mlp_head_config=mlp_head_config)
+    return nets_config
 
 def create_flow_config(flow_cfg: DictConfig):
+    """Create config for building the flow."""
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
-    egnn_cfg = dict(flow_cfg.pop("egnn"))
-    h_cfg = dict(egnn_cfg.pop("h"))
-    transformer_cfg = dict(flow_cfg.pop("transformer"))
-    transformer_config = TransformerConfig(**dict(transformer_cfg))
-    egnn_cfg = EgnnConfig(**egnn_cfg, h_config=HConfig(**h_cfg))
+    nets_config = create_nets_config(flow_cfg.pop("nets"))
     base_config = dict(flow_cfg.pop("base"))
     base_config = BaseConfig(**base_config)
-
-
-    flow_dist_config = EquivariantFlowDistConfig(
+    flow_dist_config = FlowDistConfig(
         **flow_cfg,
-        egnn_config=egnn_cfg,
-        transformer_config=transformer_config,
-        base_config=base_config
+        nets_config=nets_config,
+        base_config=base_config,
     )
     return flow_dist_config
 
@@ -206,11 +255,14 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
 
     flow_config = create_flow_config(cfg.flow)
 
+    optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
+
     experiment_config = TrainConfig(
         dim=dim,
         n_nodes=n_nodes,
         flow_dist_config=flow_config,
         load_datasets=load_dataset,
+        optimizer_config=optimizer_config,
         **training_config,
         logger=logger,
         save_dir=save_path,
@@ -245,7 +297,8 @@ def train(config: TrainConfig):
     @hk.transform
     def log_prob_fn(x):
         distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        return distribution.log_prob(x)
+        log_prob = distribution.log_prob(x)
+        return log_prob
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
@@ -261,10 +314,6 @@ def train(config: TrainConfig):
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, config.n_nodes, config.dim*2)))
 
-    optimizer = optax.chain(optax.zero_nans(),
-                            optax.clip_by_global_norm(config.max_global_norm if config.max_global_norm else jnp.inf),
-                            getattr(optax, config.optimizer_name)(config.lr))
-    opt_state = optimizer.init(params)
 
     train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
                                                                    config.test_set_size)
@@ -284,12 +333,19 @@ def train(config: TrainConfig):
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
+    optimizer, lr = get_optimizer(config.optimizer_config,
+                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
+                              total_n_epoch=config.n_epoch)
+    opt_state = optimizer.init(params)
+
     if config.scan_run:
         def scan_fn(carry, xs):
-            params, opt_state = carry
+            params, opt_state, key = carry
+            key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
-            return (params, opt_state), info
+            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer, subkey,
+                                              config.use_equivariance_loss, config.equivariance_loss_weight)
+            return (params, opt_state, key), info
 
     pbar = tqdm(range(config.n_epoch))
 
@@ -304,17 +360,24 @@ def train(config: TrainConfig):
 
         if config.scan_run:
             batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
-            (params, opt_state), infos = jax.lax.scan(scan_fn, (params, opt_state), batched_data, unroll=1)
+            (params, opt_state, key), infos = jax.lax.scan(scan_fn, (params, opt_state, key), batched_data, unroll=1)
 
             for batch_index in range(batched_data.shape[0]):
                 info = jax.tree_map(lambda x: x[batch_index], infos)
                 info.update(epoch=i)
+                info.update(n_optimizer_steps=opt_state[-1][0].count)
+                if hasattr(lr, "__call__"):
+                    info.update(lr=lr(info["n_optimizer_steps"]))
                 config.logger.write(info)
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer)
+                key, subkey = jax.random.split(key)
+                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer,
+                                                  subkey,
+                                                  config.use_equivariance_loss, config.equivariance_loss_weight
+                                                  )
                 config.logger.write(info)
                 info.update(epoch=i)
                 if jnp.isnan(info["grad_norm"]):

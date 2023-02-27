@@ -1,6 +1,5 @@
 import hydra
 from omegaconf import DictConfig
-import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -29,13 +28,17 @@ def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.egnn.mlp_units = (4,)
-    cfg.flow.transformer.mlp_units = (4,)
-    cfg.flow.n_layers = 4
-    cfg.training.batch_size = 16
+    cfg.flow.nets.type = "e3gnn"
+    cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
+    cfg.flow.nets.egnn.h_embedding_dim = 3
+    cfg.flow.nets.transformer.mlp_units = (4,)
+    cfg.flow.n_layers = 2
+    cfg.training.batch_size = 4
+
     cfg.training.n_epoch = 32
     cfg.training.save = False
-    cfg.training.plot_batch_size = 8
+    cfg.flow.type = ['proj']
+    cfg.training.plot_batch_size = 4
     cfg.logger = DictConfig({"list_logger": None})
     return cfg
 

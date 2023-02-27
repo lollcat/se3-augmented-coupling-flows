@@ -12,7 +12,7 @@ target:
 flow:
   base:
     aug_scale_init: ${target.aug_scale}
-    double_centrered_gaussian: false
+    double_centered_gaussian: false
   dim: 3
   nodes: 13
   n_layers: 4
@@ -24,36 +24,60 @@ flow:
       process_flow_params_jointly: false
       condition_on_x_proj: false
       gram_schmidt: false
-      mlp_function_units: [16,]
     proj_v2:
       process_flow_params_jointly: false
       condition_on_x_proj: false
       gram_schmidt: false
-      mlp_function_units: [ 16, ]
+      n_vectors: 10
   act_norm: false
   fast_compile: true
   compile_n_unroll: 1
-  egnn:
-    mlp_units: [32,32]
-    n_layers: 3
-    h:
-      linear_softmax: true
+  nets:
+    type: e3gnn # mace or egnn or e3transformer or e3gnn
+    e3gnn:
+      n_blocks: 3
+      mlp_units: [ 32, 32 ]
+      n_vectors_hidden: 8
+      n_invariant_feat_hidden: 64
+    e3transformer:
+      n_blocks: 3
+      mlp_units: [32, 32]
+      n_vectors_hidden: 8
+      n_invariant_feat_hidden: 64
+      bessel_number: 10  # Number of bessel functions.
+      r_max: 5.
+    mace:
+      n_invariant_feat_hidden: 16
+      n_vectors_hidden: 16
+      bessel_number: 10  # Number of bessel functions.
+      r_max: 5.
+    egnn:
+      mlp_units: [32,32]
+      n_layers: 3
+      h_linear_softmax: true
       h_embedding_dim: 16
-  transformer: # for proj_v2 flow.
-    mlp_units: [32,32]
-    num_heads: 3
-    key_size: 4
-    w_init_scale: 1.0
+    transformer: # for proj_v2 flow.
+      mlp_units: [32,32]
+      num_heads: 3
+      key_size: 4
+      w_init_scale: 1.0
+    mlp_head_config:
+      mlp_units: [ 32, 32 ]
 
 
 training:
-  lr: 6e-4
+  optimizer:
+    init_lr: 1e-5
+    optimizer_name: adam
+    use_schedule: true
+    peak_lr: 1e-3 # can be null
+    end_lr: 0 # can be null
+    warmup_n_epoch: 10 # can be null
+    max_global_norm: 0.5
   use_64_bit: false
-  optimizer_name: adam
   n_epoch: 200
   batch_size: 100
   plot_batch_size: 256
-  max_global_norm: 100
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: 1000

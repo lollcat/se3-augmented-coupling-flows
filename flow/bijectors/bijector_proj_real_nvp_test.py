@@ -9,11 +9,10 @@ from flow.test_utils import bijector_test
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
-from nets.en_gnn import EgnnConfig
-from nets.transformer import TransformerConfig
+from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
 
 
-def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
+def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
     """Test equivariance and invertibility."""
     if jnp.ones(()).dtype == jnp.float64:
         rtol = 1e-6
@@ -82,14 +81,22 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 2):
     chex.assert_trees_all_close(x_g_out, x_out_g)
 
 
-def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
                             gram_schmidt: bool = False,
                             global_frame: bool = False,
-                            process_flow_params_jointly: bool = True):
+                            process_flow_params_jointly: bool = True,
+                            use_mace: bool = True):
+    nets_config = NetsConfig(type='mace' if use_mace else "egnn",
+                             mace_lay_config=MACETorsoConfig(
+                                 bessel_number=5,
+                                 n_vectors_hidden=3,
+                                 n_invariant_feat_hidden=3,
+                                 r_max=10.),
+                             egnn_lay_config=EgnnTorsoConfig() if not use_mace else None,
+                             mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
+                             transformer_config=TransformerConfig() if process_flow_params_jointly else None
+                             )
 
-    egnn_config = EgnnConfig("", mlp_units=(2,), n_layers=2)
-    transformer_config = TransformerConfig(mlp_units=(2,), n_layers=2) if process_flow_params_jointly else None
-    mlp_function_units = (2,) if not process_flow_params_jointly else None
 
     def make_flow():
         bijectors = []
@@ -98,12 +105,10 @@ def test_bijector_with_proj(dim: int = 2, n_layers: int = 2,
             bijector = make_se_equivariant_split_coupling_with_projection(
                 layer_number=i, dim=dim, swap=swap,
                 identity_init=False,
-                egnn_config=egnn_config,
-                transformer_config=transformer_config,
+                nets_config=nets_config,
                 global_frame=global_frame,
                 gram_schmidt=gram_schmidt,
                 process_flow_params_jointly=process_flow_params_jointly,
-                mlp_function_units=mlp_function_units,
                                                             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
@@ -135,14 +140,18 @@ if __name__ == '__main__':
 
         config.update("jax_enable_x64", True)
 
+    use_mace = False
     for global_frame in [False, True]:
         for process_jointly in [False, True]:
             print(f"running tests for global-frame={global_frame}, process jointly={process_jointly}")
-            test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                    gram_schmidt=gram_schmidt)
-            print("passed 2D test")
-
             test_bijector_with_proj(dim=3, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                    gram_schmidt=gram_schmidt)
+                                    gram_schmidt=gram_schmidt, use_mace=use_mace)
             print("passed 3D test")
+
+            if not use_mace:
+                test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
+                                        gram_schmidt=gram_schmidt, use_mace=use_mace)
+                print("passed 2D test")
+
+
 
