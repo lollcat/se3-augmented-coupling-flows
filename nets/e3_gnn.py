@@ -77,13 +77,13 @@ class EGCL(hk.Module):
             vectors / (self.normalization_constant + lengths[..., None]))
         sph_harmon = sph_harmon.axis_to_mul()
         vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
-        vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=senders, output_size=n_nodes) / n_nodes
+        vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) / (n_nodes - 1)
 
         # Get feature output
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i = e3nn.scatter_sum(data=e3nn.tensor_product(m_ij, e, irrep_normalization='norm'),
-                               dst=senders, output_size=n_nodes) / n_nodes
+                               dst=receivers, output_size=n_nodes) / (n_nodes - 1)
         phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
@@ -107,6 +107,7 @@ class E3GNNTorsoConfig(NamedTuple):
     activation_fn: Callable = jax.nn.silu
     sh_irreps_max_ell: int = 2
     residual_h: bool = True
+    linear_softmax: bool = True
     layer_stack: bool = True
 
     def get_EGCL_kwargs(self):
@@ -182,9 +183,11 @@ class E3Gnn(hk.Module):
 
         # Get scalar features.
         invariant_features = out.filter(keep=f"{self.config.n_vectors_readout}x0e")
+        if self.config.torso_config.linear_softmax:
+            invariant_features = e3nn_apply_activation(invariant_features, partial(jax.nn.softmax, axis=-1))
         invariant_features = hk.Linear(invariant_features.shape[-1],
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
-                                       )(jax.nn.elu(invariant_features.array))
+                                       )(invariant_features.array)
 
         positions_out = vector_features + center_of_mass[:, None]
         return positions_out, invariant_features

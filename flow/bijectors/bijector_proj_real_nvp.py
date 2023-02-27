@@ -264,7 +264,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
     n_heads = dim + (1 if gram_schmidt else 0)
     n_invariant_params = dim*2
 
-    if nets_config.type == "mace" :
+    if nets_config.type == "mace":
         n_invariant_feat_out = nets_config.mace_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "egnn":
         n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim

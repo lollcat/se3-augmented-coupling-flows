@@ -297,7 +297,8 @@ def train(config: TrainConfig):
     @hk.transform
     def log_prob_fn(x):
         distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        return distribution.log_prob(x)
+        log_prob = distribution.log_prob(x)
+        return log_prob
 
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):

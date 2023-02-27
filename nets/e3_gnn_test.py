@@ -69,7 +69,7 @@ def layer_test():
 
 def e3gnn_test():
     dim = 3
-    n_nodes = 4
+    n_nodes = 5
     n_vectors_hidden = 5
     n_invariant_feat_hidden = 5
     n_vectors_readout = 4
