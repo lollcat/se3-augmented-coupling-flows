@@ -5,7 +5,7 @@ import distrax
 import haiku as hk
 
 from flow.test_utils import bijector_test
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACELayerConfig
+from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp_v2 import matmul_in_invariant_space, inverse_matmul_in_invariant_space,\
     perform_low_rank_matmul, perform_low_rank_matmul_inverse, reshape_things_for_low_rank_matmul, \
@@ -120,7 +120,7 @@ def test_bijector_with_proj(
         n_vectors = 3,
 ):
     nets_config = NetsConfig(use_mace=use_mace,
-                             mace_lay_config=MACELayerConfig(
+                             mace_lay_config=MACETorsoConfig(
                                  bessel_number=5,
                                  n_vectors_hidden=3,
                                  n_invariant_feat_hidden=3,

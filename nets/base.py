@@ -3,7 +3,7 @@ from typing import NamedTuple, Optional, Sequence
 import jax.numpy as jnp
 
 from nets.e3nn_transformer import EnTransformerTorsoConfig, EnTransformer, EnTransformerConfig
-from nets.mace import MACELayerConfig, MACEConfig, MaceNet
+from nets.mace import MACETorsoConfig, MACEConfig, MaceNet
 from nets.en_gnn import EgnnTorsoConfig, EnGNN, EgnnConfig
 from nets.en_gnn_multi_x import multi_se_equivariant_net, MultiEgnnConfig
 from nets.transformer import TransformerConfig
@@ -14,7 +14,7 @@ class MLPHeadConfig(NamedTuple):
 
 class NetsConfig(NamedTuple):
     type: str
-    mace_lay_config: Optional[MACELayerConfig] = None
+    mace_lay_config: Optional[MACETorsoConfig] = None
     egnn_lay_config: Optional[EgnnTorsoConfig] = None
     e3transformer_lay_config: Optional[EnTransformerTorsoConfig] = None
     transformer_config: Optional[TransformerConfig] = None

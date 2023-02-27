@@ -9,7 +9,7 @@ from flow.test_utils import bijector_test
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACELayerConfig
+from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
 
 
 def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
@@ -87,7 +87,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
                             process_flow_params_jointly: bool = True,
                             use_mace: bool = True):
     nets_config = NetsConfig(type='mace' if use_mace else "egnn",
-                             mace_lay_config=MACELayerConfig(
+                             mace_lay_config=MACETorsoConfig(
                                  bessel_number=5,
                                  n_vectors_hidden=3,
                                  n_invariant_feat_hidden=3,

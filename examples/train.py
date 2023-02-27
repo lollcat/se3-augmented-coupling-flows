@@ -20,7 +20,7 @@ from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConf
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig
 from nets.en_gnn import EgnnTorsoConfig
 from nets.transformer import TransformerConfig
-from nets.mace import MACELayerConfig
+from nets.mace import MACETorsoConfig
 from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances
@@ -209,7 +209,7 @@ def create_nets_config(nets_config: DictConfig):
     """Configure nets (MACE, EGNN, Transformer, MLP)."""
     nets_config = dict(nets_config)
     egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
-    mace_config = MACELayerConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
+    mace_config = MACETorsoConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
     e3transformer_cfg = EnTransformerTorsoConfig(**dict(nets_config.pop("e3transformer"))) if "e3transformer" in nets_config.keys() else None
     transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
     transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None

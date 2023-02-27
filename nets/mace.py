@@ -12,7 +12,7 @@ import chex
 from nets.mace_net_adjusted import MACE
 from utils.graph import get_senders_and_receivers_fully_connected
 
-class MACELayerConfig(NamedTuple):
+class MACETorsoConfig(NamedTuple):
     n_vectors_hidden: int
     n_invariant_feat_hidden: int
     bessel_number: int  # Number of bessel functions.
@@ -24,7 +24,7 @@ class MACELayerConfig(NamedTuple):
     cut_off: float = 1.e6  # No cutoff by default for fully connected graph. Currently unused.
     # Average number of neighbours. Used for normalization. Defaults to n-nodes (fully connected).
     avg_num_neighbors: Optional[int] = None
-    interaction_irreps: Union[str, e3nn.Irreps] = "o3_restricted",  # or o3_full
+    interaction_irreps: Union[str, e3nn.Irreps] = "o3_restricted" # or o3_full
 
 
 class MACEConfig(NamedTuple):
@@ -32,7 +32,7 @@ class MACEConfig(NamedTuple):
     n_invariant_feat_readout: int
     n_vectors_readout: int
     zero_init_invariant_feat: bool
-    layer_config: MACELayerConfig
+    torso_config: MACETorsoConfig
 
 
 class MaceNet(hk.Module):
@@ -41,7 +41,7 @@ class MaceNet(hk.Module):
         super().__init__(name=config.name)
         self.config = config
         # TODO: setting lay out irreps to match read out. That makes sense?
-        # TODO: Add an MLP type of thing at the end of this?
+        # TODO: A sprinkle of MLPs
 
 
 
@@ -60,20 +60,20 @@ class MaceNet(hk.Module):
         node_specie = jnp.zeros(x.shape[0], dtype=int)
 
         # avg_num_neighbors defaults to fully connected.
-        avg_num_neighbors = self.config.layer_config.avg_num_neighbors if self.config.layer_config.avg_num_neighbors \
+        avg_num_neighbors = self.config.torso_config.avg_num_neighbors if self.config.torso_config.avg_num_neighbors \
             else x.shape[0]
         mace_fn = MACE(
             output_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1o"),
-            r_max=self.config.layer_config.r_max,
-            num_interactions=self.config.layer_config.n_interactions,
-            hidden_irreps=e3nn.Irreps(f"{self.config.layer_config.n_invariant_feat_hidden}x0e+{self.config.layer_config.n_vectors_hidden}x1o"),
+            r_max=self.config.torso_config.r_max,
+            num_interactions=self.config.torso_config.n_interactions,
+            hidden_irreps=e3nn.Irreps(f"{self.config.torso_config.n_invariant_feat_hidden}x0e+{self.config.torso_config.n_vectors_hidden}x1o"),
             readout_mlp_irreps=e3nn.Irreps(f"{self.config.n_invariant_feat_readout}x0e+{self.config.n_vectors_readout}x1o"),
             avg_num_neighbors=avg_num_neighbors,
-            num_species=self.config.layer_config.num_species,
+            num_species=self.config.torso_config.num_species,
             radial_basis=lambda length, max_length: e3nn.bessel(length, x_max=max_length,
-                                                                n=self.config.layer_config.bessel_number),
+                                                                n=self.config.torso_config.bessel_number),
             radial_envelope=e3nn.soft_envelope,
-            interaction_irreps=self.config.layer_config.interaction_irreps
+            interaction_irreps=self.config.torso_config.interaction_irreps
 
         )
         # senders, receivers, shifts = get_neighborhood(
@@ -105,4 +105,4 @@ class MaceNet(hk.Module):
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(jax.nn.elu(invariant_features.array))
 
-        return vector_features + centre_of_mass, invariant_features
+        return vector_features + centre_of_mass[:, None], invariant_features
