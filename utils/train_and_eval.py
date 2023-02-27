@@ -119,7 +119,7 @@ def get_marginal_log_lik_info(log_prob_fn, x_original, key, global_centering, au
     info.update(marginal_log_lik=marginal_log_lik)
 
     info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
-    info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]))
+    info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
     return info
 
 
