@@ -24,7 +24,7 @@ class MACETorsoConfig(NamedTuple):
     cut_off: float = 1.e6  # No cutoff by default for fully connected graph. Currently unused.
     # Average number of neighbours. Used for normalization. Defaults to n-nodes (fully connected).
     avg_num_neighbors: Optional[int] = None
-    interaction_irreps: Union[str, e3nn.Irreps] = "o3_restricted" # or o3_full
+    interaction_irreps: Union[str, e3nn.Irreps] = "o3_restricted"  # or o3_full
 
 
 class MACEConfig(NamedTuple):
