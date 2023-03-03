@@ -38,8 +38,10 @@ flow:
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
-      n_vectors_hidden: 8
+      n_vectors_hidden: 2
       n_invariant_feat_hidden: 64
+      sh_irreps_max_ell: 1
+      get_shifts_via_tensor_product: false
     e3transformer:
       n_blocks: 3
       mlp_units: [32, 32]

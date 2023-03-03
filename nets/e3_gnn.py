@@ -16,10 +16,12 @@ class EGCL(hk.Module):
                  mlp_units: Sequence[int],
                  n_vectors_hidden: int,
                  n_invariant_feat_hidden: int,
-                 activation_fn: Callable = jax.nn.silu,
-                 sh_irreps_max_ell: int = 2,
-                 residual_h: bool = True,
-                 normalization_constant: float = 1.0
+                 activation_fn: Callable,
+                 sh_irreps_max_ell: int,
+                 residual_h: bool,
+                 residual_x: bool,
+                 normalization_constant: float,
+                 get_shifts_via_tensor_product: bool,
                  ):
         super().__init__()
         self.mlp_units = mlp_units
@@ -27,7 +29,9 @@ class EGCL(hk.Module):
         self.n_vectors_hidden = n_vectors_hidden
         self.activation_fn = activation_fn
         self.residual_h = residual_h
+        self.residual_x = residual_x
         self.normalization_constant = normalization_constant
+        self.get_shifts_via_tensor_product = get_shifts_via_tensor_product
 
         self.feature_irreps = e3nn.Irreps(f"{n_invariant_feat_hidden}x0e")
         self.vector_irreps = e3nn.Irreps(f"{n_vectors_hidden}x1o")
@@ -64,7 +68,7 @@ class EGCL(hk.Module):
         lengths = safe_norm(vectors, axis=-1)
 
         scalar_edge_features = e3nn.concatenate([
-            e3nn.IrrepsArray(f"{self.n_vectors_hidden}x0e", lengths),
+            e3nn.IrrepsArray(f"{self.n_vectors_hidden}x0e", lengths**2),
             e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", node_features[senders]),
             e3nn.IrrepsArray(f"{self.n_invariant_feat_hidden}x0e", node_features[receivers]),
         ]).simplify()
@@ -73,11 +77,22 @@ class EGCL(hk.Module):
 
         # Get positional output
         phi_x_out = self.phi_x(m_ij)
-        sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(
-            vectors / (self.normalization_constant + lengths[..., None]))
-        sph_harmon = sph_harmon.axis_to_mul()
-        vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
-        vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) / (n_nodes - 1)
+        if self.get_shifts_via_tensor_product:
+            sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(
+                vectors / (self.normalization_constant + lengths[..., None]))
+            sph_harmon = sph_harmon.axis_to_mul()
+            vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
+            vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) \
+                              / (n_nodes - 1)
+            vectors_out = vector_per_node.factor_mul_to_last_axis().array
+        else:
+            # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
+            phi_x_out = hk.Linear(self.n_vectors_hidden)(phi_x_out.array)
+            shifts_ij = phi_x_out[:, :, None] * \
+                        vectors / (self.normalization_constant + lengths[:, :, None])
+            shifts_i = e3nn.scatter_sum(data=shifts_ij, dst=receivers, output_size=n_nodes)
+            vectors_out = shifts_i / (n_nodes - 1)
+        chex.assert_equal_shape((vectors_out, node_vectors))
 
         # Get feature output
         e = self.phi_inf(m_ij)
@@ -87,14 +102,15 @@ class EGCL(hk.Module):
         phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
-
-        # Final processing and conversion into plain arrays.
         features_out = phi_h_out.array
         chex.assert_equal_shape((features_out, node_features))
+
+        # Final processing and conversion into plain arrays.
+
         if self.residual_h:
             features_out = features_out + node_features
-        vectors_out = vector_per_node.factor_mul_to_last_axis().array
-        chex.assert_equal_shape((vectors_out, node_vectors))
+        if self.residual_x:
+            vectors_out = node_vectors + vectors_out
         return vectors_out, features_out
 
 
@@ -107,8 +123,11 @@ class E3GNNTorsoConfig(NamedTuple):
     activation_fn: Callable = jax.nn.silu
     sh_irreps_max_ell: int = 2
     residual_h: bool = True
+    residual_x: bool = True
     linear_softmax: bool = True
     layer_stack: bool = True
+    get_shifts_via_tensor_product: bool = True
+    normalization_constant: float = 1.
 
     def get_EGCL_kwargs(self):
         kwargs = {}
@@ -117,7 +136,11 @@ class E3GNNTorsoConfig(NamedTuple):
                       n_invariant_feat_hidden=self.n_invariant_feat_hidden,
                       activation_fn=self.activation_fn,
                       sh_irreps_max_ell=self.sh_irreps_max_ell,
-                      residual_h=self.residual_h)
+                      residual_h=self.residual_h,
+                      residual_x=self.residual_x,
+                      get_shifts_via_tensor_product=self.get_shifts_via_tensor_product,
+                      normalization_constant=self.normalization_constant
+                      )
         return kwargs
 
 class E3GNNConfig(NamedTuple):
@@ -146,9 +169,10 @@ class E3Gnn(hk.Module):
 
     def call_single(self, x):
         n_nodes = x.shape[0]
+
         h = jnp.ones((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
-        vectors = x - jnp.mean(x, axis=0, keepdims=True)
-        vectors = jnp.repeat(vectors[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
+        vectors_in = x - jnp.mean(x, axis=0, keepdims=True)
+        vectors = jnp.repeat(vectors_in[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
         if self.config.torso_config.layer_stack:
@@ -158,7 +182,6 @@ class E3Gnn(hk.Module):
         else:
             for i in range(self.config.torso_config.n_blocks):
                 vectors, h = self.egcl_fn(vectors, h)
-
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
         # Get vector features for final layer.
 
@@ -179,6 +202,8 @@ class E3Gnn(hk.Module):
         vector_features = vector_features.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
         vectors_out = vector_features.array
         chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
+        if self.config.torso_config.residual_x:
+            vectors_out = vectors_out - vectors_in[:, None, :]
 
         # Get scalar features.
         invariant_features = out.filter(keep=f"{self.config.n_vectors_readout}x0e")
@@ -187,5 +212,4 @@ class E3Gnn(hk.Module):
         invariant_features = hk.Linear(invariant_features.shape[-1],
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(invariant_features.array)
-
         return vectors_out, invariant_features
