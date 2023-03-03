@@ -101,6 +101,7 @@ class EGCL(hk.Module):
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
         m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes)
+        assert m_i.irreps == e3nn.Irreps(f"{self.mlp_units[-1]}x0e")
         phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
@@ -160,8 +161,8 @@ class E3Gnn(hk.Module):
         self.config = config
         self.egcl_fn = lambda x, h: EGCL(
             **config.torso_config.get_EGCL_kwargs())(x, h)
-        self.output_irreps = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e+"
-                                          f"{config.n_vectors_readout}x1o")
+        self.output_irreps_vector = e3nn.Irreps(f"{config.n_vectors_readout}x1o")
+        self.output_irreps_scalars = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e")
 
 
     def __call__(self, x):
@@ -188,31 +189,25 @@ class E3Gnn(hk.Module):
                 vectors, h = self.egcl_fn(vectors, h)
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
 
-        vector_feat = e3nn.IrrepsArray('1x1o', vectors)
-        vector_feat = vector_feat.axis_to_mul(axis=-2)
-        assert vector_feat.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
-
-        # Get invariant features for final layer and concatenate.
-        irreps_h = e3nn.Irreps(f"{self.config.torso_config.n_invariant_feat_hidden}x0e")
-        h = e3nn.IrrepsArray(irreps_h, h)
-        final_layer_in = e3nn.concatenate([h, vector_feat], axis=-1)
-
-        # Pass through final layer.
-        out = e3nn.haiku.Linear(self.output_irreps)(final_layer_in)
-
-        # Get vector features.
-        vector_features = out.filter(keep=f"{self.config.n_vectors_readout}x1o")
-        vector_features = vector_features.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
-        vectors_out = vector_features.array
+        # Get vector out.
+        vectors = e3nn.IrrepsArray('1x1o', vectors)
+        vectors = vectors.axis_to_mul(axis=-2)
+        assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
+        vectors = e3nn.haiku.Linear(self.output_irreps_vector)(vectors)
+        vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
+        vectors_out = vectors.array
         chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
         if self.config.torso_config.residual_x:
             vectors_out = vectors_out - vectors_in[:, None, :]
 
         # Get scalar features.
-        invariant_features = out.filter(keep=f"{self.config.n_invariant_feat_readout}x0e")
+        irreps_h = e3nn.Irreps(f"{self.config.torso_config.n_invariant_feat_hidden}x0e")
+        h = e3nn.IrrepsArray(irreps_h, h)
+        invariant_features = e3nn.haiku.Linear(self.output_irreps_scalars)(h)
         if self.config.torso_config.linear_softmax:
             invariant_features = e3nn_apply_activation(invariant_features, partial(jax.nn.softmax, axis=-1))
         invariant_features = hk.Linear(invariant_features.shape[-1],
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(invariant_features.array)
+
         return vectors_out, invariant_features
