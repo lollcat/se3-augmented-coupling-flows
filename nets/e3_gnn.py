@@ -99,9 +99,8 @@ class EGCL(hk.Module):
         # Get feature output
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
-        m_i_to_sum = m_ij.mul_to_axis() * e[:, :, None]
-        m_i = e3nn.scatter_sum(data=m_i_to_sum,
-                               dst=receivers, output_size=n_nodes).axis_to_mul()
+        m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
+        m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes)
         phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
@@ -157,7 +156,7 @@ class E3GNNConfig(NamedTuple):
 class E3Gnn(hk.Module):
     def __init__(self, config: E3GNNConfig):
         super().__init__(name=config.name)
-        assert config.n_vectors_readout >= config.torso_config.n_vectors_hidden
+        assert config.n_vectors_readout <= config.torso_config.n_vectors_hidden
         self.config = config
         self.egcl_fn = lambda x, h: EGCL(
             **config.torso_config.get_EGCL_kwargs())(x, h)
