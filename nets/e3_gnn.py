@@ -190,6 +190,8 @@ class E3Gnn(hk.Module):
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
 
         # Get vector out.
+        if self.config.torso_config.residual_x:
+            vectors = vectors - vectors_in[:, None, :]
         vectors = e3nn.IrrepsArray('1x1o', vectors)
         vectors = vectors.axis_to_mul(axis=-2)
         assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
@@ -197,8 +199,6 @@ class E3Gnn(hk.Module):
         vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
         vectors_out = vectors.array
         chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
-        if self.config.torso_config.residual_x:
-            vectors_out = vectors_out - vectors_in[:, None, :]
 
         # Get scalar features.
         irreps_h = e3nn.Irreps(f"{self.config.torso_config.n_invariant_feat_hidden}x0e")
