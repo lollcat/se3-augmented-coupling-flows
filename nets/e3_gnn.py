@@ -101,7 +101,7 @@ class EGCL(hk.Module):
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
         m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes)
-        phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
+        phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
         features_out = phi_h_out.array
