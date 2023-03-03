@@ -187,7 +187,6 @@ class E3Gnn(hk.Module):
             for i in range(self.config.torso_config.n_blocks):
                 vectors, h = self.egcl_fn(vectors, h)
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
-        # Get vector features for final layer.
 
         vector_feat = e3nn.IrrepsArray('1x1o', vectors)
         vector_feat = vector_feat.axis_to_mul(axis=-2)
@@ -210,7 +209,7 @@ class E3Gnn(hk.Module):
             vectors_out = vectors_out - vectors_in[:, None, :]
 
         # Get scalar features.
-        invariant_features = out.filter(keep=f"{self.config.n_vectors_readout}x0e")
+        invariant_features = out.filter(keep=f"{self.config.n_invariant_feat_readout}x0e")
         if self.config.torso_config.linear_softmax:
             invariant_features = e3nn_apply_activation(invariant_features, partial(jax.nn.softmax, axis=-1))
         invariant_features = hk.Linear(invariant_features.shape[-1],
