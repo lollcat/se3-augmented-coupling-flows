@@ -5,6 +5,7 @@ import haiku as hk
 import jax.numpy as jnp
 import jax
 import e3nn_jax as e3nn
+import mace_jax.modules
 from mace_jax.modules.models import safe_norm
 import chex
 
@@ -82,6 +83,7 @@ class EGCL(hk.Module):
                 vectors / (self.normalization_constant + lengths[..., None]))
             sph_harmon = sph_harmon.axis_to_mul()
             vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
+            # vector_irreps_array = mace_jax.modules.NonLinearReadoutBlock(vector_irreps_array.irreps)
             vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) \
                               / (n_nodes - 1)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
@@ -97,8 +99,9 @@ class EGCL(hk.Module):
         # Get feature output
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
-        m_i = e3nn.scatter_sum(data=e3nn.tensor_product(m_ij, e, irrep_normalization='norm'),
-                               dst=receivers, output_size=n_nodes) / (n_nodes - 1)
+        m_i_to_sum = m_ij.mul_to_axis() * e[:, :, None]
+        m_i = e3nn.scatter_sum(data=m_i_to_sum,
+                               dst=receivers, output_size=n_nodes).axis_to_mul()
         phi_h_in = e3nn.concatenate([m_i, node_features]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
         phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
