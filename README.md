@@ -27,6 +27,7 @@ ListLogger that can may used if you don't want to use wandb.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
 
 ## Less burning
+    - marginal stats look spurious
     - Spline flows
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
     - e3nn outputs are typically shift **invariant** rather than equivariant. 

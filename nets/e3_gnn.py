@@ -65,7 +65,7 @@ class EGCL(hk.Module):
         senders, receivers = get_senders_and_receivers_fully_connected(node_vectors.shape[0])
 
         # Prepare the edge attributes.
-        vectors = node_vectors[senders] - node_vectors[receivers]
+        vectors = node_vectors[receivers] - node_vectors[senders]
         lengths = safe_norm(vectors, axis=-1)
 
         scalar_edge_features = e3nn.concatenate([
@@ -153,9 +153,11 @@ class E3GNNConfig(NamedTuple):
     zero_init_invariant_feat: bool
     torso_config: E3GNNTorsoConfig
 
+
 class E3Gnn(hk.Module):
     def __init__(self, config: E3GNNConfig):
         super().__init__(name=config.name)
+        assert config.n_vectors_readout >= config.torso_config.n_vectors_hidden
         self.config = config
         self.egcl_fn = lambda x, h: EGCL(
             **config.torso_config.get_EGCL_kwargs())(x, h)
