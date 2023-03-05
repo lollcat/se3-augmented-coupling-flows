@@ -23,8 +23,10 @@ class EGCL(hk.Module):
                  residual_x: bool,
                  normalization_constant: float,
                  get_shifts_via_tensor_product: bool,
+                 variance_scaling_init: float
                  ):
         super().__init__()
+        self.variance_scaling_init = variance_scaling_init
         self.mlp_units = mlp_units
         self.n_invariant_feat_hidden = n_invariant_feat_hidden
         self.n_vectors_hidden = n_vectors_hidden
@@ -89,7 +91,9 @@ class EGCL(hk.Module):
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
         else:
             # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
-            phi_x_out = hk.Linear(self.n_vectors_hidden)(phi_x_out.array)
+            phi_x_out = hk.Linear(self.n_vectors_hidden,
+                                  w_init=hk.initializers.VarianceScaling(self.variance_scaling_init, "fan_avg", "uniform")
+                                  )(phi_x_out.array)
             shifts_ij = phi_x_out[:, :, None] * \
                         vectors / (self.normalization_constant + lengths[:, :, None])
             shifts_i = e3nn.scatter_sum(data=shifts_ij, dst=receivers, output_size=n_nodes)
@@ -131,6 +135,7 @@ class E3GNNTorsoConfig(NamedTuple):
     layer_stack: bool = True
     get_shifts_via_tensor_product: bool = True
     normalization_constant: float = 1.
+    variance_scaling_init: float = 0.001
 
     def get_EGCL_kwargs(self):
         kwargs = {}
@@ -142,7 +147,8 @@ class E3GNNTorsoConfig(NamedTuple):
                       residual_h=self.residual_h,
                       residual_x=self.residual_x,
                       get_shifts_via_tensor_product=self.get_shifts_via_tensor_product,
-                      normalization_constant=self.normalization_constant
+                      normalization_constant=self.normalization_constant,
+                      variance_scaling_init=self.variance_scaling_init
                       )
         return kwargs
 
@@ -175,7 +181,7 @@ class E3Gnn(hk.Module):
     def call_single(self, x):
         n_nodes = x.shape[0]
 
-        h = jnp.ones((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
+        h = jnp.zeros((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
         vectors_in = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors_in[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
@@ -190,6 +196,7 @@ class E3Gnn(hk.Module):
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
 
         # Get vector out.
+        # TODO: hunt NaNs
         if self.config.torso_config.residual_x:
             vectors = vectors - vectors_in[:, None, :]
         vectors = e3nn.IrrepsArray('1x1o', vectors)
