@@ -197,17 +197,8 @@ class multi_se_equivariant_net(hk.Module):
         x_original = x
         # Perform forward pass of EGNN.
 
-        # No node feature, so initialise them invariant fn of x.
-        diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        sq_norms = jnp.sum(diff_combos**2, axis=-1)
-        h = hk.Linear(self.egnn_config.h_embedding_dim)(sq_norms[..., None])
-
-        if self.egnn_config.h_linear_softmax:
-            h = h.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            h = jax.nn.softmax(h, axis=-2)
-        h = jnp.mean(h, axis=-2)
-
+        # No node feature, so initialise them zeros.
+        h = jnp.zeros((*x.shape[:-1], self.egnn_config.h_embedding_dim))
 
         # Project to number of heads
         x = jnp.repeat(x[:, None, ...], repeats=self.n_heads, axis=1)
@@ -222,22 +213,9 @@ class multi_se_equivariant_net(hk.Module):
             for layer in self.egnn_layers:
                 x_out, h_egnn = layer(x_out, h_egnn)
 
-        # Pass square norms of x as a feature.
-        sq_norms = get_norms_sqrd(x_original)[..., None]
-
-        if self.egnn_config.h_linear_softmax:
-            sq_norms = hk.Linear(self.egnn_config.h_embedding_dim)(sq_norms)
-            sq_norms = sq_norms.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            sq_norms = jax.nn.softmax(sq_norms, axis=-2)
-
-        mlp_out = hk.nets.MLP((*self.egnn_config.mlp_units, self.egnn_config.h_embedding_dim),
-                              activate_final=True, activation=self.egnn_config.activation_fn)(sq_norms)
-        h_out = jnp.mean(mlp_out, axis=-2)
-
         # Use h_egnn output from the EGNN as a feature for h-out.
         if self.egnn_config.h_linear_softmax:
             h_egnn = jax.nn.softmax(h_egnn, axis=-1)
-        h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
-        h_out = self.h_final_layer(h_out)
+        h_out = self.h_final_layer(h_egnn)
         return x_out - x_original[:, None], h_out
