@@ -23,9 +23,11 @@ class EGCL(hk.Module):
                  residual_x: bool,
                  normalization_constant: float,
                  get_shifts_via_tensor_product: bool,
-                 variance_scaling_init: float
+                 variance_scaling_init: float,
+                 vector_scaling_init: float,
                  ):
         super().__init__()
+        self.vector_scaling_init = vector_scaling_init
         self.variance_scaling_init = variance_scaling_init
         self.mlp_units = mlp_units
         self.n_invariant_feat_hidden = n_invariant_feat_hidden
@@ -85,10 +87,16 @@ class EGCL(hk.Module):
                 vectors / (self.normalization_constant + lengths[..., None]))
             sph_harmon = sph_harmon.axis_to_mul()
             vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
-            # vector_irreps_array = mace_jax.modules.NonLinearReadoutBlock(vector_irreps_array.irreps)
+            vector_irreps_array = mace_jax.modules.NonLinearReadoutBlock(
+                hidden_irreps=vector_irreps_array.irreps,
+                output_irreps=vector_irreps_array.irreps)(
+                vector_irreps_array)
             vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) \
                               / (n_nodes - 1)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
+            # Here is a good place to do something like layer norm.
+            vectors_out = vectors_out * hk.get_parameter("vector_scaling", shape=(),
+                                                         init=hk.initializers.Constant(self.vector_scaling_init))
         else:
             # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
             phi_x_out = hk.Linear(self.n_vectors_hidden,
@@ -104,7 +112,7 @@ class EGCL(hk.Module):
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
-        m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes)
+        m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes) / (n_nodes - 1)
         assert m_i.irreps == e3nn.Irreps(f"{self.mlp_units[-1]}x0e")
         phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
@@ -136,6 +144,7 @@ class E3GNNTorsoConfig(NamedTuple):
     get_shifts_via_tensor_product: bool = True
     normalization_constant: float = 1.
     variance_scaling_init: float = 0.001
+    vector_scaling_init: float = 0.001
 
     def get_EGCL_kwargs(self):
         kwargs = {}
@@ -148,7 +157,8 @@ class E3GNNTorsoConfig(NamedTuple):
                       residual_x=self.residual_x,
                       get_shifts_via_tensor_product=self.get_shifts_via_tensor_product,
                       normalization_constant=self.normalization_constant,
-                      variance_scaling_init=self.variance_scaling_init
+                      variance_scaling_init=self.variance_scaling_init,
+                      vector_scaling_init=self.vector_scaling_init,
                       )
         return kwargs
 
@@ -196,7 +206,6 @@ class E3Gnn(hk.Module):
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
 
         # Get vector out.
-        # TODO: hunt NaNs
         if self.config.torso_config.residual_x:
             vectors = vectors - vectors_in[:, None, :]
         vectors = e3nn.IrrepsArray('1x1o', vectors)

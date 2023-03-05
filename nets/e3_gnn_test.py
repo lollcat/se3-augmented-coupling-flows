@@ -75,10 +75,10 @@ def e3gnn_test():
     n_vectors_readout = 4
     n_invariant_feat_readout = 4
 
-    torso_config = E3GNNTorsoConfig(n_blocks=2, mlp_units=(4,), n_invariant_feat_hidden=n_invariant_feat_hidden,
+    torso_config = E3GNNTorsoConfig(n_blocks=3, mlp_units=(4,), n_invariant_feat_hidden=n_invariant_feat_hidden,
                                     n_vectors_hidden=n_vectors_hidden,
                                     layer_stack=False,
-                                    get_shifts_via_tensor_product=False)
+                                    get_shifts_via_tensor_product=True)
     e3gnn_config = E3GNNConfig(name="dogfish",
                                n_vectors_readout=n_vectors_readout,
                                n_invariant_feat_readout=n_invariant_feat_readout,
