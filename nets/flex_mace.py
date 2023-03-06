@@ -17,12 +17,12 @@ from mace_jax.modules import (
     RadialEmbeddingBlock,
     MessagePassingConvolution
 )
-# try:
-#     from profile_nn_jax import profile
-# except ImportError:
 
-    # def profile(_, x):
-    #     return x
+
+def irreps_array_repeat(array: e3nn.IrrepsArray, n_repeat: int, axis: int):
+    irreps = array.irreps
+    new_array = jnp.repeat(array.array, n_repeat, axis=axis)
+    return e3nn.IrrepsArray(irreps, new_array)
 
 
 def get_edge_norm_vectors_and_lengths(positions, senders, receivers, eps):
@@ -46,7 +46,7 @@ class FlexMACE(hk.Module):
     """Flexible Mace block for generative modelling."""
     def __init__(
         self,
-        output_irreps: e3nn.Irreps,  # Irreps of the output, default 1x0e
+        output_irreps: e3nn.Irreps,  # Irreps of the output
         mace_layer_output_irreps: e3nn.Irreps, # Irreps of the MaceLayer output, default  x0e+1x1o
         hidden_irreps: e3nn.Irreps,  # 256x0e or 128x0e + 128x1o
          # Layer Readout MLP params -- single hidden later e3nn gate based 
@@ -78,8 +78,7 @@ class FlexMACE(hk.Module):
        
     ):
         super().__init__()
-
-        self.output_irreps = e3nn.Irreps(output_irreps)
+        self.output_irreps = output_irreps
         self.mace_layer_output_irreps  = mace_layer_output_irreps
         self.hidden_irreps = e3nn.Irreps(hidden_irreps)
         self.readout_mlp_irreps = e3nn.Irreps(readout_mlp_irreps)
@@ -126,6 +125,10 @@ class FlexMACE(hk.Module):
         assert positions.ndim == 2 and positions.shape[1] == 3
         assert node_specie.ndim == 1
         assert senders.ndim == 1 and receivers.ndim == 1
+
+        positions = positions[:, None, :]
+        positions = e3nn.IrrepsArray("1x1o", positions - jnp.mean(positions, axis=0, keepdims=True))
+        positions_in = positions
         
         # Note features are Embeddings of discrete node "species" (i.e. hidrogen, carbon,z)
         node_feats = self.node_embedding(node_specie).astype(
@@ -137,7 +140,7 @@ class FlexMACE(hk.Module):
         # node_feats are rotation invariant scalars (0e) initially but become full irreps after MACE layers
         
         norm_vectors, lengths = get_edge_norm_vectors_and_lengths(
-            positions,
+            positions.array,
             senders,
             receivers,
             eps=self.epsilon)  # [n_edges, 3]  [n_edges, ]
@@ -147,17 +150,17 @@ class FlexMACE(hk.Module):
         
         # Interactions
         # outputs = []
+
         for i in range(self.num_layers):
             
             # Mace Layer
             first = i == 0
             # last = i == self.num_layers - 1
-
-            interaction_irreps = (
-                self.hidden_irreps
-                if not first
-                else self.hidden_irreps.filter("0e")
-            )
+            if first:
+                interaction_irreps = self.hidden_irreps.filter("0e")
+                lengths = lengths[:, None]
+            else:
+                interaction_irreps = self.hidden_irreps
 
 
             many_body_scalars, many_body_vectors, node_feats = FlexMACELayer(  
@@ -182,31 +185,35 @@ class FlexMACE(hk.Module):
                 lengths=lengths_0[:,None],
                 node_feats=node_feats,
                 node_specie=node_specie,  # not sure if we are going to need this
-                scalar_edge_feats=lengths[:, None],
+                scalar_edge_feats=lengths,
                 senders=senders,
                 receivers=receivers,
             )
-
+            if first:
+                positions = irreps_array_repeat(positions, self.mace_layer_output_irreps.filter("1o").dim, axis=1)
             # residual paths
 
             # update vectors and lengths note that this presserves equivariance
             #this can be summed because L1 harmonics are just vectors 
-            positions = positions + many_body_vectors.array
-            norm_vectors, lengths = get_edge_norm_vectors_and_lengths(
-                                                    positions,
+            positions = positions + many_body_vectors.mul_to_axis(axis=1)
+            norm_vectors, lengths = jax.vmap(get_edge_norm_vectors_and_lengths, in_axes=(1, None, None, None),
+                                             out_axes=1)(
+                                                    positions.array,
                                                     senders,
                                                     receivers,
-                                                    eps=self.epsilon)  # [n_edges, 3]  [n_edges, ]
+                                                    eps=self.epsilon)  # [n_edges, 3]  [n_edges,]
+            lengths = jnp.reshape(lengths, (lengths.shape[0], jnp.prod(lengths.shape[1:])))
             # update node features 
-            mlp_inputs = e3nn.concatenate([residual_node_feats, many_body_scalars], axis=1)
-            mlp_layer_sizes =   (self.residual_mlp_depth-1) * [self.residual_mlp_width] + [self.hidden_scalar_dim]
+            mlp_inputs = e3nn.concatenate([residual_node_feats, many_body_scalars], axis=-1)
+            mlp_layer_sizes = (self.residual_mlp_depth-1) * [self.residual_mlp_width] + [self.hidden_scalar_dim]
             residual_node_feats = residual_node_feats + e3nn.haiku.MultiLayerPerceptron(
               mlp_layer_sizes,
              act=self.activation)(mlp_inputs)  # [self.num_features * self.hidden_irreps] 
 
-        # Note that in this configuration only scalars will be outputed 
+        # Note that in this configuration only scalars will be outputed
+        readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)])
         node_outputs = e3nn.haiku.Linear(self.output_irreps,
-                name="output_linear", biases=True)(residual_node_feats)
+                name="output_linear", biases=True)(readout_in)
         return node_outputs  # [n_nodes, output_irreps]
 
 
@@ -272,16 +279,13 @@ class FlexMACELayer(hk.Module):
         senders: jnp.ndarray,  # [n_edges]
         receivers: jnp.ndarray,  # [n_edges]
     ):
-        
         edge_feats = e3nn.spherical_harmonics(
                 self.sh_irreps,
                 vectors,
                 normalize=False,
                 normalization="component",
-                ) # [n_edges, sh_irreps]
-
-        # edge_attrs = profile("embedding: edge_attrs", edge_attrs)
-        # node_feats = profile(f"{self.name}: node_feats", node_feats)
+                )  # [n_edges, sh_irreps]
+        edge_feats = edge_feats.axis_to_mul(axis=-2)
 
             
         node_feats = FlexInteractionBlock(
