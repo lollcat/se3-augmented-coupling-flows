@@ -42,12 +42,14 @@ class MessagePassingConvolution(hk.Module):
         target_irreps: e3nn.Irreps,
         activation: Callable,
         mlp_units: Sequence[int],
+        use_e3nn_haiku: bool,
     ):
         super().__init__()
         self.avg_num_neighbors = avg_num_neighbors
         self.target_irreps = e3nn.Irreps(target_irreps)
         self.activation = activation
-        self.mlp_units = list(mlp_units)
+        self.mlp_units = mlp_units
+        self.use_e3nn_haiku = use_e3nn_haiku
 
     def __call__(
         self,
@@ -64,10 +66,11 @@ class MessagePassingConvolution(hk.Module):
                     edge_attrs,
                     filter_ir_out=self.target_irreps,
                 )
-        mix = e3nn.haiku.MultiLayerPerceptron(
-            self.mlp_units + [messages.irreps.num_irreps],
-            self.activation,
-            output_activation=False,
+        mix = GeneralMLP(
+            use_e3nn=self.use_e3nn_haiku,
+            output_sizes=list(self.mlp_units) + [messages.irreps.num_irreps],
+            activation=self.activation,
+            activate_final=False,
         )(
             edge_feats.filter(keep="0e")
         )  # [n_edges, num_irreps]

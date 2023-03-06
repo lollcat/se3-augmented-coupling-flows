@@ -87,7 +87,8 @@ class EGCL(hk.Module):
             sph_harmon = sph_harmon.axis_to_mul()
             # TODO: fix target irreps here.
             vector_per_node = MessagePassingConvolution(avg_num_neighbors=n_nodes-1, target_irreps=self.vector_irreps,
-                                                        activation=self.activation_fn, mlp_units=self.mlp_units)(
+                                                        activation=self.activation_fn, mlp_units=self.mlp_units,
+                                                        use_e3nn_haiku=self.use_e3nn_haiku)(
                 m_ij, sph_harmon, receivers, n_nodes)
             vector_per_node = e3nn.haiku.Linear(self.vector_irreps)(vector_per_node)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
