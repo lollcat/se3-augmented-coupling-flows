@@ -152,7 +152,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
             info.update(invariances_info)
 
         log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
-        marginal_log_lik_info = get_marginal_log_lik_info(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x_batch),
+        marginal_log_lik_info = get_marginal_log_lik_info(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x),
                                                            x_original=x_batch[..., :dim], key=key, K=K,
                                                            global_centering=global_centering,
                                                            aug_scale=aug_scale)
