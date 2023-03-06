@@ -216,13 +216,11 @@ class E3Gnn(hk.Module):
         chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
 
         # Get scalar features.
-        irreps_h = e3nn.Irreps(f"{self.config.torso_config.n_invariant_feat_hidden}x0e")
-        h = e3nn.IrrepsArray(irreps_h, h)
-        invariant_features = e3nn.haiku.Linear(self.output_irreps_scalars)(h)
         if self.config.torso_config.linear_softmax:
-            invariant_features = e3nn_apply_activation(invariant_features, partial(jax.nn.softmax, axis=-1))
-        invariant_features = hk.Linear(invariant_features.shape[-1],
+            h_out = jax.nn.softmax(h, axis=-1)
+        else:
+            h_out = h
+        h_out = hk.Linear(self.config.n_invariant_feat_readout,
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
-                                       )(invariant_features.array)
-
-        return vectors_out, invariant_features
+                                       )(h_out)
+        return vectors_out, h_out

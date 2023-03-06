@@ -21,7 +21,8 @@ class EGCL_Multi(hk.Module):
                  normalize_by_x_norm: bool = True, activation_fn: Callable = jax.nn.silu,
                  normalization_constant: float = 1.0, tanh: bool = False, phi_x_max: float = 10.0,
                  agg='mean', stop_gradient_for_norm: bool = False,
-                 variance_scaling_init: float =0.001):
+                 variance_scaling_init: float =0.001,
+                 cross_attention: bool = False):
 
 
         super().__init__(name=name + "equivariant")
@@ -34,11 +35,13 @@ class EGCL_Multi(hk.Module):
              hk.Linear(n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_x_cross = hk.Sequential([
-            hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
-             hk.Linear(n_heads*n_heads, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
-             hk.Linear(n_heads*n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
-             lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
+        if cross_attention:
+            self.phi_x_cross = hk.Sequential([
+                hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
+                 hk.Linear(n_heads*n_heads, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
+                 hk.Linear(n_heads*n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg",
+                                                                                   "uniform")),
+                 lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
         self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
         self.residual_h = residual
@@ -47,6 +50,7 @@ class EGCL_Multi(hk.Module):
         self.agg = agg
         self.stop_gradient_for_norm = stop_gradient_for_norm
         self.n_heads = n_heads
+        self.cross_attention = cross_attention
 
     def __call__(self, x, h):
         assert x.shape[-2] == self.n_heads
@@ -106,19 +110,22 @@ class EGCL_Multi(hk.Module):
             norm_diff_combo = norm_diff_combo.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)
             equivariant_shift = jnp.einsum('ijhd,ijh->ihd', norm_diff_combo, phi_x_out)
 
-            # cross attention
-            norm = jnp.sqrt(jnp.where(sq_norms_heads == 0., 1., sq_norms_heads)) + self.normalization_constant
-            if self.stop_gradient_for_norm:
-                norm = jax.lax.stop_gradient(norm)
-            norm_diff_combo = diff_combos_heads / norm[..., None]
-            norm_diff_combo = norm_diff_combo.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)
-            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', norm_diff_combo, phi_x_cross_out)
+            if self.cross_attention:
+                # cross attention
+                norm = jnp.sqrt(jnp.where(sq_norms_heads == 0., 1., sq_norms_heads)) + self.normalization_constant
+                if self.stop_gradient_for_norm:
+                    norm = jax.lax.stop_gradient(norm)
+                norm_diff_combo = diff_combos_heads / norm[..., None]
+                norm_diff_combo = norm_diff_combo.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)
+                equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', norm_diff_combo, phi_x_cross_out)
+                equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+                chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
         else:
             equivariant_shift = jnp.einsum('ijhd,ijh->id', diff_combos_nodes, phi_x_out)
-            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', diff_combos_heads, phi_x_cross_out)
-
-        chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
-        equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+            if self.cross_attention:
+                equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', diff_combos_heads, phi_x_cross_out)
+                equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+                chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
 
         if self.agg == 'mean':
             equivariant_shift = equivariant_shift / (n_nodes - 1)
