@@ -111,15 +111,15 @@ class ProjectedScalarAffine(distrax.Bijector):
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
 
-def get_new_space_basis(x: chex.Array, various_x_points: chex.Array, gram_schmidt: bool, global_frame: bool,
+def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
                         add_small_identity: bool = False):
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
-    various_x_points = jnp.swapaxes(various_x_points, 0, 1)
+    various_x_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
 
-    origin = various_x_points[0]
-    basis_vectors = various_x_points[1:] - origin[None, ...]
+    origin = x + various_x_vectors[0]
+    basis_vectors = various_x_vectors[1:]
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
@@ -136,7 +136,7 @@ def get_new_space_basis(x: chex.Array, various_x_points: chex.Array, gram_schmid
         orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
         change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
     else:
-        chex.assert_tree_shape_suffix(various_x_points, (dim, n_nodes, dim))
+        chex.assert_tree_shape_suffix(various_x_vectors, (dim, n_nodes, dim))
 
         z_basis_vector = basis_vectors[0]
         if dim == 3:

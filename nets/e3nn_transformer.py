@@ -185,10 +185,9 @@ class EnTransformer(hk.Module):
             return hk.vmap(self.call_single, split_rng=False)(x)
 
     def call_single(self, x):
-        center_of_mass = jnp.mean(x, axis=0, keepdims=True)
         n_nodes = x.shape[0]
         h = jnp.ones((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
-        vectors = x - center_of_mass
+        vectors = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
         if self.config.torso_config.layer_stack:
@@ -223,6 +222,6 @@ class EnTransformer(hk.Module):
         invariant_features = hk.Linear(invariant_features.shape[-1],
                                        w_init=jnp.zeros if self.config.zero_init_invariant_feat else None,
                                        )(jax.nn.elu(invariant_features.array))
-        return vector_features + center_of_mass[:, None, :], invariant_features
+        return vector_features, invariant_features
 
 
