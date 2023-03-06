@@ -119,7 +119,7 @@ class FlexMACE(hk.Module):
         self,
         # vectors: jnp.ndarray,  # [n_edges, 3]
         positions: jnp.ndarray, # [n_nodes, 3]
-        node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
+        node_specie: jnp.ndarray,  # [5, 1)_nodes] int between 0 and num_species-1
         shared_features: jnp.ndarray, # [dim_shared_features] features shared among all nodes, like time, or total number of atoms in system
         senders: jnp.ndarray,  # [n_edges]
         receivers: jnp.ndarray,  # [n_edges]
@@ -204,7 +204,9 @@ class FlexMACE(hk.Module):
              activation=self.activation, activate_final=False)(mlp_inputs)  # [self.num_features * self.hidden_irreps]
 
         # Note that in this configuration only scalars will be outputed
-        readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)])
+        print('positions', positions.irreps, positions.shape)
+        print('positions_in', positions_in.irreps, positions_in.shape)
+        readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)]).regroup()
         node_outputs = Linear(self.output_irreps,
                 name="output_linear", biases=True)(readout_in)
         return node_outputs  # [n_nodes, output_irreps]
@@ -354,7 +356,7 @@ class FlexNonLinearReadoutBlock(hk.Module):
         num_vectors = (
             self.hidden_irreps.num_irreps
             - self.hidden_irreps.filter(["0e", "0o"]).num_irreps
-        )  # Multiplicity of (l > 0) irreps for which we need extra scalars to act as gates
+        )  # Multiplicity of (l > 0) irreps fo.filter(["0e"r which we need extra scalars to act as gates
         
         # input linear
         x = Linear(
@@ -415,6 +417,8 @@ class FlexInteractionBlock(hk.Module):
             node_feats
         )
 
+        print((node_feats.array == 0).sum(), node_feats.shape)
+
         assert node_feats.ndim == 2
         # returning node feats is correct
         return node_feats  # [n_nodes, target_irreps]
@@ -432,8 +436,6 @@ class FlexMessagePassingConvolution(hk.Module):
     ):
         super().__init__()
         self.avg_num_neighbors = avg_num_neighbors
-        # TODO: why is this like this?
-        # self.target_irreps = e3nn.Irreps(target_irreps)
         self.target_irreps = target_irreps
         
         self.mlp_width = mlp_width
@@ -467,9 +469,10 @@ class FlexMessagePassingConvolution(hk.Module):
             [node_scalars[senders], node_scalars[receivers],
              scalar_edge_feats, lengths], axis=1).regroup()  # we should get one per edge
         
+        num_scalars = self.target_irreps.filter('0e').dim
         # MLP is not equivariant, applies to scalars only 
         mix = HaikuMLP(
-            output_sizes=(self.mlp_depth - 1) * [self.mlp_width] + [messages.irreps.num_irreps], # number of vectors that transform independently, counting channels as different vectors
+            output_sizes=(self.mlp_depth - 1) * [self.mlp_width] + [messages.irreps.num_irreps + num_scalars], # number of vectors that transform independently, counting channels as different vectors
             activation=self.activation,
             activate_final=False,
         )(
@@ -478,7 +481,9 @@ class FlexMessagePassingConvolution(hk.Module):
  
         # irreps only elementwise product with arrays of size num_irreps
 
-        messages = messages * mix  # [n_edges, irreps]
+        # concatenate scalars
+        messages = e3nn.concatenate([messages * mix[:,:-num_scalars], mix[:,-num_scalars:]],
+                                    axis=1).regroup() 
         
         # scatter operation
         zeros = e3nn.IrrepsArray.zeros(
