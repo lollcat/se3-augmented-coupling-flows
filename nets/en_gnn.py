@@ -76,11 +76,8 @@ class EGCL(hk.Module):
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
 
-        # Equation 4(b)
-        e = self.phi_inf(m_ij)
-        e = e.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
-        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
 
+        # Get vector updates.
         # Equation 5(a)
         phi_x_out = jnp.squeeze(self.phi_x(m_ij), axis=-1)
         phi_x_out = phi_x_out.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
@@ -104,6 +101,14 @@ class EGCL(hk.Module):
             assert self.agg == 'sum'
 
         x_new = x + equivariant_shift
+
+        # Get feature updates.
+        # Equation 4(b)
+        e = self.phi_inf(m_ij)
+        e = e.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
+        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
+        if self.agg == 'mean':
+            m_i = m_i / (n_nodes - 1)
 
         # Equation 5(b)
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
@@ -133,6 +138,7 @@ class EgnnTorsoConfig(NamedTuple):
     stop_gradient_for_norm: bool = False
     variance_scaling_init: float = 0.001
     normalization_constant: float = 1.0
+    cross_attention: bool = True  # Only for if multiple x are output.
 
 class EgnnConfig(NamedTuple):
     """Config of the EGNN."""

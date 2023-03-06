@@ -22,7 +22,7 @@ class EGCL_Multi(hk.Module):
                  normalization_constant: float = 1.0, tanh: bool = False, phi_x_max: float = 10.0,
                  agg='mean', stop_gradient_for_norm: bool = False,
                  variance_scaling_init: float =0.001,
-                 cross_attention: bool = False):
+                 cross_attention: bool = True):
 
 
         super().__init__(name=name + "equivariant")
@@ -91,17 +91,20 @@ class EGCL_Multi(hk.Module):
         e = self.phi_inf(m_ij)
         e = e.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
         m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
+        if self.agg == 'mean':
+            m_i = m_i / (n_nodes - 1)
 
+        # Get vectors.
         # Equation 5(a)
         phi_x_out = self.phi_x(m_ij)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
+
 
         if self.cross_attention:
             # Get phi_x_out_cross_attention
             phi_x_cross_out = self.phi_x_cross(m_i)
             phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
 
-        # TODO: add "cross attention" shifting term also here.
         if self.normalize_by_x_norm:
             # Get norm in safe way that prevents nans.
             norm = jnp.sqrt(jnp.where(sq_norms_nodes == 0., 1., sq_norms_nodes)) + self.normalization_constant
@@ -135,6 +138,7 @@ class EGCL_Multi(hk.Module):
 
         x_new = x + equivariant_shift
 
+        # Get feature updates.
         # Equation 5(b)
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
         phi_h_in = jnp.concatenate([m_i, h], axis=-1)
@@ -170,7 +174,8 @@ class multi_se_equivariant_net(hk.Module):
                                                  agg=config.torso_config.agg,
                                                  stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
                                                  variance_scaling_init=config.torso_config.variance_scaling_init,
-                                                 normalization_constant=config.torso_config.normalization_constant
+                                                 normalization_constant=config.torso_config.normalization_constant,
+                                                 cross_attention=config.torso_config.cross_attention
                                                  )(x, h)
         else:
             self.egnn_layers = [EGCL_Multi(config.name,
