@@ -13,6 +13,19 @@ from utils.graph import get_senders_and_receivers_fully_connected, e3nn_apply_ac
 from nets.e3gnn_blocks import MessagePassingConvolution
 
 
+
+class MyMLP(hk.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.mlp = hk.nets.MLP(*args, **kwargs)
+
+    def __call__(self, x: e3nn.IrrepsArray):
+        assert x.irreps.is_scalar()
+        x_out = self.mlp(x.array)
+        irreps_array_out = e3nn.IrrepsArray(irreps=f"{x_out.shape[-1]}x0e", array=x_out)
+        return irreps_array_out
+
+
 class EGCL(hk.Module):
     def __init__(self,
                  mlp_units: Sequence[int],
@@ -48,20 +61,29 @@ class EGCL(hk.Module):
             normalize=False,
             normalization="component")
 
-        self.phi_e = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                               act=self.activation_fn,
-                                                               output_activation=True)
+        use_egnn = False
+        if use_egnn:
+            self.phi_e = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
+                                                                   act=self.activation_fn,
+                                                                   output_activation=True)
 
-        self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"))
-        self.phi_x = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                     act=self.activation_fn,
-                                                     output_activation=True
-                                                     )
-        self.phi_h = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                     act=self.activation_fn,
-                                                     output_activation=True
-                                                     )
-
+            self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"))
+            self.phi_x = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
+                                                         act=self.activation_fn,
+                                                         output_activation=True
+                                                         )
+            self.phi_h = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
+                                                         act=self.activation_fn,
+                                                         output_activation=True
+                                                         )
+        else:
+            self.phi_e = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
+                                                        activate_final=True)
+            self.phi_inf = MyMLP(output_sizes=(1,), activate_final=False)
+            self.phi_x = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
+                                                        activate_final=True)
+            self.phi_h = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
+                                                        activate_final=True)
 
     def __call__(self, node_vectors, node_features):
         n_nodes = node_vectors.shape[0]
@@ -69,7 +91,7 @@ class EGCL(hk.Module):
 
         chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
         chex.assert_tree_shape_suffix(node_vectors, (self.n_vectors_hidden, 3))
-        senders, receivers = get_senders_and_receivers_fully_connected(node_vectors.shape[0])
+        senders, receivers = get_senders_and_receivers_fully_connected(n_nodes)
 
         # Prepare the edge attributes.
         vectors = node_vectors[receivers] - node_vectors[senders]
