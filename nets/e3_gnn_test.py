@@ -138,5 +138,5 @@ def e3gnn_test():
 
 
 if __name__ == '__main__':
-    # layer_test()
-    e3gnn_test()
+    layer_test()
+    # e3gnn_test()

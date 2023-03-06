@@ -10,6 +10,7 @@ from mace_jax.modules.models import safe_norm
 import chex
 
 from utils.graph import get_senders_and_receivers_fully_connected, e3nn_apply_activation
+from nets.e3gnn_blocks import MessagePassingConvolution
 
 
 class EGCL(hk.Module):
@@ -81,23 +82,21 @@ class EGCL(hk.Module):
         m_ij = self.phi_e(scalar_edge_features)
 
         # Get positional output
-        phi_x_out = self.phi_x(m_ij)
         if self.get_shifts_via_tensor_product:
             sph_harmon = jax.vmap(self.sh_harms_fn, in_axes=-2, out_axes=-2)(
                 vectors / (self.normalization_constant + lengths[..., None]))
             sph_harmon = sph_harmon.axis_to_mul()
-            vector_irreps_array = e3nn.haiku.FullyConnectedTensorProduct(self.vector_irreps)(phi_x_out, sph_harmon)
-            vector_irreps_array = mace_jax.modules.NonLinearReadoutBlock(
-                hidden_irreps=vector_irreps_array.irreps,
-                output_irreps=vector_irreps_array.irreps)(
-                vector_irreps_array)
-            vector_per_node = e3nn.scatter_sum(data=vector_irreps_array, dst=receivers, output_size=n_nodes) \
-                              / (n_nodes - 1)
+            # TODO: fix target irreps here.
+            vector_per_node = MessagePassingConvolution(avg_num_neighbors=n_nodes-1, target_irreps=self.vector_irreps,
+                                                        activation=self.activation_fn, mlp_units=self.mlp_units)(
+                m_ij, sph_harmon, receivers, n_nodes)
+            vector_per_node = e3nn.haiku.Linear(self.vector_irreps)(vector_per_node)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
-            # Here is a good place to do something like layer norm.
+            # TODO: Here is a good place to do something like layer norm.
             vectors_out = vectors_out * hk.get_parameter("vector_scaling", shape=(),
                                                          init=hk.initializers.Constant(self.vector_scaling_init))
         else:
+            phi_x_out = self.phi_x(m_ij)
             # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
             phi_x_out = hk.Linear(self.n_vectors_hidden,
                                   w_init=hk.initializers.VarianceScaling(self.variance_scaling_init, "fan_avg", "uniform")
