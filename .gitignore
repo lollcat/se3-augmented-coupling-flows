@@ -4,3 +4,8 @@
 /target/data/qm9_train.npy
 /target/data/qm9_test.npy
 */temp/*
+*.pyc
+*.npz
+*.npy
+*.log
+/outputs

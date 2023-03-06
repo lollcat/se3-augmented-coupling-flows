@@ -103,7 +103,7 @@ class MACE(hk.Module):
         assert senders.ndim == 1 and receivers.ndim == 1
         assert vectors.shape[0] == senders.shape[0] == receivers.shape[0]
 
-        # Embeddings
+        # Note features are Embeddings of discrete node "species" (i.e. hidrogen, carbon,z)
         node_feats = self.node_embedding(node_specie).astype(
             vectors.dtype
         )  # [n_nodes, feature * irreps]
@@ -111,7 +111,7 @@ class MACE(hk.Module):
 
         lengths = safe_norm(vectors, axis=-1)
 
-        edge_attrs = e3nn.concatenate(
+        edge_attrs = e3nn.concatenate( # edge represented by bessels of length + spherical harmonics of direction
             [
                 self.radial_embedding(lengths),
                 e3nn.spherical_harmonics(
