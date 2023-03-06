@@ -4,6 +4,36 @@ import haiku as hk
 import e3nn_jax as e3nn
 import jax.numpy as jnp
 
+class GeneralMLP(hk.Module):
+    def __init__(self, use_e3nn: bool, output_sizes, activation, activate_final):
+        super().__init__()
+        if use_e3nn:
+            self.mlp = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(output_sizes),
+                                                       act=activation,
+                                                       output_activation=activate_final
+                                                       )
+        else:
+            self.mlp = HaikuMLP(output_sizes, activation, activate_final)
+    def __call__(self, x: e3nn.IrrepsArray):
+        assert x.irreps.is_scalar()
+        return self.mlp(x)
+
+
+class HaikuMLP(hk.Module):
+    """Wrap haiku MLP to work on e3nn.IrrepsArray's.
+    Note: Only works on scalars."""
+    def __init__(self, output_sizes, activation, activate_final):
+        super().__init__()
+        self.mlp = hk.nets.MLP(output_sizes=output_sizes,
+                               activation=activation,
+                               activate_final=activate_final)
+
+    def __call__(self, x: e3nn.IrrepsArray):
+        assert x.irreps.is_scalar()
+        x_out = self.mlp(x.array)
+        irreps_array_out = e3nn.IrrepsArray(irreps=f"{x_out.shape[-1]}x0e", array=x_out)
+        return irreps_array_out
+
 
 class MessagePassingConvolution(hk.Module):
     def __init__(

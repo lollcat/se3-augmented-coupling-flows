@@ -42,6 +42,7 @@ flow:
       n_invariant_feat_hidden: 64
       sh_irreps_max_ell: 1
       get_shifts_via_tensor_product: false
+      use_e3nn_haiku: false
     e3transformer:
       n_blocks: 3
       mlp_units: [32, 32]
@@ -108,7 +109,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.nets.type} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.nets.type}_use_e3nn_haiku${flow.nets.e3gnn.use_e3nn_haiku} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

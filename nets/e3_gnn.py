@@ -10,20 +10,7 @@ from mace_jax.modules.models import safe_norm
 import chex
 
 from utils.graph import get_senders_and_receivers_fully_connected, e3nn_apply_activation
-from nets.e3gnn_blocks import MessagePassingConvolution
-
-
-
-class MyMLP(hk.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.mlp = hk.nets.MLP(*args, **kwargs)
-
-    def __call__(self, x: e3nn.IrrepsArray):
-        assert x.irreps.is_scalar()
-        x_out = self.mlp(x.array)
-        irreps_array_out = e3nn.IrrepsArray(irreps=f"{x_out.shape[-1]}x0e", array=x_out)
-        return irreps_array_out
+from nets.e3gnn_blocks import MessagePassingConvolution, GeneralMLP
 
 
 class EGCL(hk.Module):
@@ -39,6 +26,7 @@ class EGCL(hk.Module):
                  get_shifts_via_tensor_product: bool,
                  variance_scaling_init: float,
                  vector_scaling_init: float,
+                 use_e3nn_haiku: bool
                  ):
         super().__init__()
         self.vector_scaling_init = vector_scaling_init
@@ -51,6 +39,7 @@ class EGCL(hk.Module):
         self.residual_x = residual_x
         self.normalization_constant = normalization_constant
         self.get_shifts_via_tensor_product = get_shifts_via_tensor_product
+        self.use_e3nn_haiku = use_e3nn_haiku
 
         self.feature_irreps = e3nn.Irreps(f"{n_invariant_feat_hidden}x0e")
         self.vector_irreps = e3nn.Irreps(f"{n_vectors_hidden}x1o")
@@ -61,29 +50,15 @@ class EGCL(hk.Module):
             normalize=False,
             normalization="component")
 
-        use_egnn = False
-        if use_egnn:
-            self.phi_e = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                                   act=self.activation_fn,
-                                                                   output_activation=True)
+        self.phi_e = GeneralMLP(use_e3nn=use_e3nn_haiku,
+                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
+        self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e")) if use_e3nn_haiku else \
+            GeneralMLP(use_e3nn=False, output_sizes=(1,), activation=None, activate_final=False)
+        self.phi_x = GeneralMLP(use_e3nn=use_e3nn_haiku,
+                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
+        self.phi_h = GeneralMLP(use_e3nn=use_e3nn_haiku,
+                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
 
-            self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"))
-            self.phi_x = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                         act=self.activation_fn,
-                                                         output_activation=True
-                                                         )
-            self.phi_h = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
-                                                         act=self.activation_fn,
-                                                         output_activation=True
-                                                         )
-        else:
-            self.phi_e = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
-                                                        activate_final=True)
-            self.phi_inf = MyMLP(output_sizes=(1,), activate_final=False)
-            self.phi_x = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
-                                                        activate_final=True)
-            self.phi_h = MyMLP(output_sizes=self.mlp_units, activation=self.activation_fn,
-                                                        activate_final=True)
 
     def __call__(self, node_vectors, node_features):
         n_nodes = node_vectors.shape[0]
@@ -168,6 +143,7 @@ class E3GNNTorsoConfig(NamedTuple):
     normalization_constant: float = 1.
     variance_scaling_init: float = 0.001
     vector_scaling_init: float = 0.001
+    use_e3nn_haiku: bool = False
 
     def get_EGCL_kwargs(self):
         kwargs = {}
@@ -182,6 +158,7 @@ class E3GNNTorsoConfig(NamedTuple):
                       normalization_constant=self.normalization_constant,
                       variance_scaling_init=self.variance_scaling_init,
                       vector_scaling_init=self.vector_scaling_init,
+                      use_e3nn_haiku=self.use_e3nn_haiku
                       )
         return kwargs
 
