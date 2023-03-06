@@ -47,43 +47,33 @@ def test_mace(dim: int = 3, n_nodes: int = 5):
 
     key, subkey = jax.random.split(key)
     params = mace_forward_fn.init(subkey, positions)
-    positions_out, h = jax.jit(mace_forward_fn.apply)(params, positions)
-    chex.assert_shape(positions_out, (n_nodes, config.n_vectors_readout, dim))
+    vectors_out, h = jax.jit(mace_forward_fn.apply)(params, positions)
+    chex.assert_shape(vectors_out, (n_nodes, config.n_vectors_readout, dim))
     chex.assert_shape(h, (n_nodes, config.n_invariant_feat_readout))
-
-
-    # Visualise vectors.
-    vectors_in = positions - jnp.mean(positions, axis=(0, 1))
-    vectors_out = positions_out - jnp.mean(positions_out, axis=(0, 1))
-    fig, ax = plot_points_and_vectors(vectors_in / jnp.linalg.norm(vectors_in, axis=-1, keepdims=True))
-    ax.set_title('normalized vectors in')
-    plt.show()
-    fig, ax = plot_points_and_vectors(vectors_out / jnp.linalg.norm(vectors_out, axis=-1, keepdims=True))
-    ax.set_title('normalized vectors out')
-    plt.show()
 
     fig, ax = plot_points_and_vectors(positions)
     ax.set_title("postions in")
     plt.show()
-    fig, ax = plot_points_and_vectors(positions_out)
-    ax.set_title("postions out")
+
+    # Visualise vectors.
+    fig, ax = plot_points_and_vectors(vectors_out / jnp.linalg.norm(vectors_out, axis=-1, keepdims=True))
+    ax.set_title('normalized vectors out')
     plt.show()
+
 
     # Test equivariance.
     key, subkey = jax.random.split(key)
     theta = jax.random.uniform(subkey) * 2 * jnp.pi
     key, subkey = jax.random.split(key)
-    translation = jax.random.normal(subkey, shape=(dim,))
-    key, subkey = jax.random.split(key)
     phi = jax.random.uniform(subkey) * 2 * jnp.pi
-    def group_action(x, theta=theta, translation=translation):
+    def group_action(x, theta=theta, translation=jnp.zeros(dim)):
         x_rot = rotate_translate_permute_3d(x, theta, phi, translation, permute=False)
         return x_rot
 
     x_g = group_action(positions)
     x_g_out, h_g = mace_forward_fn.apply(params, x_g)
 
-    x_out_g = jax.vmap(group_action)(positions_out)
+    x_out_g = jax.vmap(group_action)(vectors_out)
 
     chex.assert_trees_all_close(h, h_g, rtol=rtol)
     chex.assert_trees_all_close(x_out_g, x_g_out, rtol=rtol)

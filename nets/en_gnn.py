@@ -45,7 +45,7 @@ class EGCL(hk.Module):
              hk.Linear(1, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
         self.normalization_constant = normalization_constant
@@ -76,11 +76,8 @@ class EGCL(hk.Module):
         m_ij = self.phi_e(jnp.concatenate([sq_norms[..., None], h_combos], axis=-1))
         m_ij = m_ij.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
 
-        # Equation 4(b)
-        e = self.phi_inf(m_ij)
-        e = e.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
-        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
 
+        # Get vector updates.
         # Equation 5(a)
         phi_x_out = jnp.squeeze(self.phi_x(m_ij), axis=-1)
         phi_x_out = phi_x_out.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
@@ -104,6 +101,14 @@ class EGCL(hk.Module):
             assert self.agg == 'sum'
 
         x_new = x + equivariant_shift
+
+        # Get feature updates.
+        # Equation 4(b)
+        e = self.phi_inf(m_ij)
+        e = e.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)  # explicitly set diagonal to 0
+        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
+        if self.agg == 'mean':
+            m_i = m_i / (n_nodes - 1)
 
         # Equation 5(b)
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
@@ -133,6 +138,7 @@ class EgnnTorsoConfig(NamedTuple):
     stop_gradient_for_norm: bool = False
     variance_scaling_init: float = 0.001
     normalization_constant: float = 1.0
+    cross_attention: bool = False  # Only for if multiple x are output.
 
 class EgnnConfig(NamedTuple):
     """Config of the EGNN."""
@@ -187,19 +193,11 @@ class EnGNN(hk.Module):
     
     def forward_single(self, x):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
-
+        x_in = x
         # Perform forward pass of EGNN.
 
-        # No node feature, so initialise them invariant fn of x.
-        diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        sq_norms = jnp.sum(diff_combos**2, axis=-1)
-        h = hk.Linear(self.config.torso_config.h_embedding_dim)(sq_norms[..., None])
-
-        if self.config.torso_config.h_linear_softmax:
-            h = h.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            h = jax.nn.softmax(h, axis=-2)
-        h = jnp.mean(h, axis=-2)
+        # No node feature, so initialise them zeros.
+        h = jnp.zeros((*x.shape[:-1], self.config.torso_config.h_embedding_dim))
 
         if self.config.torso_config.hk_layer_stack:
             # Use layer_stack to speed up compilation time.
@@ -212,24 +210,9 @@ class EnGNN(hk.Module):
             for layer in self.egnn_layers:
                 x_out, h_egnn = layer(x_out, h_egnn)
 
-        # Pass square norms of x as a feature.
-        sq_norms = get_norms_sqrd(x)[..., None]
-
-        if self.config.torso_config.h_linear_softmax:
-            sq_norms = hk.Linear(self.config.torso_config.h_embedding_dim)(sq_norms)
-            sq_norms = sq_norms.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            sq_norms = jax.nn.softmax(sq_norms, axis=-2)
-
-        mlp_out = hk.nets.MLP((*self.config.torso_config.mlp_units, self.config.torso_config.h_embedding_dim),
-                              activate_final=True, activation=self.config.torso_config.activation_fn)(sq_norms)
-        h_out = jnp.mean(mlp_out, axis=-2)
-
         # Use h_egnn output from the EGNN as a feature for h-out.
         if self.config.torso_config.h_linear_softmax:
             h_egnn = jax.nn.softmax(h_egnn, axis=-1)
 
-        # passing h_out, and h_egnn into the final linear layer is a bit like a big skip connection.
-        h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
-
-        h_out = self.h_final_layer(h_out)
-        return x_out, h_out
+        h_out = self.h_final_layer(h_egnn)
+        return x_out - x_in, h_out

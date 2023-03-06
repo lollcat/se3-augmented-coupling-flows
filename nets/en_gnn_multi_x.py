@@ -21,7 +21,8 @@ class EGCL_Multi(hk.Module):
                  normalize_by_x_norm: bool = True, activation_fn: Callable = jax.nn.silu,
                  normalization_constant: float = 1.0, tanh: bool = False, phi_x_max: float = 10.0,
                  agg='mean', stop_gradient_for_norm: bool = False,
-                 variance_scaling_init: float =0.001):
+                 variance_scaling_init: float =0.001,
+                 cross_attention: bool = False):
 
 
         super().__init__(name=name + "equivariant")
@@ -34,19 +35,22 @@ class EGCL_Multi(hk.Module):
              hk.Linear(n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_x_cross = hk.Sequential([
-            hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
-             hk.Linear(n_heads*n_heads, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
-             hk.Linear(n_heads*n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
-             lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
+        if cross_attention:
+            self.phi_x_cross = hk.Sequential([
+                hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
+                 hk.Linear(n_heads*n_heads, w_init=jnp.zeros, b_init=jnp.zeros) if identity_init_x else
+                 hk.Linear(n_heads*n_heads, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg",
+                                                                                   "uniform")),
+                 lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
         self.normalization_constant = normalization_constant
         self.agg = agg
         self.stop_gradient_for_norm = stop_gradient_for_norm
         self.n_heads = n_heads
+        self.cross_attention = cross_attention
 
     def __call__(self, x, h):
         assert x.shape[-2] == self.n_heads
@@ -61,6 +65,7 @@ class EGCL_Multi(hk.Module):
         chex.assert_rank(x, 3)
         chex.assert_rank(h, 2)
         n_nodes, n_heads = x.shape[0:2]
+        avg_num_neighbours = n_nodes - 1
 
         # Equation 4(a)
         # Append norms between all heads to h.
@@ -87,16 +92,19 @@ class EGCL_Multi(hk.Module):
         e = self.phi_inf(m_ij)
         e = e.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
         m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
+        m_i = m_i / jnp.sqrt(avg_num_neighbours)
 
+        # Get vectors.
         # Equation 5(a)
         phi_x_out = self.phi_x(m_ij)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
-        # Get phi_x_out_cross_attention
-        phi_x_cross_out = self.phi_x_cross(m_i)
-        phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
 
-        # TODO: add "cross attention" shifting term also here.
+        if self.cross_attention:
+            # Get phi_x_out_cross_attention
+            phi_x_cross_out = self.phi_x_cross(m_i)
+            phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
+
         if self.normalize_by_x_norm:
             # Get norm in safe way that prevents nans.
             norm = jnp.sqrt(jnp.where(sq_norms_nodes == 0., 1., sq_norms_nodes)) + self.normalization_constant
@@ -106,27 +114,31 @@ class EGCL_Multi(hk.Module):
             norm_diff_combo = norm_diff_combo.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)
             equivariant_shift = jnp.einsum('ijhd,ijh->ihd', norm_diff_combo, phi_x_out)
 
-            # cross attention
-            norm = jnp.sqrt(jnp.where(sq_norms_heads == 0., 1., sq_norms_heads)) + self.normalization_constant
-            if self.stop_gradient_for_norm:
-                norm = jax.lax.stop_gradient(norm)
-            norm_diff_combo = diff_combos_heads / norm[..., None]
-            norm_diff_combo = norm_diff_combo.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)
-            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', norm_diff_combo, phi_x_cross_out)
+            if self.cross_attention:
+                # cross attention
+                norm = jnp.sqrt(jnp.where(sq_norms_heads == 0., 1., sq_norms_heads)) + self.normalization_constant
+                if self.stop_gradient_for_norm:
+                    norm = jax.lax.stop_gradient(norm)
+                norm_diff_combo = diff_combos_heads / norm[..., None]
+                norm_diff_combo = norm_diff_combo.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)
+                equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', norm_diff_combo, phi_x_cross_out)
+                equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+                chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
         else:
             equivariant_shift = jnp.einsum('ijhd,ijh->id', diff_combos_nodes, phi_x_out)
-            equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', diff_combos_heads, phi_x_cross_out)
-
-        chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
-        equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+            if self.cross_attention:
+                equivariant_shift_cross_attention = jnp.einsum('nijd,nij->njd', diff_combos_heads, phi_x_cross_out)
+                equivariant_shift = equivariant_shift + equivariant_shift_cross_attention
+                chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
 
         if self.agg == 'mean':
-            equivariant_shift = equivariant_shift / (n_nodes - 1)
+            equivariant_shift = equivariant_shift / avg_num_neighbours
         else:
             assert self.agg == 'sum'
 
         x_new = x + equivariant_shift
 
+        # Get feature updates.
         # Equation 5(b)
         phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
         phi_h_in = jnp.concatenate([m_i, h], axis=-1)
@@ -162,7 +174,8 @@ class multi_se_equivariant_net(hk.Module):
                                                  agg=config.torso_config.agg,
                                                  stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
                                                  variance_scaling_init=config.torso_config.variance_scaling_init,
-                                                 normalization_constant=config.torso_config.normalization_constant
+                                                 normalization_constant=config.torso_config.normalization_constant,
+                                                 cross_attention=config.torso_config.cross_attention
                                                  )(x, h)
         else:
             self.egnn_layers = [EGCL_Multi(config.name,
@@ -197,17 +210,8 @@ class multi_se_equivariant_net(hk.Module):
         x_original = x
         # Perform forward pass of EGNN.
 
-        # No node feature, so initialise them invariant fn of x.
-        diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-        diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        sq_norms = jnp.sum(diff_combos**2, axis=-1)
-        h = hk.Linear(self.egnn_config.h_embedding_dim)(sq_norms[..., None])
-
-        if self.egnn_config.h_linear_softmax:
-            h = h.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            h = jax.nn.softmax(h, axis=-2)
-        h = jnp.mean(h, axis=-2)
-
+        # No node feature, so initialise them zeros.
+        h = jnp.zeros((*x.shape[:-1], self.egnn_config.h_embedding_dim))
 
         # Project to number of heads
         x = jnp.repeat(x[:, None, ...], repeats=self.n_heads, axis=1)
@@ -222,22 +226,9 @@ class multi_se_equivariant_net(hk.Module):
             for layer in self.egnn_layers:
                 x_out, h_egnn = layer(x_out, h_egnn)
 
-        # Pass square norms of x as a feature.
-        sq_norms = get_norms_sqrd(x_original)[..., None]
-
-        if self.egnn_config.h_linear_softmax:
-            sq_norms = hk.Linear(self.egnn_config.h_embedding_dim)(sq_norms)
-            sq_norms = sq_norms.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(-1e30)
-            sq_norms = jax.nn.softmax(sq_norms, axis=-2)
-
-        mlp_out = hk.nets.MLP((*self.egnn_config.mlp_units, self.egnn_config.h_embedding_dim),
-                              activate_final=True, activation=self.egnn_config.activation_fn)(sq_norms)
-        h_out = jnp.mean(mlp_out, axis=-2)
-
         # Use h_egnn output from the EGNN as a feature for h-out.
         if self.egnn_config.h_linear_softmax:
             h_egnn = jax.nn.softmax(h_egnn, axis=-1)
-        h_out = jnp.concatenate([h_out, h_egnn], axis=-1)
 
-        h_out = self.h_final_layer(h_out)
-        return x_out, h_out
+        h_out = self.h_final_layer(h_egnn)
+        return x_out - x_original[:, None], h_out

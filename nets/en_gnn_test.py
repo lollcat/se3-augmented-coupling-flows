@@ -5,16 +5,20 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils.numerical import rotate_translate_permute_2d
-from nets.en_gnn_multi_x import multi_se_equivariant_net, HConfig, MultiEgnnConfig, EgnnConfig
+from nets.en_gnn_multi_x import multi_se_equivariant_net, MultiEgnnConfig, EgnnTorsoConfig
 
 
 def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
                         n_heads: int = 2):
     """Run the EGNN forward pass, and check that it is equivariant."""
-    h_config = HConfig(h_embedding_dim=3, h_out=True, h_out_dim=2, share_h=True, linear_softmax=True)
-    eggn_config = EgnnConfig(name='egnn', mlp_units=(16,), identity_init_x=False, n_layers=2,
-                                  h_config=h_config, zero_init_h=False)
-    multi_x_config = MultiEgnnConfig(n_heads=n_heads, egnn_config=eggn_config)
+    eggn_config = EgnnTorsoConfig(mlp_units=(16,), identity_init_x=False, n_layers=2,
+                                  zero_init_h=False,
+                                  h_embedding_dim=3, h_linear_softmax=True,
+                                  hk_layer_stack=False)
+    multi_x_config = MultiEgnnConfig(
+        name="multi_x_egnn",
+        n_equivariant_vectors_out=n_heads,
+        n_invariant_feat_out=3*n_heads, torso_config=eggn_config, invariant_feat_zero_init=False)
 
     equivariant_fn = hk.without_apply_rng(hk.transform(lambda x: multi_se_equivariant_net(multi_x_config)(x)))
 
@@ -25,12 +29,11 @@ def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
     x = jax.random.normal(subkey, shape=(batch_size, n_nodes, dim))
     key, subkey = jax.random.split(key)
     theta = jax.random.normal(subkey, shape=(batch_size, ))
-    key, subkey = jax.random.split(key)
-    shift = jax.random.normal(subkey, shape=(batch_size, dim))
+    shift = jnp.zeros((batch_size, dim))
 
 
-    x_transformed = jax.vmap(rotate_translate_permute_2d)(x, theta, shift)
-    x_untransformed = jax.vmap(partial(rotate_translate_permute_2d, rotate_first=False))(x_transformed, -theta, -shift)
+    x_transformed = jax.vmap(partial(rotate_translate_permute_2d, permute=False))(x, theta, shift)
+    x_untransformed = jax.vmap(partial(rotate_translate_permute_2d, rotate_first=False, permute=False))(x_transformed, -theta, -shift)
     chex.assert_trees_all_close(x_untransformed, x)
 
     if x.dtype == jnp.float64:
