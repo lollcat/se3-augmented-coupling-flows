@@ -17,7 +17,8 @@ def layer_test():
     n_invariant_feat_hidden = 3
 
     torso_config = E3GNNTorsoConfig(n_blocks=2, mlp_units=(4,), n_invariant_feat_hidden=n_invariant_feat_hidden,
-                                    n_vectors_hidden=n_vectors_hidden)
+                                    n_vectors_hidden=n_vectors_hidden,
+                                    get_shifts_via_tensor_product=True)
 
     @hk.without_apply_rng
     @hk.transform

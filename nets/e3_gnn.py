@@ -88,13 +88,12 @@ class EGCL(hk.Module):
             # TODO: fix target irreps here.
             vector_per_node = MessagePassingConvolution(avg_num_neighbors=n_nodes-1, target_irreps=self.vector_irreps,
                                                         activation=self.activation_fn, mlp_units=self.mlp_units,
-                                                        use_e3nn_haiku=self.use_e3nn_haiku)(
+                                                        use_e3nn_haiku=self.use_e3nn_haiku,
+                                                        variance_scaling_init=self.variance_scaling_init)(
                 m_ij, sph_harmon, receivers, n_nodes)
             vector_per_node = e3nn.haiku.Linear(self.vector_irreps, biases=True)(vector_per_node)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
             # TODO: Here is a good place to do something like layer norm.
-            vectors_out = vectors_out * hk.get_parameter("vector_scaling", shape=(),
-                                                         init=hk.initializers.Constant(self.vector_scaling_init))
         else:
             phi_x_out = self.phi_x(m_ij)
             # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
