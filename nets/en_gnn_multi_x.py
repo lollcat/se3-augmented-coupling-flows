@@ -96,9 +96,10 @@ class EGCL_Multi(hk.Module):
         phi_x_out = self.phi_x(m_ij)
         phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
 
-        # Get phi_x_out_cross_attention
-        phi_x_cross_out = self.phi_x_cross(m_i)
-        phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
+        if self.cross_attention:
+            # Get phi_x_out_cross_attention
+            phi_x_cross_out = self.phi_x_cross(m_i)
+            phi_x_cross_out = jnp.reshape(phi_x_cross_out, (n_nodes, n_heads, n_heads))
 
         # TODO: add "cross attention" shifting term also here.
         if self.normalize_by_x_norm:
