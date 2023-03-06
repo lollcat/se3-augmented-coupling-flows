@@ -22,11 +22,23 @@ class GeneralMLP(hk.Module):
 class HaikuMLP(hk.Module):
     """Wrap haiku MLP to work on e3nn.IrrepsArray's.
     Note: Only works on scalars."""
-    def __init__(self, output_sizes, activation, activate_final):
+    def __init__(self, output_sizes, activation, activate_final, variance_init_final_scale = 0.001):
         super().__init__()
-        self.mlp = hk.nets.MLP(output_sizes=output_sizes,
-                               activation=activation,
-                               activate_final=activate_final)
+        if variance_init_final_scale:
+            linear = hk.Linear(output_sizes[-1],
+                               w_init=hk.initializers.VarianceScaling(variance_init_final_scale,
+                                                                      "fan_avg", "uniform"))
+            sequential_in = [hk.nets.MLP(output_sizes=output_sizes,
+                                   activation=activation,
+                                   activate_final=True),
+                                   linear]
+            if activate_final:
+                sequential_in.append(activation)
+            self.mlp = hk.Sequential(sequential_in)
+        else:
+            self.mlp = hk.nets.MLP(output_sizes=output_sizes,
+                                   activation=activation,
+                                   activate_final=activate_final)
 
     def __call__(self, x: e3nn.IrrepsArray):
         assert x.irreps.is_scalar()

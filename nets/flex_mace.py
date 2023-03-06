@@ -19,6 +19,7 @@ from mace_jax.modules import (
     MessagePassingConvolution
 )
 from nets.e3gnn_linear_haiku import Linear
+from nets.e3gnn_blocks import HaikuMLP
 
 
 def irreps_array_repeat(array: e3nn.IrrepsArray, n_repeat: int, axis: int):
@@ -199,9 +200,9 @@ class FlexMACE(hk.Module):
             # update node features 
             mlp_inputs = e3nn.concatenate([residual_node_feats, many_body_scalars], axis=-1)
             mlp_layer_sizes = (self.residual_mlp_depth-1) * [self.residual_mlp_width] + [self.hidden_scalar_dim]
-            residual_node_feats = residual_node_feats + e3nn.haiku.MultiLayerPerceptron(
-              mlp_layer_sizes,
-             act=self.activation)(mlp_inputs)  # [self.num_features * self.hidden_irreps] 
+            residual_node_feats = residual_node_feats + HaikuMLP(
+             output_sizes=mlp_layer_sizes,
+             activation=self.activation, activate_final=False)(mlp_inputs)  # [self.num_features * self.hidden_irreps]
 
         # Note that in this configuration only scalars will be outputed
         readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)])
@@ -468,10 +469,10 @@ class FlexMessagePassingConvolution(hk.Module):
              scalar_edge_feats, lengths], axis=1).regroup()  # we should get one per edge
         
         # MLP is not equivariant, applies to scalars only 
-        mix = e3nn.haiku.MultiLayerPerceptron(
-            (self.mlp_depth - 1) * [self.mlp_width] + [messages.irreps.num_irreps], # number of vectors that transform independently, counting channels as different vectors
-            self.activation,
-            output_activation=False,
+        mix = HaikuMLP(
+            output_sizes=(self.mlp_depth - 1) * [self.mlp_width] + [messages.irreps.num_irreps], # number of vectors that transform independently, counting channels as different vectors
+            activation=self.activation,
+            activate_final=False,
         )(
             mlp_input_features.filter(keep="0e")   # vector should only contain 0e anyway
         )  # [n_edges, num_irreps]
