@@ -43,7 +43,7 @@ class EGCL_Multi(hk.Module):
                                                                                    "uniform")),
                  lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
         self.normalization_constant = normalization_constant
@@ -65,6 +65,7 @@ class EGCL_Multi(hk.Module):
         chex.assert_rank(x, 3)
         chex.assert_rank(h, 2)
         n_nodes, n_heads = x.shape[0:2]
+        avg_num_neighbours = n_nodes - 1
 
         # Equation 4(a)
         # Append norms between all heads to h.
@@ -91,8 +92,7 @@ class EGCL_Multi(hk.Module):
         e = self.phi_inf(m_ij)
         e = e.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
         m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
-        if self.agg == 'mean':
-            m_i = m_i / (n_nodes - 1)
+        m_i = m_i / jnp.sqrt(avg_num_neighbours)
 
         # Get vectors.
         # Equation 5(a)
@@ -132,7 +132,7 @@ class EGCL_Multi(hk.Module):
                 chex.assert_equal_shape((equivariant_shift, equivariant_shift_cross_attention))
 
         if self.agg == 'mean':
-            equivariant_shift = equivariant_shift / (n_nodes - 1)
+            equivariant_shift = equivariant_shift / avg_num_neighbours
         else:
             assert self.agg == 'sum'
 

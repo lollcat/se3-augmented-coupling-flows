@@ -45,7 +45,7 @@ class EGCL(hk.Module):
              hk.Linear(1, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform")),
              lambda x: jax.nn.tanh(x)*phi_x_max if tanh else x])
 
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=False, activation=activation_fn)
+        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
         self.residual_h = residual
         self.normalize_by_x_norm = normalize_by_x_norm
         self.normalization_constant = normalization_constant

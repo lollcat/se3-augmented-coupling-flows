@@ -65,6 +65,8 @@ class EGCL(hk.Module):
 
     def __call__(self, node_vectors, node_features):
         n_nodes = node_vectors.shape[0]
+        avg_num_neighbours = n_nodes - 1
+
         chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
         chex.assert_tree_shape_suffix(node_vectors, (self.n_vectors_hidden, 3))
         senders, receivers = get_senders_and_receivers_fully_connected(node_vectors.shape[0])
@@ -104,14 +106,14 @@ class EGCL(hk.Module):
             shifts_ij = phi_x_out[:, :, None] * \
                         vectors / (self.normalization_constant + lengths[:, :, None])
             shifts_i = e3nn.scatter_sum(data=shifts_ij, dst=receivers, output_size=n_nodes)
-            vectors_out = shifts_i / (n_nodes - 1)
+            vectors_out = shifts_i / avg_num_neighbours
         chex.assert_equal_shape((vectors_out, node_vectors))
 
         # Get feature output
         e = self.phi_inf(m_ij)
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
-        m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes) / (n_nodes - 1)
+        m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes) / jnp.sqrt(avg_num_neighbours)
         assert m_i.irreps == e3nn.Irreps(f"{self.mlp_units[-1]}x0e")
         phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
