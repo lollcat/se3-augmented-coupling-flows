@@ -52,7 +52,7 @@ class EGCL(hk.Module):
 
         self.phi_e = GeneralMLP(use_e3nn=use_e3nn_haiku,
                                 output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
-        self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e")) if use_e3nn_haiku else \
+        self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"), biases=True) if use_e3nn_haiku else \
             GeneralMLP(use_e3nn=False, output_sizes=(1,), activation=None, activate_final=False)
         self.phi_x = GeneralMLP(use_e3nn=use_e3nn_haiku,
                                 output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
@@ -90,7 +90,7 @@ class EGCL(hk.Module):
                                                         activation=self.activation_fn, mlp_units=self.mlp_units,
                                                         use_e3nn_haiku=self.use_e3nn_haiku)(
                 m_ij, sph_harmon, receivers, n_nodes)
-            vector_per_node = e3nn.haiku.Linear(self.vector_irreps)(vector_per_node)
+            vector_per_node = e3nn.haiku.Linear(self.vector_irreps, biases=True)(vector_per_node)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
             # TODO: Here is a good place to do something like layer norm.
             vectors_out = vectors_out * hk.get_parameter("vector_scaling", shape=(),
@@ -115,7 +115,7 @@ class EGCL(hk.Module):
         assert m_i.irreps == e3nn.Irreps(f"{self.mlp_units[-1]}x0e")
         phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
-        phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps)(phi_h_out)
+        phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps, biases=True)(phi_h_out)
         features_out = phi_h_out.array
         chex.assert_equal_shape((features_out, node_features))
 
@@ -143,7 +143,7 @@ class E3GNNTorsoConfig(NamedTuple):
     get_shifts_via_tensor_product: bool = True
     normalization_constant: float = 1.
     variance_scaling_init: float = 0.001
-    vector_scaling_init: float = 0.001
+    vector_scaling_init: float = 0.01
     use_e3nn_haiku: bool = False
 
     def get_EGCL_kwargs(self):
@@ -213,7 +213,7 @@ class E3Gnn(hk.Module):
             vectors = e3nn.IrrepsArray('1x1o', vectors)
             vectors = vectors.axis_to_mul(axis=-2)
             assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
-            vectors = e3nn.haiku.Linear(self.output_irreps_vector)(vectors)
+            vectors = e3nn.haiku.Linear(self.output_irreps_vector, biases=True)(vectors)
             vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
             vectors_out = vectors.array
 
