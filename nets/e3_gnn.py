@@ -50,16 +50,16 @@ class EGCL(hk.Module):
 
         self.phi_e = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
                                                                act=self.activation_fn,
-                                                               output_activation=self.activation_fn)
+                                                               output_activation=True)
 
         self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"))
         self.phi_x = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
                                                      act=self.activation_fn,
-                                                     output_activation=self.activation_fn
+                                                     output_activation=True
                                                      )
         self.phi_h = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(self.mlp_units),
                                                      act=self.activation_fn,
-                                                     output_activation=self.activation_fn
+                                                     output_activation=True
                                                      )
 
 

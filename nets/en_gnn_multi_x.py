@@ -22,7 +22,7 @@ class EGCL_Multi(hk.Module):
                  normalization_constant: float = 1.0, tanh: bool = False, phi_x_max: float = 10.0,
                  agg='mean', stop_gradient_for_norm: bool = False,
                  variance_scaling_init: float =0.001,
-                 cross_attention: bool = True):
+                 cross_attention: bool = False):
 
 
         super().__init__(name=name + "equivariant")

@@ -138,7 +138,7 @@ class EgnnTorsoConfig(NamedTuple):
     stop_gradient_for_norm: bool = False
     variance_scaling_init: float = 0.001
     normalization_constant: float = 1.0
-    cross_attention: bool = True  # Only for if multiple x are output.
+    cross_attention: bool = False  # Only for if multiple x are output.
 
 class EgnnConfig(NamedTuple):
     """Config of the EGNN."""
