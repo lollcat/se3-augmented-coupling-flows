@@ -207,12 +207,16 @@ class E3Gnn(hk.Module):
         # Get vector out.
         if self.config.torso_config.residual_x:
             vectors = vectors - vectors_in[:, None, :]
-        vectors = e3nn.IrrepsArray('1x1o', vectors)
-        vectors = vectors.axis_to_mul(axis=-2)
-        assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
-        vectors = e3nn.haiku.Linear(self.output_irreps_vector)(vectors)
-        vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
-        vectors_out = vectors.array
+        if self.config.torso_config.n_vectors_hidden != self.config.n_vectors_readout:
+            vectors = e3nn.IrrepsArray('1x1o', vectors)
+            vectors = vectors.axis_to_mul(axis=-2)
+            assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
+            vectors = e3nn.haiku.Linear(self.output_irreps_vector)(vectors)
+            vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
+            vectors_out = vectors.array
+
+        else:  # If the shape is the same, pass the vectors out immediately.
+            vectors_out = vectors
         chex.assert_shape(vectors_out, (n_nodes, self.config.n_vectors_readout, 3))
 
         # Get scalar features.
