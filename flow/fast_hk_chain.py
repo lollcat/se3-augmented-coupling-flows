@@ -75,8 +75,8 @@ class Chain(Bijector):
     (x_out, log_det), extra = self.stack(self.single_forward_fn_with_extra)(x, log_det_init, reverse=True)
     return x_out, log_det, extra
 
-  def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array]:
+  def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
     """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
     (x_out, log_det), extra = self.stack(self.single_reverse_fn_with_extra)(y, log_det_init)
-    return x_out, log_det
+    return x_out, log_det, extra

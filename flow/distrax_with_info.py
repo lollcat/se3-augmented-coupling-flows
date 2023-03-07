@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Sequence
+from typing import Tuple, Union, Sequence, Callable
 
 import distrax
 import chex
@@ -60,3 +60,36 @@ class Transformed(distrax.Transformed):
         y, fldj, extra = jax.vmap(self.bijector.forward_and_log_det_with_extra)(x)
         lp_y = jax.vmap(jnp.subtract)(lp_x, fldj)
         return y, lp_y, extra
+
+
+from distrax._src.bijectors.split_coupling import BijectorParams
+
+
+class SplitCouplingWithInfo(distrax.SplitCoupling, Bijector):
+    def __init__(self,
+               split_index: int,
+               event_ndims: int,
+               conditioner: Callable[[Array], BijectorParams],
+               bijector: Callable[[BijectorParams], Bijector],
+               swap: bool = False,
+               split_axis: int = -1):
+        super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
+        self._check_forward_input_shape(x)
+        x1, x2 = self._split(x)
+        params = self._conditioner(x1)
+        inner_bijector = self._inner_bijector(params)
+        y2, logdet, info = inner_bijector.forward_and_log_det_with_info(x2)
+        return self._recombine(x1, y2), logdet
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        """Like inverse_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
+        self._check_inverse_input_shape(y)
+        y1, y2 = self._split(y)
+        params = self._conditioner(y1)
+        x2, logdet = self._inner_bijector(params).inverse_and_log_det(y2)
+        return self._recombine(y1, x2), logdet
+
+
