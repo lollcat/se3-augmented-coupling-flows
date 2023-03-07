@@ -33,7 +33,7 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    type: e3gnn # mace or egnn or e3transformer or e3gnn
+    type: mace # mace or egnn or e3transformer or e3gnn
     e3gnn:
       n_blocks: 3
       mlp_units: [ 32, 32 ]
@@ -50,10 +50,21 @@ flow:
       bessel_number: 10  # Number of bessel functions.
       r_max: 5.
     mace:
-      n_invariant_feat_hidden: 16
-      n_vectors_hidden: 16
-      bessel_number: 10  # Number of bessel functions.
-      r_max: 5.
+      n_vectors_mace_lay_out: 3
+      n_invariant_feat_mace_lay_out: 64
+      n_vectors_readout: 4
+      n_invariant_feat_readout: 4
+      n_vectors_hidden: 4
+      n_invariant_feat_hidden: 64
+      num_features: 1
+      num_species: 1
+      max_ell: 5
+      num_layers: 2
+      correlation: 3
+      interaction_mlp_depth: 3
+      interaction_mlp_width: 64
+      residual_mlp_width: 64
+      residual_mlp_depth: 1
     egnn:
       mlp_units: [32,32]
       n_layers: 3

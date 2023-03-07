@@ -37,8 +37,8 @@ def build_egnn_fn(
         if nets_config.type == "mace":
             mace_config = MACEConfig(name=name+"_mace",
                                      torso_config=nets_config.mace_torso_config,
-                                     n_vectors_readout=n_equivariant_vectors_out,
-                                     n_invariant_feat_readout=n_invariant_feat_out,
+                                     n_vectors_out=n_equivariant_vectors_out,
+                                     n_invariant_feat_out=n_invariant_feat_out,
                                      zero_init_invariant_feat=zero_init_invariant_feat)
             x, h = MaceNet(mace_config)(x)
             if n_equivariant_vectors_out == 1:

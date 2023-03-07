@@ -38,9 +38,9 @@ flow:
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
-      n_vectors_hidden: 3
+      n_vectors_hidden: 5
       n_invariant_feat_hidden: 64
-      sh_irreps_max_ell: 1
+      sh_irreps_max_ell: 3
       get_shifts_via_tensor_product: true
       use_e3nn_haiku: false
     e3transformer:
@@ -53,12 +53,21 @@ flow:
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     mace:
+      n_vectors_mace_lay_out: 3
+      n_invariant_feat_mace_lay_out: 64
+      n_vectors_readout: 4
+      n_invariant_feat_readout: 4
+      n_vectors_hidden: 4
       n_invariant_feat_hidden: 64
-      n_vectors_hidden: 16
-      bessel_number: 10  # Number of bessel functions.
-      r_max: 10.
-      n_interactions: 2
-      interaction_irreps: o3_restricted  # "o3_restricted",  # or o3_full
+      num_features: 1
+      num_species: 1
+      max_ell: 2
+      num_layers: 2
+      correlation: 3
+      interaction_mlp_depth: 3
+      interaction_mlp_width: 64
+      residual_mlp_width: 64
+      residual_mlp_depth: 1
     egnn:
       mlp_units: [64,64]
       n_layers: 3
@@ -92,7 +101,7 @@ training:
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
-  plot_batch_size: 256
+  plot_batch_size: 32
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
@@ -100,7 +109,7 @@ training:
   n_plots: 10
   n_checkpoints: 0
   n_eval: 20
-  K_marginal_log_lik: 20
+  K_marginal_log_lik: 10
   save: true
   save_dir: qm9pos_results
   use_equivariance_loss: false
@@ -109,7 +118,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.nets.type}_use_e3nn_haiku${flow.nets.e3gnn.use_e3nn_haiku}_get_shifts_via_tensor_product${flow.nets.e3gnn.get_shifts_via_tensor_product} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.nets.type}_6_vec_3_max_ell # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

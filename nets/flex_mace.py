@@ -10,13 +10,7 @@ import e3nn_jax as e3nn
 from mace_jax import tools
 from mace_jax.modules.models import safe_norm
 from mace_jax.modules import (
-    EquivariantProductBasisBlock,
-    InteractionBlock,
     LinearNodeEmbeddingBlock,
-    LinearReadoutBlock,
-    NonLinearReadoutBlock,
-    RadialEmbeddingBlock,
-    MessagePassingConvolution
 )
 from nets.e3gnn_linear_haiku import Linear
 from nets.e3gnn_blocks import HaikuMLP
