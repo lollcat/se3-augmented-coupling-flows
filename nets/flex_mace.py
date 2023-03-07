@@ -204,8 +204,6 @@ class FlexMACE(hk.Module):
              activation=self.activation, activate_final=False)(mlp_inputs)  # [self.num_features * self.hidden_irreps]
 
         # Note that in this configuration only scalars will be outputed
-        print('positions', positions.irreps, positions.shape)
-        print('positions_in', positions_in.irreps, positions_in.shape)
         readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)]).regroup()
         node_outputs = Linear(self.output_irreps,
                 name="output_linear", biases=True)(readout_in)
@@ -405,6 +403,8 @@ class FlexInteractionBlock(hk.Module):
         # input linear (cant increase order but can increase channels)
         node_feats = Linear(self.hidden_irreps, name="linear_up", biases=True)(node_feats)
         
+     
+
         # This outputs target irreps since these may be larger than hidden irreps in first layer
         node_feats = FlexMessagePassingConvolution(
             avg_num_neighbors=self.avg_num_neighbors, target_irreps=self.target_irreps,
@@ -416,8 +416,6 @@ class FlexInteractionBlock(hk.Module):
         node_feats = Linear(self.target_irreps, name="linear_down", biases=True)(
             node_feats
         )
-
-        print((node_feats.array == 0).sum(), node_feats.shape)
 
         assert node_feats.ndim == 2
         # returning node feats is correct
