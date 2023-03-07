@@ -18,9 +18,8 @@ ListLogger that can may used if you don't want to use wandb.
 ## Burning
     - Add code that allows visualisation of what's happening in the flow.
     - Rewrite for e3nn
-        1. Write EGNN with e3nn, retain MACE performance
-        2. Let networks take in positional and feature info.
-        3. Alanine dipeptide
+        1. Let networks take in positional and feature info.
+        2. Alanine dipeptide
     - Code diffusion/CNF
     - Rewrite with jgraph, generalise to varying number of nodes
     - Add more augmented variables.
