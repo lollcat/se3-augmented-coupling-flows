@@ -26,8 +26,10 @@ class GeneralMLP(hk.Module):
 class HaikuMLP(hk.Module):
     """Wrap haiku MLP to work on e3nn.IrrepsArray's.
     Note: Only works on scalars."""
-    def __init__(self, output_sizes, activation, activate_final: bool, variance_init_final_scale: Optional[float]):
+    def __init__(self, output_sizes, activation, activate_final: bool, variance_init_final_scale: Optional[float],
+                 layer_norm_inputs: bool = True):
         super().__init__()
+        self.layer_norm_inputs = layer_norm_inputs
         if variance_init_final_scale:
             sequential_in = []
             if len(output_sizes) > 1:
@@ -48,7 +50,10 @@ class HaikuMLP(hk.Module):
 
     def __call__(self, x: e3nn.IrrepsArray):
         assert x.irreps.is_scalar()
-        x_out = self.mlp(x.array)
+        x = x.array
+        if self.layer_norm_inputs:
+            x = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)(x)
+        x_out = self.mlp(x)
         irreps_array_out = e3nn.IrrepsArray(irreps=f"{x_out.shape[-1]}x0e", array=x_out)
         return irreps_array_out
 
