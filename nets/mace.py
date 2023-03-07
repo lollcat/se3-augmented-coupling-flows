@@ -9,13 +9,12 @@ from nets.flex_mace import FlexMACE
 from utils.graph import get_senders_and_receivers_fully_connected
 
 class MACETorsoConfig(NamedTuple):
-    n_vectors_mace_lay_out: int
-    n_invariant_feat_mace_lay_out: int
-    n_vectors_readout: int
-    n_invariant_feat_readout: int
-    n_vectors_hidden: int
-    n_invariant_feat_hidden: int
-    num_features: int
+    n_vectors_residual: int
+    n_invariant_feat_residual: int
+    n_vectors_hidden_readout_block: int
+    n_invariant_hidden_readout_block: int
+    hidden_irreps: str
+    num_features: int = 1
     num_species: int = 1
     # Maximum angular momentum in the spherical expansion on edges, :math:`l = 0, 1, \dots`.
     # Controls the resolution of the spherical expansion.
@@ -43,14 +42,16 @@ def get_mace_kwargs(config: MACEConfig, avg_num_neighbours: int):
     kwargs = {}
     if config.torso_config.avg_num_neighbors is not None:
         raise Exception("Haven't thought about this yet")
+    if config.torso_config.num_features != 1:
+        raise Exception("This effect is currently unclear to the user.")
     kwargs.update(
         output_irreps=e3nn.Irreps(f"{config.n_invariant_feat_out}x0e+{config.n_vectors_out}x1o"),
-        mace_layer_output_irreps=e3nn.Irreps(f"{config.torso_config.n_invariant_feat_mace_lay_out}x0e+"
-                                             f"{config.torso_config.n_vectors_mace_lay_out}x1o"),
-        hidden_irreps=e3nn.Irreps(
-            f"{config.torso_config.n_invariant_feat_hidden}x0e+{config.torso_config.n_vectors_hidden}x1o"),
+        mace_layer_output_irreps=e3nn.Irreps(f"{config.torso_config.n_invariant_feat_residual}x0e+"
+                                             f"{config.torso_config.n_vectors_residual}x1o"),
+        hidden_irreps=e3nn.Irreps(config.torso_config.hidden_irreps),
         readout_mlp_irreps=e3nn.Irreps(
-            f"{config.torso_config.n_invariant_feat_readout}x0e+{config.torso_config.n_vectors_readout}x1o"),
+            f"{config.torso_config.n_invariant_hidden_readout_block}x0e+"
+            f"{config.torso_config.n_vectors_hidden_readout_block}x1o"),
         num_features = config.torso_config.num_features,
         avg_num_neighbors=avg_num_neighbours,
         max_ell = config.torso_config.max_ell,
