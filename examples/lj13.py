@@ -35,6 +35,16 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 2
     cfg.training.batch_size = 4
 
+    # Make MACE small for local run.
+    cfg.flow.nets.mace.n_invariant_feat_mace_lay_out = 16
+    cfg.flow.nets.mace.residual_mlp_width = 16
+    cfg.flow.nets.mace.interaction_mlp_width = 16
+    cfg.flow.nets.mace.interaction_mlp_depth = 1
+    cfg.flow.nets.mace.max_ell = 2
+    cfg.flow.nets.mace.n_invariant_feat_hidden = 16
+    cfg.flow.nets.mace.n_invariant_feat_mace_lay_out = 16
+
+
     cfg.training.n_epoch = 32
     cfg.training.save = False
     cfg.flow.type = ['proj']
