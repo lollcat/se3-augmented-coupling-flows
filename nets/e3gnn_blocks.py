@@ -5,15 +5,17 @@ import e3nn_jax as e3nn
 import jax.numpy as jnp
 
 class GeneralMLP(hk.Module):
-    def __init__(self, use_e3nn: bool, output_sizes, activation, activate_final):
+    def __init__(self, use_e3nn: bool, output_sizes, activation, activate_final,
+                 variance_scaling_init: float = 0.001):
         super().__init__()
         if use_e3nn:
             self.mlp = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(output_sizes),
                                                        act=activation,
-                                                       output_activation=activate_final
+                                                       output_activation=activate_final,
                                                        )
         else:
-            self.mlp = HaikuMLP(output_sizes, activation, activate_final)
+            self.mlp = HaikuMLP(output_sizes=output_sizes, activation=activation, activate_final=activate_final,
+                                variance_init_final_scale=variance_scaling_init)
     def __call__(self, x: e3nn.IrrepsArray):
         assert x.irreps.is_scalar()
         return self.mlp(x)
@@ -22,16 +24,18 @@ class GeneralMLP(hk.Module):
 class HaikuMLP(hk.Module):
     """Wrap haiku MLP to work on e3nn.IrrepsArray's.
     Note: Only works on scalars."""
-    def __init__(self, output_sizes, activation, activate_final, variance_init_final_scale = 0.001):
+    def __init__(self, output_sizes, activation, activate_final: bool, variance_init_final_scale: float = 0.001):
         super().__init__()
         if variance_init_final_scale:
+            sequential_in = []
+            if len(output_sizes) > 1:
+                sequential_in.append(hk.nets.MLP(output_sizes=output_sizes[:-1],
+                            activation=activation,
+                            activate_final=True))
             linear = hk.Linear(output_sizes[-1],
                                w_init=hk.initializers.VarianceScaling(variance_init_final_scale,
                                                                       "fan_avg", "uniform"))
-            sequential_in = [hk.nets.MLP(output_sizes=output_sizes,
-                                   activation=activation,
-                                   activate_final=True),
-                                   linear]
+            sequential_in.append(linear)
             if activate_final:
                 sequential_in.append(activation)
             self.mlp = hk.Sequential(sequential_in)
