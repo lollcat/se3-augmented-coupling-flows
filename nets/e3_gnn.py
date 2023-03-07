@@ -5,7 +5,6 @@ import haiku as hk
 import jax.numpy as jnp
 import jax
 import e3nn_jax as e3nn
-import mace_jax.modules
 from mace_jax.modules.models import safe_norm
 import chex
 
@@ -54,12 +53,13 @@ class EGCL(hk.Module):
         self.phi_e = GeneralMLP(use_e3nn=self.use_e3nn_haiku,
                                 output_sizes=(*self.mlp_units, n_invariant_feat_hidden),
                                 activation=self.activation_fn, activate_final=False,
-                                variance_scaling_init=variance_scaling_init)
+                                variance_scaling_init=None)
         self.phi_inf = e3nnLinear(irreps_out=e3nn.Irreps("1x0e"), biases=True) if use_e3nn_haiku else \
             GeneralMLP(use_e3nn=False, output_sizes=(1,), activation=None, activate_final=False,
-                       variance_scaling_init=variance_scaling_init)
+                       variance_scaling_init=None)
         self.phi_h = GeneralMLP(use_e3nn=use_e3nn_haiku,
-                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=False)
+                                output_sizes=self.mlp_units, activation=self.activation_fn,
+                                activate_final=False, variance_scaling_init=None)
         if not get_shifts_via_tensor_product:
             self.phi_x = GeneralMLP(use_e3nn=use_e3nn_haiku,
                                     output_sizes=(*self.mlp_units, self.n_vectors_hidden),

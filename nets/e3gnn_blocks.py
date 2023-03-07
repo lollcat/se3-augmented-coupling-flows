@@ -4,9 +4,11 @@ import haiku as hk
 import e3nn_jax as e3nn
 import jax.numpy as jnp
 
+from nets.e3gnn_linear_haiku import Linear
+
 class GeneralMLP(hk.Module):
     def __init__(self, use_e3nn: bool, output_sizes, activation, activate_final,
-                 variance_scaling_init: float = 0.001):
+                 variance_scaling_init: Optional[float]):
         super().__init__()
         if use_e3nn:
             self.mlp = e3nn.haiku.MultiLayerPerceptron(list_neurons=list(output_sizes),
@@ -24,7 +26,7 @@ class GeneralMLP(hk.Module):
 class HaikuMLP(hk.Module):
     """Wrap haiku MLP to work on e3nn.IrrepsArray's.
     Note: Only works on scalars."""
-    def __init__(self, output_sizes, activation, activate_final: bool, variance_init_final_scale: float = 0.001):
+    def __init__(self, output_sizes, activation, activate_final: bool, variance_init_final_scale: Optional[float]):
         super().__init__()
         if variance_init_final_scale:
             sequential_in = []
@@ -33,8 +35,8 @@ class HaikuMLP(hk.Module):
                             activation=activation,
                             activate_final=True))
             linear = hk.Linear(output_sizes[-1],
-                               w_init=hk.initializers.VarianceScaling(variance_init_final_scale,
-                                                                      "fan_avg", "uniform"))
+                               w_init=hk.initializers.VarianceScaling(variance_init_final_scale, "fan_avg", "uniform")
+                               if variance_init_final_scale else None)
             sequential_in.append(linear)
             if activate_final:
                 sequential_in.append(activation)
@@ -73,7 +75,7 @@ class MessagePassingConvolution(hk.Module):
         activation: Callable,
         mlp_units: Sequence[int],
         use_e3nn_haiku: bool,
-        variance_scaling_init: Optional[float] = None
+        variance_scaling_init: Optional[float] = 0.001
     ):
         super().__init__()
         self.avg_num_neighbors = avg_num_neighbors
@@ -103,13 +105,14 @@ class MessagePassingConvolution(hk.Module):
             output_sizes=self.mlp_units,
             activation=self.activation,
             activate_final=True,
+            variance_scaling_init=self.variance_scaling
         )(
             edge_feats.filter(keep="0e")
         )  # [n_edges, irreps]
         if self.use_e3nn_haiku or self.variance_scaling:
             mix = HaikuLinear(messages.irreps.num_irreps, self.variance_scaling)(mix)
         else:
-            mix = e3nn.haiku.Linear(e3nn.Irreps(f"{messages.irreps.num_irreps}x0e"), biases=True)(mix)
+            mix = Linear(e3nn.Irreps(f"{messages.irreps.num_irreps}x0e"), biases=True)(mix)
 
         messages = messages * mix  # [n_edges, irreps]
 
