@@ -119,7 +119,7 @@ class FlexMACE(hk.Module):
         self,
         # vectors: jnp.ndarray,  # [n_edges, 3]
         positions: jnp.ndarray, # [n_nodes, 3]
-        node_specie: jnp.ndarray,  # [5, 1)_nodes] int between 0 and num_species-1
+        node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
         shared_features: jnp.ndarray, # [dim_shared_features] features shared among all nodes, like time, or total number of atoms in system
         senders: jnp.ndarray,  # [n_edges]
         receivers: jnp.ndarray,  # [n_edges]
@@ -131,7 +131,7 @@ class FlexMACE(hk.Module):
         positions = positions[:, None, :]
         positions = e3nn.IrrepsArray("1x1o", positions - jnp.mean(positions, axis=0, keepdims=True))
         positions_in = positions
-        
+
         # Note features are Embeddings of discrete node "species" (i.e. hidrogen, carbon,z)
         node_feats = self.node_embedding(node_specie).astype(
             positions.dtype
@@ -201,7 +201,9 @@ class FlexMACE(hk.Module):
             mlp_layer_sizes = (self.residual_mlp_depth-1) * [self.residual_mlp_width] + [self.hidden_scalar_dim]
             residual_node_feats = residual_node_feats + HaikuMLP(
              output_sizes=mlp_layer_sizes,
-             activation=self.activation, activate_final=False)(mlp_inputs)  # [self.num_features * self.hidden_irreps]
+             activation=self.activation, activate_final=False,
+             variance_init_final_scale=None
+            )(mlp_inputs)  # [self.num_features * self.hidden_irreps]
 
         # Note that in this configuration only scalars will be outputed
         readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)]).regroup()
@@ -403,7 +405,7 @@ class FlexInteractionBlock(hk.Module):
         # input linear (cant increase order but can increase channels)
         node_feats = Linear(self.hidden_irreps, name="linear_up", biases=True)(node_feats)
         
-     
+
 
         # This outputs target irreps since these may be larger than hidden irreps in first layer
         node_feats = FlexMessagePassingConvolution(
@@ -468,11 +470,12 @@ class FlexMessagePassingConvolution(hk.Module):
              scalar_edge_feats, lengths], axis=1).regroup()  # we should get one per edge
         
         num_scalars = self.target_irreps.filter('0e').dim
-        # MLP is not equivariant, applies to scalars only 
+        # MLP is not equivariant, applies to scalars only
         mix = HaikuMLP(
             output_sizes=(self.mlp_depth - 1) * [self.mlp_width] + [messages.irreps.num_irreps + num_scalars], # number of vectors that transform independently, counting channels as different vectors
             activation=self.activation,
             activate_final=False,
+            variance_init_final_scale=0.001,
         )(
             mlp_input_features.filter(keep="0e")   # vector should only contain 0e anyway
         )  # [n_edges, num_irreps]
@@ -481,7 +484,7 @@ class FlexMessagePassingConvolution(hk.Module):
 
         # concatenate scalars
         messages = e3nn.concatenate([messages * mix[:,:-num_scalars], mix[:,-num_scalars:]],
-                                    axis=1).regroup() 
+                                    axis=1).regroup()
         
         # scatter operation
         zeros = e3nn.IrrepsArray.zeros(

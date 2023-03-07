@@ -5,12 +5,12 @@ import haiku as hk
 import jax.numpy as jnp
 import jax
 import e3nn_jax as e3nn
-import mace_jax.modules
 from mace_jax.modules.models import safe_norm
 import chex
 
 from utils.graph import get_senders_and_receivers_fully_connected, e3nn_apply_activation
 from nets.e3gnn_blocks import MessagePassingConvolution, GeneralMLP
+from nets.e3gnn_linear_haiku import Linear as e3nnLinear
 
 
 class EGCL(hk.Module):
@@ -50,15 +50,22 @@ class EGCL(hk.Module):
             normalize=False,
             normalization="component")
 
-        self.phi_e = GeneralMLP(use_e3nn=use_e3nn_haiku,
-                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
-        self.phi_inf = e3nn.haiku.Linear(irreps_out=e3nn.Irreps("1x0e"), biases=True) if use_e3nn_haiku else \
-            GeneralMLP(use_e3nn=False, output_sizes=(1,), activation=None, activate_final=False)
-        self.phi_x = GeneralMLP(use_e3nn=use_e3nn_haiku,
-                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
+        self.phi_e = GeneralMLP(use_e3nn=self.use_e3nn_haiku,
+                                output_sizes=(*self.mlp_units, n_invariant_feat_hidden),
+                                activation=self.activation_fn, activate_final=False,
+                                variance_scaling_init=None)
+        self.phi_inf = e3nnLinear(irreps_out=e3nn.Irreps("1x0e"), biases=True) if use_e3nn_haiku else \
+            GeneralMLP(use_e3nn=False, output_sizes=(1,), activation=None, activate_final=False,
+                       variance_scaling_init=None)
         self.phi_h = GeneralMLP(use_e3nn=use_e3nn_haiku,
-                                output_sizes=self.mlp_units, activation=self.activation_fn, activate_final=True)
-
+                                output_sizes=self.mlp_units, activation=self.activation_fn,
+                                activate_final=False, variance_scaling_init=None)
+        if not get_shifts_via_tensor_product:
+            self.phi_x = GeneralMLP(use_e3nn=use_e3nn_haiku,
+                                    output_sizes=(*self.mlp_units, self.n_vectors_hidden),
+                                    activation=self.activation_fn,
+                                    activate_final=False,
+                                    variance_scaling_init=variance_scaling_init)
 
     def __call__(self, node_vectors, node_features):
         n_nodes = node_vectors.shape[0]
@@ -91,15 +98,12 @@ class EGCL(hk.Module):
                                                         use_e3nn_haiku=self.use_e3nn_haiku,
                                                         variance_scaling_init=self.variance_scaling_init)(
                 m_ij, sph_harmon, receivers, n_nodes)
-            vector_per_node = e3nn.haiku.Linear(self.vector_irreps, biases=True)(vector_per_node)
+            vector_per_node = e3nnLinear(self.vector_irreps, biases=True)(vector_per_node)
             vectors_out = vector_per_node.factor_mul_to_last_axis().array
             # TODO: Here is a good place to do something like layer norm.
         else:
-            phi_x_out = self.phi_x(m_ij)
+            phi_x_out = self.phi_x(m_ij).array
             # Get shifts following the approach from the en gnn paper. Switch to plain haiku for this.
-            phi_x_out = hk.Linear(self.n_vectors_hidden,
-                                  w_init=hk.initializers.VarianceScaling(self.variance_scaling_init, "fan_avg", "uniform")
-                                  )(phi_x_out.array)
             shifts_ij = phi_x_out[:, :, None] * \
                         vectors / (self.normalization_constant + lengths[:, :, None])
             shifts_i = e3nn.scatter_sum(data=shifts_ij, dst=receivers, output_size=n_nodes)
@@ -111,10 +115,10 @@ class EGCL(hk.Module):
         e = e3nn_apply_activation(e, jax.nn.sigmoid)
         m_i_to_sum = (m_ij.mul_to_axis() * e[:, :, None]).axis_to_mul()
         m_i = e3nn.scatter_sum(data=m_i_to_sum, dst=receivers, output_size=n_nodes) / jnp.sqrt(avg_num_neighbours)
-        assert m_i.irreps == e3nn.Irreps(f"{self.mlp_units[-1]}x0e")
+        assert m_i.irreps == e3nn.Irreps(f"{self.n_invariant_feat_hidden}x0e")
         phi_h_in = e3nn.concatenate([m_i, e3nn.IrrepsArray(self.feature_irreps, node_features)]).simplify()
         phi_h_out = self.phi_h(phi_h_in)
-        phi_h_out = e3nn.haiku.Linear(irreps_out=self.feature_irreps, biases=True)(phi_h_out)
+        phi_h_out = e3nnLinear(irreps_out=self.feature_irreps, biases=True)(phi_h_out)
         features_out = phi_h_out.array
         chex.assert_equal_shape((features_out, node_features))
 
@@ -212,7 +216,7 @@ class E3Gnn(hk.Module):
             vectors = e3nn.IrrepsArray('1x1o', vectors)
             vectors = vectors.axis_to_mul(axis=-2)
             assert vectors.irreps == e3nn.Irreps(f"{self.config.torso_config.n_vectors_hidden}x1o")
-            vectors = e3nn.haiku.Linear(self.output_irreps_vector, biases=True)(vectors)
+            vectors = e3nnLinear(self.output_irreps_vector, biases=True)(vectors)
             vectors = vectors.factor_mul_to_last_axis()  # [n_nodes, n_vectors, dim]
             vectors_out = vectors.array
 
