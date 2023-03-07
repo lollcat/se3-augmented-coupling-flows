@@ -9,12 +9,12 @@ from distrax._src.bijectors.bijector import Array
 import haiku as hk
 import jax.numpy as jnp
 
-from distrax_with_info import Bijector, Extra
+from flow.distrax_with_info import BijectorWithInfo, Extra
 
-class Chain(Bijector):
+class Chain(BijectorWithInfo):
   """Chain of the same bijector, that is fast to compile. Also allows for extra info being returned."""
 
-  def __init__(self, bijector_fn: Callable[[], Bijector], n_layers, compile_n_unroll=2):
+  def __init__(self, bijector_fn: Callable[[], BijectorWithInfo], n_layers, compile_n_unroll=1):
     self._bijector_fn = bijector_fn
     self._n_layers = n_layers
     self.stack = hk.experimental.layer_stack(self._n_layers, with_per_layer_inputs=False, name="flow_layer_stack",
@@ -72,11 +72,14 @@ class Chain(Bijector):
   def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
     """Computes y = f(x) and log|det J(f)(x)|."""
     log_det_init = jnp.zeros(x.shape[0:-self.event_ndims_in])
-    (x_out, log_det), extra = self.stack(self.single_forward_fn_with_extra)(x, log_det_init, reverse=True)
+    (x_out, log_det), extra = self.stack_with_info(self.single_forward_fn_with_extra)((x, log_det_init),
+                                                                                      jnp.zeros(self._n_layers),
+                                                                                      reverse=True)
     return x_out, log_det, extra
 
   def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
     """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
-    (x_out, log_det), extra = self.stack(self.single_reverse_fn_with_extra)(y, log_det_init)
+    (x_out, log_det), extra = self.stack_with_info(self.single_reverse_fn_with_extra,
+                                                   )((y, log_det_init, jnp.zeros(self._n_layers)))
     return x_out, log_det, extra

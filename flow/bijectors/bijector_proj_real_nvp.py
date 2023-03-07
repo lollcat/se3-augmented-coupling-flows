@@ -9,6 +9,7 @@ import haiku as hk
 from nets.transformer import Transformer
 from nets.base import NetsConfig, build_egnn_fn
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
+from flow.distrax_with_info import SplitCouplingWithInfo, BijectorWithInfo, Array, Extra
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -30,7 +31,7 @@ def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin,
     return new_point_original_space
 
 
-class ProjectedScalarAffine(distrax.Bijector):
+class ProjectedScalarAffine(BijectorWithInfo):
     """Following style of `ScalarAffine` distrax Bijector.
 
     Note: Doesn't need to operate on batches, as it gets called with vmap."""
@@ -109,6 +110,16 @@ class ProjectedScalarAffine(distrax.Bijector):
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         return self.inverse(y), self.inverse_log_det_jacobian(y)
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        y, log_det = self.forward_and_log_det(x)
+        info = {}
+        return y, log_det, info
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        x, log_det = self.inverse_log_det_jacobian(y)
+        info = {}
+        return x, log_det, info
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
@@ -254,7 +265,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
                                                        add_small_identity: bool = False
-                                                       ):
+                                                       ) -> BijectorWithInfo:
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
@@ -306,7 +317,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
         add_small_identity=add_small_identity
     )
 
-    return distrax.SplitCoupling(
+    return SplitCouplingWithInfo(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
         conditioner=conditioner,

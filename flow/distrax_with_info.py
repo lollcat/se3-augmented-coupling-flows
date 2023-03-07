@@ -8,7 +8,7 @@ from distrax._src.distributions.distribution import Array, PRNGKey, IntLike
 
 Extra = chex.ArrayTree
 
-class Bijector(distrax.Bijector):
+class BijectorWithInfo(distrax.Bijector):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
@@ -23,7 +23,7 @@ class Bijector(distrax.Bijector):
         return x, log_det, info
 
 
-class Distribution(distrax.Distribution):
+class DistributionWithInfo(distrax.Distribution):
     def log_prob_with_extra(self, x: chex.Array) -> Tuple[Array, Extra]:
         log_prob = self.log_prob(x)
         info = {}
@@ -40,8 +40,8 @@ class Distribution(distrax.Distribution):
         return sample, log_prob, info
 
 
-class Transformed(distrax.Transformed):
-    def __init__(self, distribution: distrax.DistributionLike, bijector: Bijector):
+class TransformedWithInfo(distrax.Transformed):
+    def __init__(self, distribution: distrax.DistributionLike, bijector: BijectorWithInfo):
         super().__init__(distribution=distribution, bijector=bijector)
 
     def log_prob_with_extra(self, value: chex.Array) -> Tuple[Array, Extra]:
@@ -62,18 +62,82 @@ class Transformed(distrax.Transformed):
         return y, lp_y, extra
 
 
+class ChainWithInfo(distrax.Chain):
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        """Like forward_and_log det, but with additional info."""
+        extras = []
+        x, log_det, extra = self._bijectors[-1].forward_and_log_det_with_extra(x)
+        extras.append(extra)
+        for bijector in reversed(self._bijectors[:-1]):
+            x, ld, extra = bijector.forward_and_log_det_with_extra(x)
+            log_det += ld
+            extras.append(extra)
+        return x, log_det, extras
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        """Like inverse_and_log det, but with additional extra. Defaults to just returning an empty dict for extra."""
+        extras = []
+        y, log_det, extra = self._bijectors[0].inverse_and_log_det_with_extra(y)
+        extras.append(extra)
+        for bijector in self._bijectors[1:]:
+            y, ld, extra = bijector.inverse_and_log_det(y)
+            log_det += ld
+            extras.append(extra)
+        return y, log_det, extras
+
+
+from distrax._src.utils import math
+
+class BlockWithInfo(distrax.Block):
+    def __init__(self, bijector: BijectorWithInfo, ndims: int):
+        super().__init__(bijector, ndims)
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        self._check_forward_input_shape(x)
+        y, log_det, extra = self._bijector.forward_and_log_det_with_extra(x)
+        return y, math.sum_last(log_det, self._ndims), extra
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        self._check_inverse_input_shape(y)
+        x, log_det, extra = self._bijector.inverse_and_log_det_with_extra(y)
+        return x, math.sum_last(log_det, self._ndims), extra
+
+
+
+
 from distrax._src.bijectors.split_coupling import BijectorParams
 
 
-class SplitCouplingWithInfo(distrax.SplitCoupling, Bijector):
+class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
     def __init__(self,
-               split_index: int,
-               event_ndims: int,
-               conditioner: Callable[[Array], BijectorParams],
-               bijector: Callable[[BijectorParams], Bijector],
-               swap: bool = False,
-               split_axis: int = -1):
+                 split_index: int,
+                 event_ndims: int,
+                 conditioner: Callable[[Array], BijectorParams],
+                 bijector: Callable[[BijectorParams], BijectorWithInfo],
+                 swap: bool = False,
+                 split_axis: int = -1):
         super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
+
+    def _inner_bijector(self, params: BijectorParams) -> BijectorWithInfo:
+        """Returns an inner bijector for the passed params."""
+        bijector = self._bijector(params)
+        if bijector.event_ndims_in != bijector.event_ndims_out:
+            raise ValueError(
+                f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
+                f'Instead, it has `event_ndims_in=={bijector.event_ndims_in}` and '
+                f'`event_ndims_out=={bijector.event_ndims_out}`.')
+        extra_ndims = self.event_ndims_in - bijector.event_ndims_in
+        if extra_ndims < 0:
+            raise ValueError(
+                f'The inner bijector can\'t have more event dimensions than the '
+                f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
+                f'bijector and {self.event_ndims_in} for the coupling bijector.')
+        elif extra_ndims > 0:
+            bijector = BlockWithInfo(bijector, extra_ndims)
+        return bijector
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
@@ -81,15 +145,15 @@ class SplitCouplingWithInfo(distrax.SplitCoupling, Bijector):
         x1, x2 = self._split(x)
         params = self._conditioner(x1)
         inner_bijector = self._inner_bijector(params)
-        y2, logdet, info = inner_bijector.forward_and_log_det_with_info(x2)
-        return self._recombine(x1, y2), logdet
+        y2, logdet, info = inner_bijector.forward_and_log_det_with_extra(x2)
+        return self._recombine(x1, y2), logdet, info
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         """Like inverse_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         self._check_inverse_input_shape(y)
         y1, y2 = self._split(y)
         params = self._conditioner(y1)
-        x2, logdet = self._inner_bijector(params).inverse_and_log_det(y2)
-        return self._recombine(y1, x2), logdet
+        x2, logdet, info = self._inner_bijector(params).inverse_and_log_det_with_extra(y2)
+        return self._recombine(y1, x2), logdet, info
 
 

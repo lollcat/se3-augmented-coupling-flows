@@ -41,7 +41,7 @@ class TransformerBlock(hk.Module):
 
 class Transformer(hk.Module):
     def __init__(self, name: str, config: TransformerConfig = TransformerConfig()):
-        super().__init__(name=name)
+        super().__init__(name=name + "_vanilla_transformer")
         self.config = config
         self.transformer_block_fn = lambda x: TransformerBlock(name=name, config=config)(x)
 
