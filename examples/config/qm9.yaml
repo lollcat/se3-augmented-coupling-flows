@@ -101,7 +101,7 @@ training:
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
-  plot_batch_size: 256
+  plot_batch_size: 32
   seed: 0
   reload_aug_per_epoch: true
   train_set_size: null
@@ -109,7 +109,7 @@ training:
   n_plots: 10
   n_checkpoints: 0
   n_eval: 20
-  K_marginal_log_lik: 20
+  K_marginal_log_lik: 10
   save: true
   save_dir: qm9pos_results
   use_equivariance_loss: false

@@ -53,3 +53,28 @@ class Chain(base.Bijector):
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
     x_out, log_det = self.stack(self.single_reverse_fn)(y, log_det_init)
     return x_out, log_det
+  
+  def single_forward_fn_with_extra(self, x, log_det):
+    y, log_det_new = self._bijector_fn().forward_and_log_det(x)
+    chex.assert_equal_shape((x, y))
+    chex.assert_equal_shape((log_det_new, log_det))
+    return y, log_det + log_det_new
+
+  def single_reverse_fn_with_extra(self, y, log_det):
+    x, log_det_new = self._bijector_fn().inverse_and_log_det(y)
+    chex.assert_equal_shape((y, x))
+    chex.assert_equal_shape((log_det_new, log_det))
+    return x, log_det + log_det_new
+
+
+  def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array]:
+    """Computes y = f(x) and log|det J(f)(x)|."""
+    log_det_init = jnp.zeros(x.shape[0:-self.event_ndims_in])
+    x_out, log_det = self.stack(self.single_forward_fn)(x, log_det_init, reverse=True)
+    return x_out, log_det
+
+  def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array]:
+    """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+    log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
+    x_out, log_det = self.stack(self.single_reverse_fn)(y, log_det_init)
+    return x_out, log_det
