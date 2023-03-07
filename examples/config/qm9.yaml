@@ -53,15 +53,12 @@ flow:
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     mace:
-      n_vectors_mace_lay_out: 3
-      n_invariant_feat_mace_lay_out: 64
-      n_vectors_readout: 4
-      n_invariant_feat_readout: 4
-      n_vectors_hidden: 4
-      n_invariant_feat_hidden: 64
-      num_features: 1
-      num_species: 1
-      max_ell: 2
+      n_vectors_residual: 3
+      n_invariant_feat_residual: 64
+      n_vectors_hidden_readout_block: 16
+      n_invariant_hidden_readout_block: 64
+      hidden_irreps: 64x0e+32x1o+16x2e+8x3o
+      max_ell: 3
       num_layers: 2
       correlation: 3
       interaction_mlp_depth: 3
