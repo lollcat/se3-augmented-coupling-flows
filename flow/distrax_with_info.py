@@ -2,6 +2,7 @@ from typing import Tuple, Union, Sequence
 
 import distrax
 import chex
+import jax
 import jax.numpy as jnp
 from distrax._src.distributions.distribution import Array, PRNGKey, IntLike
 
@@ -23,28 +24,39 @@ class Bijector(distrax.Bijector):
 
 
 class Distribution(distrax.Distribution):
-    def log_prob_with_info(self, x: chex.Array) -> Tuple[Array, Extra]:
+    def log_prob_with_extra(self, x: chex.Array) -> Tuple[Array, Extra]:
         log_prob = self.log_prob(x)
         info = {}
         return log_prob, info
-
-    def sample_with_info(self,
-             *,
-             seed: Union[IntLike, PRNGKey],
-             sample_shape: Union[IntLike, Sequence[IntLike]] = ()) -> Tuple[Array, Extra]:
-        sample = self.sample(seed=seed, sample_shape=sample_shape)
+    
+    def sample_n_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Extra]:
+        sample = self._sample_n(key, n)
         info = {}
         return sample, info
 
-
-    def sample_and_log_prob_with_info(self,
-      *,
-      seed: Union[IntLike, PRNGKey],
-      sample_shape: Union[IntLike, Sequence[IntLike]] = ()
-  ) -> Tuple[Array, Array, Extra]:
-        sample, log_prob = self.sample_and_log_prob(seed=seed, sample_shape=sample_shape)
+    def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
+        sample, log_prob = self._sample_n_and_log_prob(key, n)
         info = {}
         return sample, log_prob, info
 
 
+class Transformed(distrax.Transformed):
+    def __init__(self, distribution: distrax.DistributionLike, bijector: Bijector):
+        super().__init__(distribution=distribution, bijector=bijector)
 
+    def log_prob_with_extra(self, value: chex.Array) -> Tuple[Array, Extra]:
+        x, ildj_y, extra = self.bijector.inverse_and_log_det(value)
+        lp_x = self.distribution.log_prob(x)
+        lp_y = lp_x + ildj_y
+        return lp_y, extra
+
+    def sample_n_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Extra]:
+        x = self.distribution.sample(seed=key, sample_shape=n)
+        y, fldj, extra = jax.vmap(self.bijector.forward_and_log_det_with_extra)(x)
+        return y, extra
+
+    def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
+        x, lp_x = self.distribution.sample_and_log_prob(seed=key, sample_shape=n)
+        y, fldj, extra = jax.vmap(self.bijector.forward_and_log_det_with_extra)(x)
+        lp_y = jax.vmap(jnp.subtract)(lp_x, fldj)
+        return y, lp_y, extra
