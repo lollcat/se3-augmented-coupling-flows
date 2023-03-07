@@ -53,7 +53,7 @@ class Chain(base.Bijector):
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
     x_out, log_det = self.stack(self.single_reverse_fn)(y, log_det_init)
     return x_out, log_det
-  
+
   def single_forward_fn_with_extra(self, x, log_det):
     y, log_det_new = self._bijector_fn().forward_and_log_det(x)
     chex.assert_equal_shape((x, y))
