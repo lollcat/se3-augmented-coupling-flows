@@ -35,8 +35,9 @@ class ProjectedScalarAffine(BijectorWithInfo):
     """Following style of `ScalarAffine` distrax Bijector.
 
     Note: Doesn't need to operate on batches, as it gets called with vmap."""
-    def __init__(self, change_of_basis_matrix, origin, log_scale, shift, activation=jax.nn.softplus):
+    def __init__(self, change_of_basis_matrix, origin, log_scale, shift, info, activation=jax.nn.softplus):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
+        self._info = info
         self._change_of_basis_matrix = change_of_basis_matrix
         self._origin = origin
         self._shift = shift
@@ -113,17 +114,16 @@ class ProjectedScalarAffine(BijectorWithInfo):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         y, log_det = self.forward_and_log_det(x)
-        info = {}
-        return y, log_det, info
+        return y, log_det, self._info
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         x, log_det = self.inverse_log_det_jacobian(y)
-        info = {}
-        return x, log_det, info
+        return x, log_det, self._info
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
                         add_small_identity: bool = False):
+
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
@@ -193,12 +193,19 @@ def make_conditioner(
     else:
         assert mlp_function is not None
 
-    def _conditioner(x):
+    def _conditioner(x, return_info=False):
         chex.assert_rank(x, 2)
         n_nodes, dim = x.shape
 
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
+        info = {}
+        if return_info:
+            basis = various_x_points[:, 1:]
+            vec1 = various_x_points[:, 0]
+            vec2 = various_x_points[:, 1]
+            theta = jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) / jnp.linalg.norm(vec2, axis=-1)
+            info.update(mean_abs_theta=jnp.mean(jnp.abs(theta)))
 
         origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
                                                              add_small_identity=add_small_identity)
@@ -243,14 +250,14 @@ def make_conditioner(
 
         chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
         chex.assert_trees_all_equal_shapes(origin, log_scale, shift, x)
-        return change_of_basis_matrix, origin, log_scale, shift
+        return change_of_basis_matrix, origin, log_scale, shift, info
 
-    def conditioner(x):
+    def conditioner(x, return_info: bool = False):
         if len(x.shape) == 2:
-            return _conditioner(x)
+            return _conditioner(x, return_info)
         else:
             assert len(x.shape) == 3
-            return jax.vmap(_conditioner)(x)
+            return jax.vmap(_conditioner, in_axes=(0, None))(x, return_info)
 
     return conditioner
 
@@ -269,8 +276,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
-        change_of_basis_matrix, origin, log_scale, shift = params
-        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
+        change_of_basis_matrix, origin, log_scale, shift, info = params
+        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift, info)
 
     n_heads = dim + (1 if gram_schmidt else 0)
     n_invariant_params = dim*2

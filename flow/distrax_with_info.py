@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Sequence, Callable
+from typing import Tuple, Union, Sequence, Callable, Optional
 
 import distrax
 import chex
@@ -112,10 +112,11 @@ from distrax._src.bijectors.split_coupling import BijectorParams
 
 
 class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
+    # TODO: make more clear that conditional can optionall take in whether or not we want info from it.
     def __init__(self,
                  split_index: int,
                  event_ndims: int,
-                 conditioner: Callable[[Array], BijectorParams],
+                 conditioner: Callable[[Array, Optional[bool]], BijectorParams],
                  bijector: Callable[[BijectorParams], BijectorWithInfo],
                  swap: bool = False,
                  split_axis: int = -1):
@@ -143,7 +144,7 @@ class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
-        params = self._conditioner(x1)
+        params = self._conditioner(x1, return_info=True)
         inner_bijector = self._inner_bijector(params)
         y2, logdet, info = inner_bijector.forward_and_log_det_with_extra(x2)
         return self._recombine(x1, y2), logdet, info
@@ -152,7 +153,7 @@ class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
         """Like inverse_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         self._check_inverse_input_shape(y)
         y1, y2 = self._split(y)
-        params = self._conditioner(y1)
+        params = self._conditioner(y1, return_info=True)
         x2, logdet, info = self._inner_bijector(params).inverse_and_log_det_with_extra(y2)
         return self._recombine(y1, x2), logdet, info
 

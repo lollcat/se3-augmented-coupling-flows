@@ -180,7 +180,6 @@ def test_bijector_with_info(dim: int = 3, n_nodes = 5,
 
 
 
-
 if __name__ == '__main__':
     USE_64_BIT = True  # Fails for 32-bit
     gram_schmidt = False
