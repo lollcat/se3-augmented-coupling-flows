@@ -10,6 +10,7 @@ from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 
 
 def test_dist_with_info(dim: int = 3, n_nodes = 5,
+                        batch_size: int = 2,
                             gram_schmidt: bool = False,
                             global_frame: bool = False,
                             process_flow_params_jointly: bool = False,
@@ -78,7 +79,7 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
-    x_dummy = jax.random.normal(key=key, shape=(n_nodes, dim*2))
+    x_dummy = jax.random.normal(key=key, shape=(batch_size, n_nodes, dim*2))
     params = log_prob_with_info_fn.init(key, x_dummy)
 
     # Test log-probing

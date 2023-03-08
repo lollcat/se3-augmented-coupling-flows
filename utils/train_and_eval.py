@@ -1,3 +1,5 @@
+from typing import Callable, Tuple
+
 import chex
 import numpy as np
 import jax
@@ -8,10 +10,13 @@ import optax
 from flow.base_dist import get_conditional_gaussian_augmented_dist
 from flow.test_utils import get_max_diff_log_prob_invariance_test
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+from flow.distrax_with_extra import Extra
 
+Params = chex.ArrayTree
+X = chex.Array
+LogProbWithExtraFn = Callable[[Params, X], Tuple[chex.Array, Extra]]
 
-
-def general_ml_loss_fn(params, x, log_prob_with_extra_fn, key, use_equivariance_loss, weight):
+def general_ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, use_equivariance_loss, weight):
     if use_equivariance_loss:
         loss, info = ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight)
     else:
@@ -19,22 +24,22 @@ def general_ml_loss_fn(params, x, log_prob_with_extra_fn, key, use_equivariance_
     return loss, info
 
 
-def ml_loss_fn(params, x, log_prob_with_extra_fn):
-    log_prob, extra = log_prob_with_extra_fn.apply(params, x)
+def ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn):
+    log_prob, extra = log_prob_with_extra_fn(params, x)
     loss = - jnp.mean(log_prob)
     info = {"ml_loss": loss}
-    info.update(extra)
+    info.update(extra.aux_info)
     return loss, info
 
-def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight, batch_size_frac = 0.1):
+def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, weight, batch_size_frac = 0.1):
     batch_size, n_nodes, dim = x.shape
     dim = dim // 2  # Account for augmentd coords.
 
     # ML loss.
-    log_prob, extra = log_prob_with_extra_fn.apply(params, x)
+    log_prob, extra = log_prob_with_extra_fn(params, x)
     ml_loss = - jnp.mean(log_prob)
     info = {"loss_ml": ml_loss}
-    info.update(extra)
+    info.update(extra.aux_info)
 
     # Equivariance loss.
     eq_batch_size = max(1, int(batch_size * batch_size_frac))
@@ -51,7 +56,7 @@ def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight, 
         return x_and_a_rot
 
 
-    log_prob_g = log_prob_with_extra_fn.apply(params, group_action(x[:eq_batch_size]))
+    log_prob_g, _ = log_prob_with_extra_fn(params, group_action(x[:eq_batch_size]))
     eq_loss = jnp.mean((log_prob_g - log_prob[:eq_batch_size])**2)
     info.update(loss_equivariance=eq_loss)
 
@@ -73,7 +78,8 @@ def get_tree_leaf_norm_info(tree):
     return info
 
 
-def ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer, key, use_equivariance_loss, eq_loss_weight):
+def ml_step(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
+            optimizer, key, use_equivariance_loss, eq_loss_weight):
     grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
         params, x, log_prob_with_extra_fn, key, use_equivariance_loss, eq_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)

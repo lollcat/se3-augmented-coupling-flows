@@ -24,7 +24,7 @@ from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
-
+from flow.distrax_with_extra import Extra
 
 
 mpl.rcParams['figure.dpi'] = 150
@@ -301,16 +301,17 @@ def train(config: TrainConfig):
         log_prob = distribution.log_prob(x)
         return log_prob
 
+
     @hk.without_apply_rng
     @hk.transform
-    def log_prob_with_extra_fn(x):
+    def log_prob_with_extra_fn(x: chex.Array) -> Tuple[chex.Array, Extra]:
         if log_prob_with_extra_fn:
             distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
             log_prob, extra = distribution.log_prob_with_extra(x)
         else:
             distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
             log_prob = distribution.log_prob(x)
-            extra = {}
+            extra = Extra()
         return log_prob, extra
 
     @hk.transform
@@ -326,6 +327,8 @@ def train(config: TrainConfig):
     key = jax.random.PRNGKey(config.seed)
     key, subkey = jax.random.split(key)
     params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, config.n_nodes, config.dim*2)))
+    params_test = log_prob_fn.init(rng=subkey, x=jnp.zeros((config.n_nodes, config.dim*2)))
+    chex.assert_trees_all_equal_shapes(params, params_test)
 
 
     train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
@@ -356,7 +359,7 @@ def train(config: TrainConfig):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer, subkey,
+            params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn.apply, optimizer, subkey,
                                               config.use_equivariance_loss, config.equivariance_loss_weight)
             return (params, opt_state, key), info
 
@@ -387,7 +390,7 @@ def train(config: TrainConfig):
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer,
+                params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn.apply, optimizer,
                                                   subkey,
                                                   config.use_equivariance_loss, config.equivariance_loss_weight
                                                   )

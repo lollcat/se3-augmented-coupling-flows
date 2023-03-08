@@ -1,42 +1,62 @@
-from typing import Tuple, Union, Sequence, Callable, Optional
+from typing import Tuple, Union, Sequence, Callable, Optional, NamedTuple, List
 
 import distrax
 import chex
 import jax
 import jax.numpy as jnp
-from distrax._src.distributions.distribution import Array, PRNGKey, IntLike
+from distrax._src.distributions.distribution import Array, PRNGKey
 
-Extra = chex.ArrayTree
+
+@jax.tree_util.register_pytree_node_class
+class Extra(NamedTuple):
+    aux_loss: chex.Array = jnp.array(0.0)
+    aux_info: Optional[dict] = None
+    info_aggregator: Optional[dict] = jnp.mean
+
+    def aggregate_info(self):
+        """Aggregate info as specified, average loss."""
+        new_info = {}
+        for key, aggregator in self.info_aggregator.items():
+            new_info[key] = aggregator(self.aux_info[key])
+        return new_info
+
+    def tree_flatten(self):
+        return ((self.aux_loss, self.aux_info), self.info_aggregator)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        return cls(*children, aux_data)
+
 
 class BijectorWithExtra(distrax.Bijector):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         y, log_det = self.forward_and_log_det(x)
-        info = {}
+        info = Extra()
         return y, log_det, info
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         """Like inverse_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         x, log_det = self.inverse_and_log_det(y)
-        info = {}
+        info = Extra()
         return x, log_det, info
 
 
 class DistributionWithExtra(distrax.Distribution):
     def log_prob_with_extra(self, x: chex.Array) -> Tuple[Array, Extra]:
         log_prob = self.log_prob(x)
-        info = {}
+        info = Extra()
         return log_prob, info
     
     def sample_n_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Extra]:
         sample = self._sample_n(key, n)
-        info = {}
+        info = Extra()
         return sample, info
 
     def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
         sample, log_prob = self._sample_n_and_log_prob(key, n)
-        info = {}
+        info = Extra()
         return sample, log_prob, info
 
 
@@ -53,12 +73,14 @@ class TransformedWithExtra(distrax.Transformed):
     def sample_n_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Extra]:
         x = self.distribution.sample(seed=key, sample_shape=n)
         y, fldj, extra = jax.vmap(self.bijector.forward_and_log_det_with_extra)(x)
+        extra = extra._replace(aux_info=extra.aggregate_info())  # Aggregate info after vmap.
         return y, extra
 
     def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
         x, lp_x = self.distribution.sample_and_log_prob(seed=key, sample_shape=n)
         y, fldj, extra = jax.vmap(self.bijector.forward_and_log_det_with_extra)(x)
         lp_y = jax.vmap(jnp.subtract)(lp_x, fldj)
+        extra = extra._replace(aux_info=extra.aggregate_info())  # Aggregate info after vmap.
         return y, lp_y, extra
 
 
@@ -66,24 +88,43 @@ class ChainWithExtra(distrax.Chain):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info."""
-        extras = []
+        n_layers = len(self._bijectors)
+        losses = []
+        info = {}
+        info_aggregator = {}
         x, log_det, extra = self._bijectors[-1].forward_and_log_det_with_extra(x)
-        extras.append(extra)
-        for bijector in reversed(self._bijectors[:-1]):
+        losses.append(extra.aux_loss)
+        info.update({f"lay_{n_layers}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
+        info_aggregator.update({f"lay_{n_layers}/{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
+        for i, bijector in enumerate(reversed(self._bijectors[:-1])):
             x, ld, extra = bijector.forward_and_log_det_with_extra(x)
             log_det += ld
-            extras.append(extra)
+            info.update({f"lay_{n_layers - 1 - i}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
+            info_aggregator.update({f"lay_{n_layers - 1 - i}/{n_layers}" + key: value for key, value in
+                                    extra.info_aggregator.items()})
+            losses.append(extra.aux_loss)
+        extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
         return x, log_det, extras
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         """Like inverse_and_log det, but with additional extra. Defaults to just returning an empty dict for extra."""
-        extras = []
+        n_layers = len(self._bijectors)
+        losses = []
+        info = {}
+        info_aggregator = {}
         y, log_det, extra = self._bijectors[0].inverse_and_log_det_with_extra(y)
-        extras.append(extra)
-        for bijector in self._bijectors[1:]:
+        info.update({f"lay_{1}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
+        info_aggregator.update(
+            {f"lay_{1}/{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
+        losses.append(extra.aux_loss)
+        for i, bijector in enumerate(self._bijectors[1:]):
             y, ld, extra = bijector.inverse_and_log_det_with_extra(y)
             log_det += ld
-            extras.append(extra)
+            info.update({f"lay_{2 + i}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
+            info_aggregator.update({f"lay_{2 + i}/{n_layers}" + key: value for key, value in
+                                    extra.info_aggregator.items()})
+            losses.append(extra.aux_loss)
+        extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
         return y, log_det, extras
 
 
