@@ -42,12 +42,12 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # Training
     cfg.training.optimizer.init_lr = 2e-4
     cfg.training.batch_size = 32
-    cfg.training.n_epoch = 10
+    cfg.training.n_epoch = 100
     cfg.training.save = False
     cfg.training.n_plots = 6
     cfg.training.plot_batch_size = 128
     cfg.training.K_marginal_log_lik = 5
-    cfg.logger = DictConfig({"list_logger": None})
+    # cfg.logger = DictConfig({"list_logger": None})
 
     # Flow
     cfg.target.aug_global_centering = False

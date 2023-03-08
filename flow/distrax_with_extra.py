@@ -94,13 +94,13 @@ class ChainWithExtra(distrax.Chain):
         info_aggregator = {}
         x, log_det, extra = self._bijectors[-1].forward_and_log_det_with_extra(x)
         losses.append(extra.aux_loss)
-        info.update({f"lay_{n_layers}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
-        info_aggregator.update({f"lay_{n_layers}/{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
+        info.update({f"lay_{n_layers}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
+        info_aggregator.update({f"lay_{n_layers}\{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
         for i, bijector in enumerate(reversed(self._bijectors[:-1])):
             x, ld, extra = bijector.forward_and_log_det_with_extra(x)
             log_det += ld
-            info.update({f"lay_{n_layers - 1 - i}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
-            info_aggregator.update({f"lay_{n_layers - 1 - i}/{n_layers}" + key: value for key, value in
+            info.update({f"lay_{n_layers - 1 - i}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
+            info_aggregator.update({f"lay_{n_layers - 1 - i}\{n_layers}" + key: value for key, value in
                                     extra.info_aggregator.items()})
             losses.append(extra.aux_loss)
         extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
@@ -113,15 +113,15 @@ class ChainWithExtra(distrax.Chain):
         info = {}
         info_aggregator = {}
         y, log_det, extra = self._bijectors[0].inverse_and_log_det_with_extra(y)
-        info.update({f"lay_{1}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
+        info.update({f"lay_{1}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
         info_aggregator.update(
-            {f"lay_{1}/{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
+            {f"lay_{1}\{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
         losses.append(extra.aux_loss)
         for i, bijector in enumerate(self._bijectors[1:]):
             y, ld, extra = bijector.inverse_and_log_det_with_extra(y)
             log_det += ld
-            info.update({f"lay_{2 + i}/{n_layers}" + key: value for key, value in extra.aux_info.items()})
-            info_aggregator.update({f"lay_{2 + i}/{n_layers}" + key: value for key, value in
+            info.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
+            info_aggregator.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in
                                     extra.info_aggregator.items()})
             losses.append(extra.aux_loss)
         extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)

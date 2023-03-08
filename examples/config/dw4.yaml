@@ -85,10 +85,10 @@ training:
   equivariance_loss_weight: 1000.0
 
 logger:
-#  list_logger: null
   wandb:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4]
+  #  list_logger: null
 

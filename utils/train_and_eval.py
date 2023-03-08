@@ -28,7 +28,7 @@ def ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn):
     log_prob, extra = log_prob_with_extra_fn(params, x)
     loss = - jnp.mean(log_prob)
     info = {"ml_loss": loss}
-    info.update(extra.aux_info)
+    info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
     return loss, info
 
 def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, weight, batch_size_frac = 0.1):
@@ -39,7 +39,7 @@ def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithEx
     log_prob, extra = log_prob_with_extra_fn(params, x)
     ml_loss = - jnp.mean(log_prob)
     info = {"loss_ml": ml_loss}
-    info.update(extra.aux_info)
+    info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
 
     # Equivariance loss.
     eq_batch_size = max(1, int(batch_size * batch_size_frac))
