@@ -9,7 +9,7 @@ import haiku as hk
 from nets.transformer import Transformer
 from nets.base import NetsConfig, build_egnn_fn
 from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
-from flow.distrax_with_info import SplitCouplingWithInfo, BijectorWithInfo, Array, Extra
+from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra, Array, Extra
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -31,7 +31,7 @@ def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin,
     return new_point_original_space
 
 
-class ProjectedScalarAffine(BijectorWithInfo):
+class ProjectedScalarAffine(BijectorWithExtra):
     """Following style of `ScalarAffine` distrax Bijector.
 
     Note: Doesn't need to operate on batches, as it gets called with vmap."""
@@ -272,7 +272,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
                                                        process_flow_params_jointly: bool = True,
                                                        condition_on_x_proj: bool = False,
                                                        add_small_identity: bool = False
-                                                       ) -> BijectorWithInfo:
+                                                       ) -> BijectorWithExtra:
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
@@ -324,7 +324,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
         add_small_identity=add_small_identity
     )
 
-    return SplitCouplingWithInfo(
+    return SplitCouplingWithExtra(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
         conditioner=conditioner,

@@ -9,12 +9,12 @@ from distrax._src.bijectors.bijector import Array
 import haiku as hk
 import jax.numpy as jnp
 
-from flow.distrax_with_info import BijectorWithInfo, Extra
+from flow.distrax_with_extra import BijectorWithExtra, Extra
 
-class Chain(BijectorWithInfo):
+class Chain(BijectorWithExtra):
   """Chain of the same bijector, that is fast to compile. Also allows for extra info being returned."""
 
-  def __init__(self, bijector_fn: Callable[[], BijectorWithInfo], n_layers, compile_n_unroll=1):
+  def __init__(self, bijector_fn: Callable[[], BijectorWithExtra], n_layers, compile_n_unroll=1):
     self._bijector_fn = bijector_fn
     self._n_layers = n_layers
     self.stack = hk.experimental.layer_stack(self._n_layers, with_per_layer_inputs=False, name="flow_layer_stack",

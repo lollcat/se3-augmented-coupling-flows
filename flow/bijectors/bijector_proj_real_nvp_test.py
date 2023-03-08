@@ -10,7 +10,7 @@ from utils.numerical import rotate_translate_permute_2d, rotate_translate_permut
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
-from flow.distrax_with_info import ChainWithInfo
+from flow.distrax_with_extra import ChainWithExtra
 from flow.fast_hk_chain import Chain as FastChain
 
 

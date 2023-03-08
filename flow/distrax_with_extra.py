@@ -8,7 +8,7 @@ from distrax._src.distributions.distribution import Array, PRNGKey, IntLike
 
 Extra = chex.ArrayTree
 
-class BijectorWithInfo(distrax.Bijector):
+class BijectorWithExtra(distrax.Bijector):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
@@ -23,7 +23,7 @@ class BijectorWithInfo(distrax.Bijector):
         return x, log_det, info
 
 
-class DistributionWithInfo(distrax.Distribution):
+class DistributionWithExtra(distrax.Distribution):
     def log_prob_with_extra(self, x: chex.Array) -> Tuple[Array, Extra]:
         log_prob = self.log_prob(x)
         info = {}
@@ -40,8 +40,8 @@ class DistributionWithInfo(distrax.Distribution):
         return sample, log_prob, info
 
 
-class TransformedWithInfo(distrax.Transformed):
-    def __init__(self, distribution: distrax.DistributionLike, bijector: BijectorWithInfo):
+class TransformedWithExtra(distrax.Transformed):
+    def __init__(self, distribution: distrax.DistributionLike, bijector: BijectorWithExtra):
         super().__init__(distribution=distribution, bijector=bijector)
 
     def log_prob_with_extra(self, value: chex.Array) -> Tuple[Array, Extra]:
@@ -62,7 +62,7 @@ class TransformedWithInfo(distrax.Transformed):
         return y, lp_y, extra
 
 
-class ChainWithInfo(distrax.Chain):
+class ChainWithExtra(distrax.Chain):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info."""
@@ -89,8 +89,8 @@ class ChainWithInfo(distrax.Chain):
 
 from distrax._src.utils import math
 
-class BlockWithInfo(distrax.Block):
-    def __init__(self, bijector: BijectorWithInfo, ndims: int):
+class BlockWithExtra(distrax.Block):
+    def __init__(self, bijector: BijectorWithExtra, ndims: int):
         super().__init__(bijector, ndims)
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
@@ -111,18 +111,18 @@ class BlockWithInfo(distrax.Block):
 from distrax._src.bijectors.split_coupling import BijectorParams
 
 
-class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
+class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
     # TODO: make more clear that conditional can optionall take in whether or not we want info from it.
     def __init__(self,
                  split_index: int,
                  event_ndims: int,
                  conditioner: Callable[[Array, Optional[bool]], BijectorParams],
-                 bijector: Callable[[BijectorParams], BijectorWithInfo],
+                 bijector: Callable[[BijectorParams], BijectorWithExtra],
                  swap: bool = False,
                  split_axis: int = -1):
         super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
 
-    def _inner_bijector(self, params: BijectorParams) -> BijectorWithInfo:
+    def _inner_bijector(self, params: BijectorParams) -> BijectorWithExtra:
         """Returns an inner bijector for the passed params."""
         bijector = self._bijector(params)
         if bijector.event_ndims_in != bijector.event_ndims_out:
@@ -137,7 +137,7 @@ class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
                 f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
                 f'bijector and {self.event_ndims_in} for the coupling bijector.')
         elif extra_ndims > 0:
-            bijector = BlockWithInfo(bijector, extra_ndims)
+            bijector = BlockWithExtra(bijector, extra_ndims)
         return bijector
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
@@ -156,5 +156,3 @@ class SplitCouplingWithInfo(distrax.SplitCoupling, BijectorWithInfo):
         params = self._conditioner(y1, return_info=True)
         x2, logdet, info = self._inner_bijector(params).inverse_and_log_det_with_extra(y2)
         return self._recombine(y1, x2), logdet, info
-
-

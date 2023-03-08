@@ -10,7 +10,7 @@ from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale
 from flow.bijectors.bijector_real_nvp_non_equivariant import make_realnvp
 from nets.base import NetsConfig
 from flow.fast_hk_chain import Chain as FastChain
-from flow.distrax_with_info import TransformedWithInfo, ChainWithInfo
+from flow.distrax_with_extra import TransformedWithExtra, ChainWithExtra
 
 
 class BaseConfig(NamedTuple):
@@ -101,14 +101,14 @@ def make_equivariant_augmented_flow_dist_fast_compile(config: FlowDistConfig):
                                                                   **kwargs_proj_v2)
                 bijectors.append(bijector)
 
-        return ChainWithInfo(bijectors)
+        return ChainWithExtra(bijectors)
 
     flow = FastChain(bijector_fn=bijector_fn, n_layers=config.n_layers, compile_n_unroll=config.compile_n_unroll)
     if config.act_norm:
         final_act_norm = make_pseudo_act_norm_bijector(layer_number=-1, dim=config.dim,
                                                        flow_identity_init=config.identity_init)
         flow = distrax.Chain([flow, final_act_norm])
-    distribution = TransformedWithInfo(base, flow)
+    distribution = TransformedWithExtra(base, flow)
     return distribution
 
 
@@ -170,7 +170,7 @@ def make_equivariant_augmented_flow_dist_distrax_chain(config: FlowDistConfig):
                                                        flow_identity_init=config.identity_init)
                          )
 
-    flow = ChainWithInfo(bijectors)
-    distribution = TransformedWithInfo(base, flow)
+    flow = ChainWithExtra(bijectors)
+    distribution = TransformedWithExtra(base, flow)
     return distribution
 

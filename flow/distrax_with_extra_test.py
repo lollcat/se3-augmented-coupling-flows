@@ -4,7 +4,7 @@ import chex
 
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
-from flow.distrax_with_info import ChainWithInfo, TransformedWithInfo
+from flow.distrax_with_extra import ChainWithExtra, TransformedWithExtra
 from flow.fast_hk_chain import Chain as FastChain
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 
@@ -41,13 +41,13 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                     process_flow_params_jointly=process_flow_params_jointly,
                 )
                 bijectors.append(bijector)
-            bijector_block = ChainWithInfo(bijectors)
+            bijector_block = ChainWithExtra(bijectors)
             return bijector_block
         flow = FastChain(bijector_fn=bijector_fn, n_layers=2)
         base = CentreGravitryGaussianAndCondtionalGuassian(
             dim=dim, n_nodes=n_nodes
         )
-        distribution = TransformedWithInfo(base, flow)
+        distribution = TransformedWithExtra(base, flow)
         return distribution
 
     @hk.without_apply_rng
