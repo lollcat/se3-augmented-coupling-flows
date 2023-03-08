@@ -117,7 +117,7 @@ class ProjectedScalarAffine(BijectorWithInfo):
         return y, log_det, self._info
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
-        x, log_det = self.inverse_log_det_jacobian(y)
+        x, log_det = self.inverse_and_log_det(y)
         return x, log_det, self._info
 
 

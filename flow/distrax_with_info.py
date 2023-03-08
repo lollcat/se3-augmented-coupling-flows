@@ -45,7 +45,7 @@ class TransformedWithInfo(distrax.Transformed):
         super().__init__(distribution=distribution, bijector=bijector)
 
     def log_prob_with_extra(self, value: chex.Array) -> Tuple[Array, Extra]:
-        x, ildj_y, extra = self.bijector.inverse_and_log_det(value)
+        x, ildj_y, extra = self.bijector.inverse_and_log_det_with_extra(value)
         lp_x = self.distribution.log_prob(x)
         lp_y = lp_x + ildj_y
         return lp_y, extra
@@ -81,7 +81,7 @@ class ChainWithInfo(distrax.Chain):
         y, log_det, extra = self._bijectors[0].inverse_and_log_det_with_extra(y)
         extras.append(extra)
         for bijector in self._bijectors[1:]:
-            y, ld, extra = bijector.inverse_and_log_det(y)
+            y, ld, extra = bijector.inverse_and_log_det_with_extra(y)
             log_det += ld
             extras.append(extra)
         return y, log_det, extras

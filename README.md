@@ -38,3 +38,4 @@ ListLogger that can may used if you don't want to use wandb.
     - Move shift to come before scale?
     - Seems like we could try enforce q(x, a) \propto p(a) = N(\mu=x, \sigma) in an additional loss?
       This would help decrease the variance in the estimate of the marginal q(x) = E_{p(a)}[q(x, a)/p(a)]. 
+    - Lots of *_test.py files are no longer working, as the code has changed since they were written. These should be rewritten. 

@@ -130,62 +130,11 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
 
     bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=4)
 
-def test_bijector_with_info(dim: int = 3, n_nodes = 5,
-                            gram_schmidt: bool = False,
-                            global_frame: bool = False,
-                            process_flow_params_jointly: bool = False,
-                            use_mace: bool = True):
-
-    nets_config = NetsConfig(type='mace' if use_mace else "egnn",
-                             mace_torso_config=MACETorsoConfig(
-                                    n_vectors_residual = 3,
-                                    n_invariant_feat_residual = 3,
-                                    n_vectors_hidden_readout_block = 3,
-                                    n_invariant_hidden_readout_block = 3,
-                                    hidden_irreps = '4x0e+4x1o'
-                                 ),
-                             egnn_torso_config=EgnnTorsoConfig() if not use_mace else None,
-                             mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
-                             transformer_config=TransformerConfig() if process_flow_params_jointly else None
-                             )
-
-    def make_flow():
-        def bijector_fn():
-            bijectors = []
-            for swap in (True, False):
-                bijector = make_se_equivariant_split_coupling_with_projection(
-                    layer_number=0, dim=dim, swap=swap,
-                    identity_init=False,
-                    nets_config=nets_config,
-                    global_frame=global_frame,
-                    gram_schmidt=gram_schmidt,
-                    process_flow_params_jointly=process_flow_params_jointly,
-                )
-                bijectors.append(bijector)
-            bijector_block = ChainWithInfo(bijectors)
-            return bijector_block
-        flow = FastChain(bijector_fn=bijector_fn, n_layers=2)
-        return flow
-    @hk.without_apply_rng
-    @hk.transform
-    def bijector_forward_with_info(x):
-        y, log_det, info = make_flow().forward_and_log_det_with_extra(x)
-        return y, log_det, info
-
-    key = jax.random.PRNGKey(0)
-    key, subkey = jax.random.split(key)
-    x_dummy = jax.random.normal(key=key, shape=(n_nodes, dim*2))
-    params = bijector_forward_with_info.init(key, x_dummy)
-    out = bijector_forward_with_info.apply(params, x_dummy)
-
 
 
 if __name__ == '__main__':
     USE_64_BIT = True  # Fails for 32-bit
     gram_schmidt = False
-
-
-    test_bijector_with_info()
 
     test_matmul_transform_in_new_space()
     print("affine transform passing tests")

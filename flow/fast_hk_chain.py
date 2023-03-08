@@ -81,5 +81,5 @@ class Chain(BijectorWithInfo):
     """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
     (x_out, log_det), extra = self.stack_with_info(self.single_reverse_fn_with_extra,
-                                                   )((y, log_det_init, jnp.zeros(self._n_layers)))
+                                                   )((y, log_det_init), jnp.zeros(self._n_layers))
     return x_out, log_det, extra
