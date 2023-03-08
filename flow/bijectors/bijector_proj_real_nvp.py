@@ -57,13 +57,14 @@ class ProjectedScalarAffine(BijectorWithExtra):
     def get_extra(self, log_dets) -> Extra:
         info = self._info
         info_aggregator = {}
-        info.update(log_det_max=log_dets)
-        info.update(log_det_min=log_dets)
+        info.update(log_det_max=log_dets, log_det_min=log_dets)
+        info.update(shift_norm=jnp.linalg.norm(self._shift, axis=-1))
         info_aggregator.update(
             mean_abs_theta=jnp.mean,
             min_abs_theta=jnp.min,
             log_det_max=jnp.max,
-            log_det_min=jnp.min
+            log_det_min=jnp.min,
+            shift_norm=jnp.mean,
                                )
         extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
         if self._info['mean_abs_theta'].shape != ():
