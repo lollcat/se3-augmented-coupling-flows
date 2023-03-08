@@ -11,28 +11,30 @@ from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_
 
 
 
-def general_ml_loss_fn(params, x, log_prob_fn, key, use_equivariance_loss, weight):
+def general_ml_loss_fn(params, x, log_prob_with_extra_fn, key, use_equivariance_loss, weight):
     if use_equivariance_loss:
-        loss, info = ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight)
+        loss, info = ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight)
     else:
-        loss, info = ml_loss_fn(params, x, log_prob_fn)
+        loss, info = ml_loss_fn(params, x, log_prob_with_extra_fn)
     return loss, info
 
 
-def ml_loss_fn(params, x, log_prob_fn):
-    log_prob = log_prob_fn.apply(params, x)
+def ml_loss_fn(params, x, log_prob_with_extra_fn):
+    log_prob, extra = log_prob_with_extra_fn.apply(params, x)
     loss = - jnp.mean(log_prob)
     info = {"ml_loss": loss}
+    info.update(extra)
     return loss, info
 
-def ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight, batch_size_frac = 0.1):
+def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight, batch_size_frac = 0.1):
     batch_size, n_nodes, dim = x.shape
     dim = dim // 2  # Account for augmentd coords.
 
     # ML loss.
-    log_prob = log_prob_fn.apply(params, x)
+    log_prob, extra = log_prob_with_extra_fn.apply(params, x)
     ml_loss = - jnp.mean(log_prob)
     info = {"loss_ml": ml_loss}
+    info.update(extra)
 
     # Equivariance loss.
     eq_batch_size = max(1, int(batch_size * batch_size_frac))
@@ -49,7 +51,7 @@ def ml_and_equivariance_loss_fn(params, x, log_prob_fn, key, weight, batch_size_
         return x_and_a_rot
 
 
-    log_prob_g = log_prob_fn.apply(params, group_action(x[:eq_batch_size]))
+    log_prob_g = log_prob_with_extra_fn.apply(params, group_action(x[:eq_batch_size]))
     eq_loss = jnp.mean((log_prob_g - log_prob[:eq_batch_size])**2)
     info.update(loss_equivariance=eq_loss)
 
@@ -71,9 +73,9 @@ def get_tree_leaf_norm_info(tree):
     return info
 
 
-def ml_step(params, x, opt_state, log_prob_fn, optimizer, key, use_equivariance_loss, eq_loss_weight):
+def ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer, key, use_equivariance_loss, eq_loss_weight):
     grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
-        params, x, log_prob_fn, key, use_equivariance_loss, eq_loss_weight)
+        params, x, log_prob_with_extra_fn, key, use_equivariance_loss, eq_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
     new_params = optax.apply_updates(params, updates)
     info.update(grad_norm=optax.global_norm(grad),

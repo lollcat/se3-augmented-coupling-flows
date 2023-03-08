@@ -192,6 +192,7 @@ class TrainConfig(NamedTuple):
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
     use_64_bit: bool = False
+    with_train_info: bool = True  # Grab info from the flow during each forward pass.
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -300,6 +301,18 @@ def train(config: TrainConfig):
         log_prob = distribution.log_prob(x)
         return log_prob
 
+    @hk.without_apply_rng
+    @hk.transform
+    def log_prob_with_extra_fn(x):
+        if log_prob_with_extra_fn:
+            distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
+            log_prob, extra = distribution.log_prob_with_extra(x)
+        else:
+            distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
+            log_prob = distribution.log_prob(x)
+            extra = {}
+        return log_prob, extra
+
     @hk.transform
     def sample_and_log_prob_fn(sample_shape=()):
         distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
@@ -343,7 +356,7 @@ def train(config: TrainConfig):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer, subkey,
+            params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer, subkey,
                                               config.use_equivariance_loss, config.equivariance_loss_weight)
             return (params, opt_state, key), info
 
@@ -374,7 +387,7 @@ def train(config: TrainConfig):
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer,
+                params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn, optimizer,
                                                   subkey,
                                                   config.use_equivariance_loss, config.equivariance_loss_weight
                                                   )
@@ -411,4 +424,4 @@ def train(config: TrainConfig):
         plot_history(config.logger.history)
         plt.show()
 
-    return config.logger, params, log_prob_fn, sample_and_log_prob_fn
+    return config.logger, params, log_prob_fn, sample_and_log_prob_fn, log_prob_with_extra_fn

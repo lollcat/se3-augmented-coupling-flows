@@ -9,7 +9,8 @@ from flow.bijectors.bijector_pseudo_act_norm import make_pseudo_act_norm_bijecto
 from flow.bijectors.bijector_scale_along_vector import make_se_equivariant_scale_along_vector
 from flow.bijectors.bijector_real_nvp_non_equivariant import make_realnvp
 from nets.base import NetsConfig
-from flow.fast_hk_chain import Chain
+from flow.fast_hk_chain import Chain as FastChain
+from flow.distrax_with_info import TransformedWithInfo, ChainWithInfo
 
 
 class BaseConfig(NamedTuple):
@@ -42,8 +43,11 @@ def make_equivariant_augmented_flow_dist(config: FlowDistConfig):
 
 
 def make_equivariant_augmented_flow_dist_fast_compile(config: FlowDistConfig):
-    flow_type = [config.type] if isinstance(config.type, str) else config.type
+    if config.type != 'proj':
+        raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
 
+
+    flow_type = [config.type] if isinstance(config.type, str) else config.type
     if not ("proj" in config.kwargs.keys() or "proj_v2" in config.kwargs.keys()):
         if not config.kwargs == {}:
             raise NotImplementedError
@@ -97,14 +101,14 @@ def make_equivariant_augmented_flow_dist_fast_compile(config: FlowDistConfig):
                                                                   **kwargs_proj_v2)
                 bijectors.append(bijector)
 
-        return distrax.Chain(bijectors)
+        return ChainWithInfo(bijectors)
 
-    flow = Chain(bijector_fn=bijector_fn, n_layers=config.n_layers, compile_n_unroll=config.compile_n_unroll)
+    flow = FastChain(bijector_fn=bijector_fn, n_layers=config.n_layers, compile_n_unroll=config.compile_n_unroll)
     if config.act_norm:
         final_act_norm = make_pseudo_act_norm_bijector(layer_number=-1, dim=config.dim,
                                                        flow_identity_init=config.identity_init)
         flow = distrax.Chain([flow, final_act_norm])
-    distribution = distrax.Transformed(base, flow)
+    distribution = TransformedWithInfo(base, flow)
     return distribution
 
 
@@ -166,7 +170,7 @@ def make_equivariant_augmented_flow_dist_distrax_chain(config: FlowDistConfig):
                                                        flow_identity_init=config.identity_init)
                          )
 
-    flow = distrax.Chain(bijectors)
-    distribution = distrax.Transformed(base, flow)
+    flow = ChainWithInfo(bijectors)
+    distribution = TransformedWithInfo(base, flow)
     return distribution
 
