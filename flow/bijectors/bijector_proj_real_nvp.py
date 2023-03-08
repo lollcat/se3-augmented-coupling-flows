@@ -53,10 +53,18 @@ class ProjectedScalarAffine(BijectorWithExtra):
             self._inv_scale = 1. / self._scale
             self._log_scale = jnp.log(jnp.abs(self._scale))
 
-    @property
-    def extra(self) -> Extra:
-        info_aggregator = {"mean_abs_theta": jnp.mean,
-                           'min_abs_theta': jnp.min}
+
+    def get_extra(self, log_dets) -> Extra:
+        info = self._info
+        info_aggregator = {}
+        info.update(log_det_max=log_dets)
+        info.update(log_det_min=log_dets)
+        info_aggregator.update(
+            mean_abs_theta=jnp.mean,
+            min_abs_theta=jnp.min,
+            log_det_max=jnp.max,
+            log_det_min=jnp.min
+                               )
         extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
         if self._info['mean_abs_theta'].shape != ():
             extra = extra._replace(aux_info=extra.aggregate_info())
@@ -122,11 +130,11 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         y, log_det = self.forward_and_log_det(x)
-        return y, log_det, self.extra
+        return y, log_det, self.get_extra(log_det)
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         x, log_det = self.inverse_and_log_det(y)
-        return x, log_det, self.extra
+        return x, log_det, self.get_extra(log_det)
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
@@ -212,7 +220,8 @@ def make_conditioner(
             basis = various_x_points[:, 1:]
             vec1 = various_x_points[:, 0]
             vec2 = various_x_points[:, 1]
-            theta = jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) / jnp.linalg.norm(vec2, axis=-1)
+            theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) /
+                               jnp.linalg.norm(vec2, axis=-1))
             info.update(mean_abs_theta=jnp.mean(jnp.abs(theta)),
                         min_abs_theta=jnp.min(jnp.abs(theta)))
 
