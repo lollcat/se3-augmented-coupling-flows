@@ -3,7 +3,7 @@ import jax
 import chex
 
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
+from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
 from flow.distrax_with_extra import ChainWithExtra, TransformedWithExtra
 from flow.fast_hk_chain import Chain as FastChain
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
@@ -16,7 +16,7 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                             process_flow_params_jointly: bool = False,
                             use_mace: bool = False):
 
-    nets_config = NetsConfig(type='mace' if use_mace else "egnn",
+    nets_config = NetsConfig(type='mace' if use_mace else "e3gnn",
                              mace_torso_config=MACETorsoConfig(
                                     n_vectors_residual = 3,
                                     n_invariant_feat_residual = 3,
@@ -24,7 +24,12 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                                     n_invariant_hidden_readout_block = 3,
                                     hidden_irreps = '4x0e+4x1o'
                                  ),
-                             egnn_torso_config=EgnnTorsoConfig() if not use_mace else None,
+                             egnn_torso_config=EgnnTorsoConfig(),
+                             e3gnn_torso_config=E3GNNTorsoConfig(
+                                                n_blocks=2,
+                                                mlp_units= (4,),
+                                                n_vectors_hidden = 3,
+                                                n_invariant_feat_hidden=3),
                              mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
                              transformer_config=TransformerConfig() if process_flow_params_jointly else None
                              )
