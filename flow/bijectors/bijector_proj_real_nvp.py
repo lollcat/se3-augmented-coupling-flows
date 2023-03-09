@@ -54,9 +54,10 @@ class ProjectedScalarAffine(BijectorWithExtra):
             self._log_scale = jnp.log(jnp.abs(self._scale))
 
 
-    def get_extra(self, log_dets) -> Extra:
+    def get_extra(self, log_dets, forward: bool) -> Extra:
         info = self._info
         info_aggregator = {}
+        log_dets = -log_dets if forward else log_dets
         info.update(log_det_max=log_dets, log_det_min=log_dets)
         info.update(shift_norm=jnp.linalg.norm(self._shift, axis=-1))
         info_aggregator.update(
@@ -131,11 +132,11 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         y, log_det = self.forward_and_log_det(x)
-        return y, log_det, self.get_extra(log_det)
+        return y, log_det, self.get_extra(log_det, forward=True)
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         x, log_det = self.inverse_and_log_det(y)
-        return x, log_det, self.get_extra(log_det)
+        return x, log_det, self.get_extra(log_det, forward=False)
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
@@ -289,8 +290,8 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
-                                                       process_flow_params_jointly: bool = True,
-                                                       condition_on_x_proj: bool = False,
+                                                       process_flow_params_jointly: bool = False,
+                                                       condition_on_x_proj: bool = True,
                                                        add_small_identity: bool = False
                                                        ) -> BijectorWithExtra:
     assert dim in (2, 3)  # Currently just written for 2D and 3D

@@ -42,7 +42,7 @@ def build_flow(config: FlowDistConfig) -> Flow:
 
 
 def create_flow_recipe(config: FlowDistConfig) -> FlowRecipe:
-    if config.type not in ['proj', 'nice']:
+    if config.type not in ['proj', 'nice'] or config.act_norm:
         raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
 
     flow_type = [config.type] if isinstance(config.type, str) else config.type
