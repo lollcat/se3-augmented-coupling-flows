@@ -47,7 +47,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     cfg.training.n_epoch = 32
     cfg.training.save = False
-    cfg.flow.type = ['proj']
+    # cfg.flow.type = 'proj'
     cfg.training.plot_batch_size = 4
     cfg.logger = DictConfig({"list_logger": None})
     return cfg

@@ -26,7 +26,7 @@ flow:
       global_frame: false
       process_flow_params_jointly: false
       condition_on_x_proj: true
-      gram_schmidt: false
+      gram_schmidt: true
       add_small_identity: true
     proj_v2:
       process_flow_params_jointly: true # if True then specify transformer config lower down.
@@ -81,7 +81,7 @@ training:
   save: true
   save_dir: dw4_results
   use_flow_aux_loss: true
-  aux_loss_weight: 1.
+  aux_loss_weight: 1.0
   with_train_info: true
 
 logger:

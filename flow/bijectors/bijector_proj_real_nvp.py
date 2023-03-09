@@ -8,7 +8,7 @@ import haiku as hk
 
 from nets.transformer import Transformer
 from nets.base import NetsConfig, build_egnn_fn
-from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
+from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection, safe_norm
 from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra, Array, Extra
 
 
@@ -119,21 +119,41 @@ class ProjectedScalarAffine(BijectorWithExtra):
         x, log_det = self.inverse_and_log_det(y)
         return x, log_det, self.get_extra(log_det, forward=False)
 
+    def get_theta_single(self, various_x_points):
+        vec1 = various_x_points[:, 1] + jnp.zeros(various_x_points.shape[-1]).at[0].set(1e-6)[None, :]
+        vec2 = various_x_points[:, 2] + jnp.zeros(various_x_points.shape[-1]).at[1].set(1e-6)[None, :]
+        theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) /
+                                     safe_norm(vec2, axis=-1))
+        return theta
+
     def get_extra(self, log_dets, forward: bool) -> Extra:
-        info = self._info
+        info = {}
         info_aggregator = {}
+        various_x_points = self._info['various_x_points']
+        if various_x_points.shape[-1] == 3:
+            if len(various_x_points.shape) == 4:
+                theta = jax.vmap(self.get_theta_single)(various_x_points)
+            else:
+                theta = self.get_theta_single(various_x_points)
+            info_aggregator.update(
+                mean_abs_theta=jnp.mean, min_abs_theta=jnp.min)
+            info.update(
+                mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)))
+            aux_loss = jnp.mean((jnp.pi / 2 - jnp.abs(theta)) ** 2)
+        else:
+            aux_loss = jnp.array(0.)
+
         log_dets = -log_dets if forward else log_dets
-        info.update(log_det_max=log_dets, log_det_min=log_dets)
-        info.update(shift_norm=jnp.linalg.norm(self._shift, axis=-1))
         info_aggregator.update(
-            mean_abs_theta=jnp.mean,
-            min_abs_theta=jnp.min,
-            log_det_max=jnp.max,
-            log_det_min=jnp.min,
+            log_det_max=jnp.max, log_det_min=jnp.min,
             shift_norm=jnp.mean,
                                )
-        extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
-        if self._info['mean_abs_theta'].shape != ():
+        info.update(
+            log_det_max=log_dets, log_det_min=log_dets,
+            shift_norm=jnp.linalg.norm(self._shift, axis=-1)
+        )
+        extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
+        if info['shift_norm'].shape != ():
             extra = extra._replace(aux_info=extra.aggregate_info())
         extra = extra._replace(aux_info=jax.lax.stop_gradient(extra.aux_info))
         return extra
@@ -159,8 +179,8 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
         origin = jnp.mean(origin, axis=0, keepdims=True)
 
     if gram_schmidt:
-        basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim, axis=0))
-        assert len(basis_vectors) == dim
+        basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim-1, axis=0))
+        assert len(basis_vectors) == (dim - 1)
 
         orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
         change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
@@ -181,7 +201,7 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
             y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
             change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
-        change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
+        change_of_basis_matrix = change_of_basis_matrix / safe_norm(change_of_basis_matrix, axis=-2,
                                                                           keepdims=True)
 
 
@@ -220,13 +240,7 @@ def make_conditioner(
 
         # Get info
         info = {}
-        # basis = various_x_points[:, 1:]
-        vec1 = various_x_points[:, 0]
-        vec2 = various_x_points[:, 1]
-        theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) /
-                           jnp.linalg.norm(vec2, axis=-1))
-        info.update(mean_abs_theta=jnp.mean(jnp.abs(theta)),
-                    min_abs_theta=jnp.min(jnp.abs(theta)))
+        info.update(various_x_points=various_x_points)
 
         origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
                                                              add_small_identity=add_small_identity)
@@ -300,7 +314,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
         change_of_basis_matrix, origin, log_scale, shift, info = params
         return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift, info)
 
-    n_heads = dim + (1 if gram_schmidt else 0)
+    n_heads = dim
     n_invariant_params = dim*2
 
     if nets_config.type == "mace":
