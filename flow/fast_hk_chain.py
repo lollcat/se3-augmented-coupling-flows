@@ -75,12 +75,12 @@ class Chain(BijectorWithExtra):
     (x_out, log_det), extra = self.stack_with_info(self.single_forward_fn_with_extra)((x, log_det_init),
                                                                                       jnp.zeros(self._n_layers),
                                                                                       reverse=True)
-    info = {}
-    aggregators = {}
-    for i in reversed(range(self._n_layers)):
-      info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
-      aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
-    extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
+    # info = {}
+    # aggregators = {}
+    # for i in reversed(range(self._n_layers)):
+    #   info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
+    #   aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+    # extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
     return x_out, log_det, extra
 
   def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
@@ -88,10 +88,10 @@ class Chain(BijectorWithExtra):
     log_det_init = jnp.zeros(y.shape[0:-self.event_ndims_in])
     (x_out, log_det), extra = self.stack_with_info(self.single_reverse_fn_with_extra,
                                                    )((y, log_det_init), jnp.zeros(self._n_layers))
-    info = {}
-    aggregators = {}
-    for i in range(self._n_layers):
-      info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
-      aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
-    extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
+    # info = {}
+    # aggregators = {}
+    # for i in range(self._n_layers):
+    #   info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
+    #   aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+    # extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
     return x_out, log_det, extra
