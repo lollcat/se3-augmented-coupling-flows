@@ -161,37 +161,20 @@ class MultiEgnnConfig(NamedTuple):
 class multi_se_equivariant_net(hk.Module):
     def __init__(self, config: MultiEgnnConfig):
         super().__init__(name=config.name + "_multi_x_egnn")
-        if config.torso_config.hk_layer_stack:
-            self.egnn_layer_fn = lambda x, h: EGCL_Multi(config.name,
-                                                 n_heads=config.n_equivariant_vectors_out,
-                                                 mlp_units=config.torso_config.mlp_units,
-                                                 identity_init_x=config.torso_config.identity_init_x,
-                                                 normalize_by_x_norm=config.torso_config.normalize_by_norms,
-                                                 residual=config.torso_config.h_residual,
-                                                 activation_fn=config.torso_config.activation_fn,
-                                                 tanh=config.torso_config.tanh,
-                                                 phi_x_max=config.torso_config.phi_x_max,
-                                                 agg=config.torso_config.agg,
-                                                 stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
-                                                 variance_scaling_init=config.torso_config.variance_scaling_init,
-                                                 normalization_constant=config.torso_config.normalization_constant,
-                                                 cross_attention=config.torso_config.cross_attention
-                                                 )(x, h)
-        else:
-            self.egnn_layers = [EGCL_Multi(config.name,
-                                                 n_heads=config.n_equivariant_vectors_out,
-                                                 mlp_units=config.torso_config.mlp_units,
-                                                 identity_init_x=config.torso_config.identity_init_x,
-                                                 normalize_by_x_norm=config.torso_config.normalize_by_norms,
-                                                 residual=config.torso_config.h_residual,
-                                                 activation_fn=config.torso_config.activation_fn,
-                                                 tanh=config.torso_config.tanh,
-                                                 phi_x_max=config.torso_config.phi_x_max,
-                                                 agg=config.torso_config.agg,
-                                                 stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
-                                                 variance_scaling_init=config.torso_config.variance_scaling_init,
-                                                 normalization_constant=config.torso_config.normalization_constant
-                               ) for _ in range(config.torso_config.n_layers)]
+        self.egnn_layers = [EGCL_Multi(config.name + str(i),
+                                             n_heads=config.n_equivariant_vectors_out,
+                                             mlp_units=config.torso_config.mlp_units,
+                                             identity_init_x=config.torso_config.identity_init_x,
+                                             normalize_by_x_norm=config.torso_config.normalize_by_norms,
+                                             residual=config.torso_config.h_residual,
+                                             activation_fn=config.torso_config.activation_fn,
+                                             tanh=config.torso_config.tanh,
+                                             phi_x_max=config.torso_config.phi_x_max,
+                                             agg=config.torso_config.agg,
+                                             stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
+                                             variance_scaling_init=config.torso_config.variance_scaling_init,
+                                             normalization_constant=config.torso_config.normalization_constant
+                           ) for i in range(config.torso_config.n_layers)]
 
         self.h_final_layer = hk.Linear(config.n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
             if config.invariant_feat_zero_init else hk.Linear(config.n_invariant_feat_out)
@@ -216,15 +199,9 @@ class multi_se_equivariant_net(hk.Module):
         # Project to number of heads
         x = jnp.repeat(x[:, None, ...], repeats=self.n_heads, axis=1)
 
-        if self.egnn_config.hk_layer_stack:
-            # Use layer_stack to speed up compilation time.
-            stack = hk.experimental.layer_stack(self.egnn_config.n_layers, with_per_layer_inputs=False, name="EGCL_layer_stack",
-                                                unroll=self.egnn_config.compile_n_unroll)
-            x_out, h_egnn = stack(self.egnn_layer_fn)(x, h)
-        else:
-            x_out, h_egnn = x, h
-            for layer in self.egnn_layers:
-                x_out, h_egnn = layer(x_out, h_egnn)
+        x_out, h_egnn = x, h
+        for layer in self.egnn_layers:
+            x_out, h_egnn = layer(x_out, h_egnn)
 
         # Use h_egnn output from the EGNN as a feature for h-out.
         if self.egnn_config.h_linear_softmax:
