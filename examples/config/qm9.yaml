@@ -24,7 +24,7 @@ flow:
       global_frame: false
       process_flow_params_jointly: false
       condition_on_x_proj: true
-      gram_schmidt: false
+      gram_schmidt: true
       add_small_identity: true
     proj_v2:
       process_flow_params_jointly: false
@@ -108,14 +108,14 @@ training:
   K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results
-  use_flow_aux_loss: false
+  use_flow_aux_loss: true
   aux_loss_weight: 1.0
   with_train_info: false
 
 logger:
 #  list_logger: null
   wandb:
-    name: qm9pos_${flow.nets.type}_new_info_bug_fix # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.nets.type}_aux_loss # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

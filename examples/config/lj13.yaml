@@ -102,6 +102,8 @@ training:
   K_marginal_log_lik: 20
   save: true
   save_dir: lj13_results
+  use_flow_aux_loss: false
+  aux_loss_weight: 1.0
 
 logger:
 #  list_logger: null
