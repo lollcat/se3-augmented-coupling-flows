@@ -121,7 +121,7 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def get_vector_info_single(self, various_x_points):
         basis_vectors = various_x_points[:, 1:]
-        # basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :]
+        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :]*1e-6
         vec1 = basis_vectors[:, 0]
         vec2 = basis_vectors[:, 1]
         arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
