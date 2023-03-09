@@ -158,7 +158,7 @@ def create_flow(recipe: FlowRecipe):
                 sample_and_log_prob_apply=sample_and_log_prob_apply,
                 log_prob_with_extra_apply=log_prob_with_extra_apply,
                 sample_and_log_prob_with_extra_apply=sample_and_log_prob_with_extra_apply,
-                sample_apply=lambda x: sample_and_log_prob_apply(*x)[0],
+                sample_apply=lambda params, key, shape: sample_and_log_prob_apply(params, key, shape)[0],
                 config=recipe.config
                 )
     return flow

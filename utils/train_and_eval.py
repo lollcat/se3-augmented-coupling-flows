@@ -132,7 +132,7 @@ def get_marginal_log_lik_info(log_prob_fn, x_original, key, global_centering, au
 
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8, 9))
-def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
+def eval_fn(params, x, key, flow_log_prob_apply_fn, flow_sample_and_log_prob_apply_fn,
             global_centering: bool,
             aug_scale: float,
             target_log_prob = None,
@@ -149,7 +149,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
     dim = x.shape[-1] // 2
     key1, key2 = jax.random.split(key)
 
-    log_prob_samples_only_fn = lambda x: flow_log_prob_fn.apply(params, x)
+    log_prob_samples_only_fn = lambda x: flow_log_prob_apply_fn(params, x)
 
     def scan_fn(carry, xs):
         x_batch, key = xs
@@ -159,11 +159,11 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
             x_batch,  log_prob_fn=log_prob_samples_only_fn, key=key)
             info.update(invariances_info)
 
-        log_prob_batch = flow_log_prob_fn.apply(params, x_batch)
-        marginal_log_lik_info = get_marginal_log_lik_info(log_prob_fn=lambda x: flow_log_prob_fn.apply(params, x),
-                                                           x_original=x_batch[..., :dim], key=key, K=K,
-                                                           global_centering=global_centering,
-                                                           aug_scale=aug_scale)
+        log_prob_batch = flow_log_prob_apply_fn(params, x_batch)
+        marginal_log_lik_info = get_marginal_log_lik_info(log_prob_fn=lambda x: flow_log_prob_apply_fn(params, x),
+                                                          x_original=x_batch[..., :dim], key=key, K=K,
+                                                          global_centering=global_centering,
+                                                          aug_scale=aug_scale)
         info.update(eval_log_lik = jnp.mean(log_prob_batch))
         info.update(marginal_log_lik_info)
         return None, info
@@ -174,7 +174,7 @@ def eval_fn(params, x, key, flow_log_prob_fn, flow_sample_and_log_prob_fn,
 
     info = jax.tree_map(jnp.mean, info)
 
-    x_flow, log_prob_flow = flow_sample_and_log_prob_fn.apply(params, key2, (batch_size,))
+    x_flow, log_prob_flow = flow_sample_and_log_prob_apply_fn(params, key2, (batch_size,))
     x_flow_original, x_flow_aug = jnp.split(x_flow, axis=-1, indices_or_sections=2)
     original_centre = jnp.mean(x_flow_original, axis=-2)
     aug_centre = jnp.mean(x_flow_aug, axis=-2)

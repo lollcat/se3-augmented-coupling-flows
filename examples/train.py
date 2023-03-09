@@ -16,7 +16,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 
-from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
+from flow.build_flow import build_flow, FlowDistConfig, BaseConfig
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
 from nets.transformer import TransformerConfig
@@ -294,40 +294,17 @@ def train(config: TrainConfig):
     eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))
     plot_iter = list(np.linspace(0, config.n_epoch - 1, config.n_plots, dtype="int"))
 
-    @hk.without_apply_rng
-    @hk.transform
-    def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        log_prob = distribution.log_prob(x)
-        return log_prob
+
+    flow_dist = build_flow(config.flow_dist_config)
 
 
-    @hk.without_apply_rng
-    @hk.transform
-    def log_prob_with_extra_fn(x: chex.Array) -> Tuple[chex.Array, Extra]:
-        if config.with_train_info:
-            distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-            log_prob, extra = distribution.log_prob_with_extra(x)
-        else:
-            distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-            log_prob = distribution.log_prob(x)
-            extra = Extra()
-        return log_prob, extra
-
-    @hk.transform
-    def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
-
-
-    sample_fn = jax.jit(lambda params, key, shape: sample_and_log_prob_fn.apply(params, key, shape)[0],
-                        static_argnums=2)
+    sample_fn = jax.jit(flow_dist.sample_apply, static_argnums=2)
 
 
     key = jax.random.PRNGKey(config.seed)
     key, subkey = jax.random.split(key)
-    params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, config.n_nodes, config.dim*2)))
-    params_test = log_prob_fn.init(rng=subkey, x=jnp.zeros((config.n_nodes, config.dim*2)))
+    params = flow_dist.init(subkey, jnp.zeros((1, config.n_nodes, config.dim*2)))
+    params_test = flow_dist.init(subkey, jnp.zeros((config.n_nodes, config.dim*2)))
     chex.assert_trees_all_equal_shapes(params, params_test)
 
 
@@ -346,15 +323,6 @@ def train(config: TrainConfig):
                                                   global_centering=config.aug_target_global_centering,
                                                   aug_scale=config.aug_target_scale)
 
-    def fake_loss_fn(params, use_extra=True, x = train_data[:3]):
-        if use_extra:
-            log_prob, extra = log_prob_with_extra_fn.apply(params, x)
-        else:
-            log_prob = log_prob_fn.apply(params, x)
-            extra = Extra()
-        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
-        return loss, extra
-
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
@@ -368,7 +336,8 @@ def train(config: TrainConfig):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn.apply, optimizer, subkey,
+            params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                                              subkey,
                                               config.use_equivariance_loss, config.equivariance_loss_weight)
             return (params, opt_state, key), info
 
@@ -399,7 +368,7 @@ def train(config: TrainConfig):
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_with_extra_fn.apply, optimizer,
+                params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                                   subkey,
                                                   config.use_equivariance_loss, config.equivariance_loss_weight
                                                   )
@@ -415,8 +384,8 @@ def train(config: TrainConfig):
 
         if i in eval_iter:
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
-                                flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
+            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_apply_fn=flow_dist.log_prob_apply,
+                                flow_sample_and_log_prob_apply_fn=flow_dist.sample_and_log_prob_apply,
                                 global_centering=config.aug_target_global_centering,
                                 aug_scale=config.aug_target_scale,
                                 key=subkey,
@@ -436,4 +405,4 @@ def train(config: TrainConfig):
         plot_history(config.logger.history)
         plt.show()
 
-    return config.logger, params, log_prob_fn, sample_and_log_prob_fn, log_prob_with_extra_fn
+    return config.logger, params, flow_dist
