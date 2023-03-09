@@ -305,7 +305,7 @@ def train(config: TrainConfig):
     @hk.without_apply_rng
     @hk.transform
     def log_prob_with_extra_fn(x: chex.Array) -> Tuple[chex.Array, Extra]:
-        if log_prob_with_extra_fn:
+        if config.with_train_info:
             distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
             log_prob, extra = distribution.log_prob_with_extra(x)
         else:

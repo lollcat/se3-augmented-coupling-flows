@@ -20,7 +20,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: nice  # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
+  type: nice # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
   kwargs:
     proj:
       global_frame: false
@@ -37,7 +37,7 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    type: egnn # only works with egnn currently, as it is 2D
+    type: egnn
     egnn:
       mlp_units: [32,32]
       n_layers: 3
@@ -63,7 +63,7 @@ training:
     init_lr: 1e-5
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 1e-4 # can be null
+    peak_lr: 1e-2 # can be null
     end_lr: 1e-3 # can be null
     warmup_n_epoch: 2. # can be null
     max_global_norm: 0.5
@@ -83,12 +83,13 @@ training:
   save_dir: dw4_results
   use_equivariance_loss: false
   equivariance_loss_weight: 1000.0
+  with_train_info: false
 
 logger:
+#  list_logger: null
   wandb:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4]
-  #  list_logger: null
 
