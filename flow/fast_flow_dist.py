@@ -1,4 +1,4 @@
-from typing import NamedTuple, Callable, Tuple, Union
+from typing import NamedTuple, Callable, Tuple, Union, Any
 
 import chex
 import distrax
@@ -15,11 +15,12 @@ Sample = chex.Array
 
 
 
-class FlowDefinition(NamedTuple):
+class FlowRecipe(NamedTuple):
     """Defines input needed to create an instance of the `Flow` callables."""
     make_base: Callable[[], distrax.Distribution]
     make_bijector: Callable[[], Union[distrax.Bijector, BijectorWithExtra]]
     n_layers: int
+    config: Any
 
 class FlowParams(NamedTuple):
     base: Params
@@ -32,35 +33,36 @@ class Flow(NamedTuple):
     sample_apply: Callable[[FlowParams, chex.PRNGKey, chex.Shape], Sample]
     log_prob_with_extra_apply: Callable[[FlowParams, Sample], Tuple[LogProb, Extra]]
     sample_and_log_prob_with_extra_apply: Callable[[FlowParams, chex.PRNGKey, chex.Shape], Tuple[Sample, LogProb, Extra]]
+    config: Any
 
 
-def create_flow(definition: FlowDefinition):
+def create_flow(recipe: FlowRecipe):
     """Create a `Flow` given the provided definition."""
 
     @hk.without_apply_rng
     @hk.transform
     def base_sample_fn(seed: chex.PRNGKey, sample_shape: chex.Shape) -> Sample:
-        return definition.make_base().sample(seed=seed, sample_shape=sample_shape)
+        return recipe.make_base().sample(seed=seed, sample_shape=sample_shape)
 
     @hk.without_apply_rng
     @hk.transform
     def base_log_prob_fn(x: Sample) -> LogProb:
-        return definition.make_base().log_prob(value=x)
+        return recipe.make_base().log_prob(value=x)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward_and_log_det(x: Sample) -> Tuple[Sample, LogDet]:
-        return definition.make_bijector().forward_and_log_det(x)
+        return recipe.make_bijector().forward_and_log_det(x)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_inverse_and_log_det(x: Sample) -> Tuple[Sample, LogDet]:
-        return definition.make_bijector().inverse_and_log_det(x)
+        return recipe.make_bijector().inverse_and_log_det(x)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward_and_log_det_with_extra(x: Sample) -> Tuple[Sample, LogDet, Extra]:
-        bijector = definition.make_bijector()
+        bijector = recipe.make_bijector()
         if isinstance(bijector, BijectorWithExtra):
             y, log_det, extra = bijector.forward_and_log_det_with_extra(x)
         else:
@@ -71,7 +73,7 @@ def create_flow(definition: FlowDefinition):
     @hk.without_apply_rng
     @hk.transform
     def bijector_inverse_and_log_det_with_extra(y: Sample) -> Tuple[Sample, LogDet, Extra]:
-        bijector = definition.make_bijector()
+        bijector = recipe.make_bijector()
         if isinstance(bijector, BijectorWithExtra):
             x, log_det, extra = bijector.inverse_and_log_det_with_extra(y)
         else:
@@ -82,7 +84,7 @@ def create_flow(definition: FlowDefinition):
     def init(seed: chex.PRNGKey, sample: Sample) -> FlowParams:
         params_base = base_log_prob_fn.init(seed, sample)
         params_bijector_single = bijector_forward_and_log_det.init(seed, sample)
-        params_bijectors = jax.tree_map(lambda x: jnp.repeat(x[None, ...], definition.n_layers, axis=0),
+        params_bijectors = jax.tree_map(lambda x: jnp.repeat(x[None, ...], recipe.n_layers, axis=0),
                                         params_bijector_single)
         return FlowParams(base=params_base, bijector=params_bijectors)
 
@@ -122,7 +124,7 @@ def create_flow(definition: FlowDefinition):
 
         info = {}
         aggregators = {}
-        for i in reversed(range(definition.n_layers)):
+        for i in reversed(range(recipe.n_layers)):
           info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
           aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
         extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
@@ -143,7 +145,7 @@ def create_flow(definition: FlowDefinition):
 
         info = {}
         aggregators = {}
-        for i in range(definition.n_layers):
+        for i in range(recipe.n_layers):
           info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
           aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
         extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
@@ -155,9 +157,7 @@ def create_flow(definition: FlowDefinition):
                 sample_and_log_prob_apply=sample_and_log_prob_apply,
                 log_prob_with_extra_apply=log_prob_with_extra_apply,
                 sample_and_log_prob_with_extra_apply=sample_and_log_prob_with_extra_apply,
-                sample_apply=lambda x: sample_and_log_prob_apply(*x)[0]
+                sample_apply=lambda x: sample_and_log_prob_apply(*x)[0],
+                config=recipe.config
                 )
-
-
-
-
+    return flow
