@@ -127,7 +127,7 @@ class ProjectedScalarAffine(BijectorWithExtra):
         arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
         theta = jax.vmap(jnp.arccos)(arccos_in)
         log_barrier_in = 1 - jnp.sign(arccos_in) + 1e-6
-        aux_loss = jnp.log(log_barrier_in)
+        aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
     def get_extra(self, log_dets, forward: bool) -> Extra:
         info = {}
