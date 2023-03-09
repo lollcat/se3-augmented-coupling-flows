@@ -10,8 +10,8 @@ from distrax._src.distributions.distribution import Array, PRNGKey
 @jax.tree_util.register_pytree_node_class
 class Extra(NamedTuple):
     aux_loss: chex.Array = jnp.array(0.0)
-    aux_info: Optional[dict] = None
-    info_aggregator: Optional[dict] = jnp.mean
+    aux_info: Optional[dict] = {}
+    info_aggregator: Optional[dict] = {}
 
     def aggregate_info(self):
         """Aggregate info as specified, average loss."""
@@ -158,12 +158,12 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                  split_index: int,
                  event_ndims: int,
                  conditioner: Callable[[Array, Optional[bool]], BijectorParams],
-                 bijector: Callable[[BijectorParams], BijectorWithExtra],
+                 bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
                  split_axis: int = -1):
         super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
 
-    def _inner_bijector(self, params: BijectorParams) -> BijectorWithExtra:
+    def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
         """Returns an inner bijector for the passed params."""
         bijector = self._bijector(params)
         if bijector.event_ndims_in != bijector.event_ndims_out:
@@ -178,22 +178,34 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                 f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
                 f'bijector and {self.event_ndims_in} for the coupling bijector.')
         elif extra_ndims > 0:
-            bijector = BlockWithExtra(bijector, extra_ndims)
+            if isinstance(bijector, BijectorWithExtra):
+                bijector = BlockWithExtra(bijector, extra_ndims)
+            else:
+                bijector = distrax.Block(bijector, extra_ndims)
         return bijector
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
-        params = self._conditioner(x1, return_info=True)
+        params = self._conditioner(x1)
         inner_bijector = self._inner_bijector(params)
-        y2, logdet, info = inner_bijector.forward_and_log_det_with_extra(x2)
-        return self._recombine(x1, y2), logdet, info
+        if isinstance(inner_bijector, BijectorWithExtra):
+            y2, logdet, extra = inner_bijector.forward_and_log_det_with_extra(x2)
+        else:
+            y2, logdet = inner_bijector.forward_and_log_det(x2)
+            extra = Extra()
+        return self._recombine(x1, y2), logdet, extra
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
-        """Like inverse_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
+        """Like inverse_and_log det, but with additional extra. Defaults to just returning an empty dict for extra."""
         self._check_inverse_input_shape(y)
         y1, y2 = self._split(y)
-        params = self._conditioner(y1, return_info=True)
-        x2, logdet, info = self._inner_bijector(params).inverse_and_log_det_with_extra(y2)
-        return self._recombine(y1, x2), logdet, info
+        params = self._conditioner(y1)
+        inner_bijector = self._inner_bijector(params)
+        if isinstance(inner_bijector, BijectorWithExtra):
+            x2, logdet, extra = inner_bijector.inverse_and_log_det_with_extra(y2)
+        else:
+            x2, logdet = inner_bijector.forward_and_log_det(y2)
+            extra = Extra()
+        return self._recombine(y1, x2), logdet, extra

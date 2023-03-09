@@ -1,12 +1,14 @@
 import haiku as hk
 import jax
 import chex
+import jax.numpy as jnp
 
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
+from flow.bijectors.bijector_nice import make_se_equivariant_nice
 from flow.distrax_with_extra import ChainWithExtra, TransformedWithExtra
 from flow.fast_hk_chain import Chain as FastChain
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
+from flow.test_utils import get_minimal_nets_config
 
 
 def test_dist_with_info(dim: int = 3, n_nodes = 5,
@@ -15,37 +17,24 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                             global_frame: bool = False,
                             process_flow_params_jointly: bool = False,
                             use_mace: bool = False):
+    nets_config = get_minimal_nets_config('mace' if use_mace else 'e3gnn')
 
-    nets_config = NetsConfig(type='mace' if use_mace else "e3gnn",
-                             mace_torso_config=MACETorsoConfig(
-                                    n_vectors_residual = 3,
-                                    n_invariant_feat_residual = 3,
-                                    n_vectors_hidden_readout_block = 3,
-                                    n_invariant_hidden_readout_block = 3,
-                                    hidden_irreps = '4x0e+4x1o'
-                                 ),
-                             egnn_torso_config=EgnnTorsoConfig(),
-                             e3gnn_torso_config=E3GNNTorsoConfig(
-                                                n_blocks=2,
-                                                mlp_units= (4,),
-                                                n_vectors_hidden = 3,
-                                                n_invariant_feat_hidden=3),
-                             mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
-                             transformer_config=TransformerConfig() if process_flow_params_jointly else None
-                             )
-
-    def make_dist():
+    def make_dist(bijector_type='nice'):
         def bijector_fn():
             bijectors = []
             for swap in (True, False):
-                bijector = make_se_equivariant_split_coupling_with_projection(
-                    layer_number=0, dim=dim, swap=swap,
-                    identity_init=False,
-                    nets_config=nets_config,
-                    global_frame=global_frame,
-                    gram_schmidt=gram_schmidt,
-                    process_flow_params_jointly=process_flow_params_jointly,
-                )
+                if bijector_type == "proj":
+                    bijector = make_se_equivariant_split_coupling_with_projection(
+                        layer_number=0, dim=dim, swap=swap,
+                        identity_init=False,
+                        nets_config=nets_config,
+                        global_frame=global_frame,
+                        gram_schmidt=gram_schmidt,
+                        process_flow_params_jointly=process_flow_params_jointly,
+                    )
+                else:
+                    bijector = make_se_equivariant_nice(layer_number=0, dim=dim, swap=swap,
+                        identity_init=False, nets_config=nets_config)
                 bijectors.append(bijector)
             bijector_block = ChainWithExtra(bijectors)
             return bijector_block
@@ -87,6 +76,14 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
     x_dummy = jax.random.normal(key=key, shape=(batch_size, n_nodes, dim*2))
     params = log_prob_with_info_fn.init(key, x_dummy)
 
+    # test grads
+    def fake_loss(params):
+        log_prob, extra = log_prob_with_info_fn.apply(params, x_dummy)
+        return jnp.mean(log_prob)
+
+    fake_loss, grads = jax.value_and_grad(fake_loss)(params)
+    chex.assert_tree_all_finite(grads)
+
     # Test log-probing
     log_prob, info = log_prob_with_info_fn.apply(params, x_dummy)
     log_prob_check = log_prob_fn.apply(params, x_dummy)
@@ -96,6 +93,9 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
     sample, log_prob, info = sample_n_and_log_prob_with_info_fn.apply(params, subkey, 5)
     sample_check, log_prob_check = sample_n_and_log_prob_fn.apply(params, subkey, 5)
     chex.assert_trees_all_close((sample, log_prob), (sample_check, log_prob_check))
+
+
+
 
 
 

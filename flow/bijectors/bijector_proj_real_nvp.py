@@ -210,21 +210,22 @@ def make_conditioner(
     else:
         assert mlp_function is not None
 
-    def _conditioner(x, return_info=False):
+    def _conditioner(x):
         chex.assert_rank(x, 2)
         n_nodes, dim = x.shape
 
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
+
+        # Get info
         info = {}
-        if return_info:
-            basis = various_x_points[:, 1:]
-            vec1 = various_x_points[:, 0]
-            vec2 = various_x_points[:, 1]
-            theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) /
-                               jnp.linalg.norm(vec2, axis=-1))
-            info.update(mean_abs_theta=jnp.mean(jnp.abs(theta)),
-                        min_abs_theta=jnp.min(jnp.abs(theta)))
+        # basis = various_x_points[:, 1:]
+        vec1 = various_x_points[:, 0]
+        vec2 = various_x_points[:, 1]
+        theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / jnp.linalg.norm(vec1, axis=-1) /
+                           jnp.linalg.norm(vec2, axis=-1))
+        info.update(mean_abs_theta=jnp.mean(jnp.abs(theta)),
+                    min_abs_theta=jnp.min(jnp.abs(theta)))
 
         origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
                                                              add_small_identity=add_small_identity)

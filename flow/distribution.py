@@ -43,7 +43,7 @@ def make_equivariant_augmented_flow_dist(config: FlowDistConfig):
 
 
 def make_equivariant_augmented_flow_dist_fast_compile(config: FlowDistConfig):
-    if config.type != 'proj':
+    if config.type not in ['proj', 'nice']:
         raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
 
 

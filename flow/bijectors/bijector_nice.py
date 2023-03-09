@@ -3,14 +3,14 @@ import jax.numpy as jnp
 import haiku as hk
 
 from nets.base import build_egnn_fn, NetsConfig
+from flow.distrax_with_extra import SplitCouplingWithExtra
 
 
 def make_conditioner(equivariant_fn, get_scaling_weight_fn):
     def conditioner(x):
-        shift = (equivariant_fn(x) - x) * get_scaling_weight_fn()
+        shift = equivariant_fn(x) * get_scaling_weight_fn()
         return shift
     return conditioner
-
 
 def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, identity_init: bool = True):
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
@@ -30,7 +30,7 @@ def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, i
         return distrax.ScalarAffine(log_scale=jnp.zeros_like(shift), shift=shift)
 
     conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn)
-    return distrax.SplitCoupling(
+    return SplitCouplingWithExtra(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
         conditioner=conditioner,
