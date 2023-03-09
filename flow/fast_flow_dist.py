@@ -95,19 +95,19 @@ def create_flow(recipe: FlowRecipe):
             x, log_det = bijector_inverse_and_log_det.apply(bijector_params, y)
             return (x, log_det_prev + log_det), None
 
-        (x, log_det), _ = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-1])), xs=params.bijector, reverse=True)
+        (x, log_det), _ = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-2])), xs=params.bijector, reverse=True)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         return base_log_prob + log_det
 
-    def sample_and_log_prob_apply(params: FlowParams, shape: chex.Shape) -> Tuple[Sample, LogProb]:
+    def sample_and_log_prob_apply(params: FlowParams, seed: chex.PRNGKey, shape: chex.Shape) -> Tuple[Sample, LogProb]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det = bijector_forward_and_log_det.apply(bijector_params, x)
             return (y, log_det_prev + log_det), None
 
-        x = base_sample_fn.apply(params.base, shape)
+        x = base_sample_fn.apply(params.base, seed, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        (y, log_det), _ = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-1])), xs=params.bijector)
+        (y, log_det), _ = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector)
         log_prob = base_log_prob - log_det
         return y, log_prob
 
@@ -118,7 +118,7 @@ def create_flow(recipe: FlowRecipe):
             return (x, log_det_prev + log_det), extra
 
 
-        (x, log_det), extra = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-1])), xs=params.bijector,
+        (x, log_det), extra = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-2])), xs=params.bijector,
                                            reverse=True)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
 
@@ -132,15 +132,16 @@ def create_flow(recipe: FlowRecipe):
         return base_log_prob + log_det, extra
 
 
-    def sample_and_log_prob_with_extra_apply(params: FlowParams, shape: chex.Shape) -> Tuple[Sample, LogProb, Extra]:
+    def sample_and_log_prob_with_extra_apply(params: FlowParams, key: chex.PRNGKey,
+                                             shape: chex.Shape) -> Tuple[Sample, LogProb, Extra]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det, extra = bijector_forward_and_log_det_with_extra.apply(bijector_params, x)
             return (y, log_det_prev + log_det), extra
 
-        x = base_sample_fn.apply(params.base, shape)
+        x = base_sample_fn.apply(params.base, key, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        (y, log_det), extra = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-1])), xs=params.bijector)
+        (y, log_det), extra = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector)
         log_prob = base_log_prob - log_det
 
         info = {}
