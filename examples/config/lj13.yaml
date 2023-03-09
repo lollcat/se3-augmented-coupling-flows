@@ -30,7 +30,6 @@ flow:
       gram_schmidt: false
       n_vectors: 10
   act_norm: false
-  fast_compile: true
   compile_n_unroll: 1
   nets:
     type: mace # mace or egnn or e3transformer or e3gnn

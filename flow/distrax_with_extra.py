@@ -106,8 +106,6 @@ class BlockWithExtra(distrax.Block, BijectorWithExtra):
         return x, math.sum_last(log_det, self._ndims), extra
 
 
-
-
 from distrax._src.bijectors.split_coupling import BijectorParams
 
 
@@ -121,7 +119,6 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -1):
         super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
-        self.use_block_with_extra = False  # Manual switch for debugging.
 
     def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
         """Returns an inner bijector for the passed params."""
@@ -138,7 +135,7 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                 f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
                 f'bijector and {self.event_ndims_in} for the coupling bijector.')
         elif extra_ndims > 0:
-            if isinstance(bijector, BijectorWithExtra) and self.use_block_with_extra:
+            if isinstance(bijector, BijectorWithExtra):
                 bijector = BlockWithExtra(bijector, extra_ndims)
             else:
                 bijector = distrax.Block(bijector, extra_ndims)

@@ -323,6 +323,22 @@ def train(config: TrainConfig):
                                                   global_centering=config.aug_target_global_centering,
                                                   aug_scale=config.aug_target_scale)
 
+
+    def fake_loss_fn(params, use_extra=True, x = train_data[:3]):
+        if use_extra:
+            log_prob, extra = flow_dist.log_prob_with_extra_apply(params, x)
+        else:
+            log_prob = flow_dist.log_prob_apply(params, x)
+            extra = Extra()
+        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
+        return loss, extra
+
+    (fake_loss, extra), grads = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, True)
+    (fake_loss_check, extra_check), grads_check = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, False)
+    chex.assert_tree_all_finite(grads)
+    chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
+
+
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 

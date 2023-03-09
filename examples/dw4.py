@@ -73,7 +73,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     debug = False
     if debug:
-        cfg.flow.fast_compile = False
         cfg_train = dict(cfg['training'])
         cfg_train['scan_run'] = False
         cfg.training = DictConfig(cfg_train)

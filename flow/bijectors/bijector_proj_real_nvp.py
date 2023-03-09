@@ -53,25 +53,6 @@ class ProjectedScalarAffine(BijectorWithExtra):
             self._inv_scale = 1. / self._scale
             self._log_scale = jnp.log(jnp.abs(self._scale))
 
-
-    def get_extra(self, log_dets, forward: bool) -> Extra:
-        info = self._info
-        info_aggregator = {}
-        log_dets = -log_dets if forward else log_dets
-        info.update(log_det_max=log_dets, log_det_min=log_dets)
-        info.update(shift_norm=jnp.linalg.norm(self._shift, axis=-1))
-        info_aggregator.update(
-            mean_abs_theta=jnp.mean,
-            min_abs_theta=jnp.min,
-            log_det_max=jnp.max,
-            log_det_min=jnp.min,
-            shift_norm=jnp.mean,
-                               )
-        extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
-        if self._info['mean_abs_theta'].shape != ():
-            extra = extra._replace(aux_info=extra.aggregate_info())
-        return extra
-
     @property
     def shift(self) -> chex.Array:
         return self._shift
@@ -137,6 +118,26 @@ class ProjectedScalarAffine(BijectorWithExtra):
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         x, log_det = self.inverse_and_log_det(y)
         return x, log_det, self.get_extra(log_det, forward=False)
+
+    def get_extra(self, log_dets, forward: bool) -> Extra:
+        info = self._info
+        info_aggregator = {}
+        log_dets = -log_dets if forward else log_dets
+        info.update(log_det_max=log_dets, log_det_min=log_dets)
+        info.update(shift_norm=jnp.linalg.norm(self._shift, axis=-1))
+        info_aggregator.update(
+            mean_abs_theta=jnp.mean,
+            min_abs_theta=jnp.min,
+            log_det_max=jnp.max,
+            log_det_min=jnp.min,
+            shift_norm=jnp.mean,
+                               )
+        extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
+        if self._info['mean_abs_theta'].shape != ():
+            extra = extra._replace(aux_info=extra.aggregate_info())
+        # extra = extra._replace(aux_info=jax.lax.stop_gradient(extra.aux_info),
+        #                        info_aggregator=jax.lax.stop_gradient(extra.info_aggregator))
+        return jax.lax.stop_gradient(extra)
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,

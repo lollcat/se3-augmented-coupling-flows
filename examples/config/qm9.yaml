@@ -31,7 +31,6 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       n_vectors: 10
-  fast_compile: true
   compile_n_unroll: 1
   nets:
     type: mace # mace or egnn or e3transformer or e3gnn

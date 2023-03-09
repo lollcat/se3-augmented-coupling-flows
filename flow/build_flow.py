@@ -28,9 +28,8 @@ class FlowDistConfig(NamedTuple):
     nets_config: NetsConfig
     type: Union[str, Sequence[str]]
     identity_init: bool = True
-    fast_compile: bool = True
     compile_n_unroll: int = 1
-    act_norm: bool = True
+    act_norm: bool = False
     kwargs: dict = {}
     base_config: BaseConfig = BaseConfig()
 
