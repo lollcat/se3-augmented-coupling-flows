@@ -20,7 +20,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: nice # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
+  type: proj # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
   kwargs:
     proj:
       global_frame: false
