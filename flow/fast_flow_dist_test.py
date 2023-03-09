@@ -6,6 +6,7 @@ import jax.numpy as jnp
 from flow.test_utils import test_fn_is_invariant
 from flow.test_utils import get_minimal_nets_config
 from flow.build_flow import build_flow, BaseConfig, FlowDistConfig
+from flow.distrax_with_extra import Extra
 
 
 _N_FLOW_LAYERS = 4
@@ -60,6 +61,20 @@ def test_distribution(dim = 3):
     chex.assert_trees_all_equal(log_prob_check[0], log_prob_single_sample_check)
 
     chex.assert_trees_all_close(log_prob, log_prob_check, rtol=rtol)
+
+    def fake_loss_fn(params, use_extra=True, x=sample):
+        if use_extra:
+            log_prob, extra = flow.log_prob_with_extra_apply(params, x)
+        else:
+            log_prob = flow.log_prob_apply(params, x)
+            extra = Extra()
+        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
+        return loss, extra
+
+    (fake_loss, extra), grads = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, True)
+    (fake_loss_check, extra_check), grads_check = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, False)
+    chex.assert_tree_all_finite(grads)
+    chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
 
     plt.plot(sample[0, :, 0], sample[0, :, 1], 'o')
     plt.title("Samples marginal in first and second dim")
