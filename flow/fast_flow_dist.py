@@ -21,6 +21,7 @@ class FlowRecipe(NamedTuple):
     make_bijector: Callable[[], Union[distrax.Bijector, BijectorWithExtra]]
     n_layers: int
     config: Any
+    compile_n_unroll: int = 2
 
 class FlowParams(NamedTuple):
     base: Params
@@ -95,7 +96,8 @@ def create_flow(recipe: FlowRecipe):
             x, log_det = bijector_inverse_and_log_det.apply(bijector_params, y)
             return (x, log_det_prev + log_det), None
 
-        (x, log_det), _ = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-2])), xs=params.bijector, reverse=True)
+        (x, log_det), _ = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-2])), xs=params.bijector, reverse=True,
+                                       unroll=recipe.compile_n_unroll)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         return base_log_prob + log_det
 
@@ -107,7 +109,8 @@ def create_flow(recipe: FlowRecipe):
 
         x = base_sample_fn.apply(params.base, seed, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        (y, log_det), _ = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector)
+        (y, log_det), _ = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector,
+                                       unroll=recipe.compile_n_unroll)
         log_prob = base_log_prob - log_det
         return y, log_prob
 
@@ -119,7 +122,7 @@ def create_flow(recipe: FlowRecipe):
 
 
         (x, log_det), extra = jax.lax.scan(scan_fn, init=(y, jnp.zeros(y.shape[:-2])), xs=params.bijector,
-                                           reverse=True)
+                                           reverse=True, unroll=recipe.compile_n_unroll)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
 
         info = {}
@@ -141,7 +144,8 @@ def create_flow(recipe: FlowRecipe):
 
         x = base_sample_fn.apply(params.base, key, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        (y, log_det), extra = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector)
+        (y, log_det), extra = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.shape[:-2])), xs=params.bijector,
+                                           unroll=recipe.compile_n_unroll)
         log_prob = base_log_prob - log_det
 
         info = {}

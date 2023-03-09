@@ -28,7 +28,7 @@ class FlowDistConfig(NamedTuple):
     nets_config: NetsConfig
     type: Union[str, Sequence[str]]
     identity_init: bool = True
-    compile_n_unroll: int = 1
+    compile_n_unroll: int = 2
     act_norm: bool = False
     kwargs: dict = {}
     base_config: BaseConfig = BaseConfig()
@@ -102,5 +102,5 @@ def create_flow_recipe(config: FlowDistConfig) -> FlowRecipe:
         return ChainWithExtra(bijectors)
 
     definition = FlowRecipe(make_base=make_base, make_bijector=make_bijector,
-                            n_layers=config.n_layers, config=config)
+                            n_layers=config.n_layers, config=config, compile_n_unroll=config.compile_n_unroll)
     return definition
