@@ -142,7 +142,7 @@ class E3GNNTorsoConfig(NamedTuple):
     residual_h: bool = True
     residual_x: bool = True
     linear_softmax: bool = True
-    layer_stack: bool = True
+    layer_stack: bool = False
     get_shifts_via_tensor_product: bool = True
     normalization_constant: float = 1.
     variance_scaling_init: float = 0.001

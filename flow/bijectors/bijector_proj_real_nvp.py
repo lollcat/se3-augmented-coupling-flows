@@ -119,27 +119,29 @@ class ProjectedScalarAffine(BijectorWithExtra):
         x, log_det = self.inverse_and_log_det(y)
         return x, log_det, self.get_extra(log_det, forward=False)
 
-    def get_theta_single(self, various_x_points):
-        vec1 = various_x_points[:, 1] + jnp.zeros(various_x_points.shape[-1]).at[0].set(1e-6)[None, :]
-        vec2 = various_x_points[:, 2] + jnp.zeros(various_x_points.shape[-1]).at[1].set(1e-6)[None, :]
-        theta = jax.vmap(jnp.arccos)(jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) /
-                                     safe_norm(vec2, axis=-1))
-        return theta
-
+    def get_vector_info_single(self, various_x_points):
+        basis_vectors = various_x_points[:, 1:]
+        # basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :]
+        vec1 = basis_vectors[:, 0]
+        vec2 = basis_vectors[:, 1]
+        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jax.vmap(jnp.arccos)(arccos_in)
+        aux_loss = jnp.log(1 - jnp.sign(arccos_in))
+        return theta, aux_loss
     def get_extra(self, log_dets, forward: bool) -> Extra:
         info = {}
         info_aggregator = {}
         various_x_points = self._info['various_x_points']
         if various_x_points.shape[-1] == 3:
             if len(various_x_points.shape) == 4:
-                theta = jax.vmap(self.get_theta_single)(various_x_points)
+                theta, aux_loss = jax.vmap(self.get_vector_info_single)(various_x_points)
             else:
-                theta = self.get_theta_single(various_x_points)
+                theta, aux_loss = self.get_vector_info_single(various_x_points)
             info_aggregator.update(
                 mean_abs_theta=jnp.mean, min_abs_theta=jnp.min)
             info.update(
                 mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)))
-            aux_loss = jnp.mean((jnp.pi / 2 - jnp.abs(theta)) ** 2)
+            aux_loss = jnp.mean(aux_loss)
         else:
             aux_loss = jnp.array(0.)
 
