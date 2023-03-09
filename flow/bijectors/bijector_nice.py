@@ -7,7 +7,7 @@ from nets.base import build_egnn_fn, NetsConfig
 
 def make_conditioner(equivariant_fn, get_scaling_weight_fn):
     def conditioner(x):
-        shift = (equivariant_fn(x) - x) * get_scaling_weight_fn()
+        shift = equivariant_fn(x) * get_scaling_weight_fn()
         return shift
     return conditioner
 

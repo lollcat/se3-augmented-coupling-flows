@@ -20,7 +20,7 @@ flow:
   nodes: 4
   n_layers: 4
   identity_init: true
-  type: [proj,]  # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
+  type: nice # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
   kwargs:
     proj:
       global_frame: false
@@ -37,27 +37,7 @@ flow:
   fast_compile: true
   compile_n_unroll: 1
   nets:
-    type: e3gnn # mace or egnn or e3transformer
-    e3gnn:
-      n_blocks: 3
-      mlp_units: [ 32, 32 ]
-      n_vectors_hidden: 3
-      n_invariant_feat_hidden: 64
-      sh_irreps_max_ell: 1
-      get_shifts_via_tensor_product: false
-      residual_x: true
-    e3transformer:
-      n_blocks: 3
-      mlp_units: [32, 32]
-      n_vectors_hidden: 8
-      n_invariant_feat_hidden: 64
-      bessel_number: 10  # Number of bessel functions.
-      r_max: 5.
-    mace:
-      n_invariant_feat_hidden: 16
-      n_vectors_hidden: 16
-      bessel_number: int  # Number of bessel functions.
-      r_max: 5.
+    type: egnn
     egnn:
       mlp_units: [32,32]
       n_layers: 3
