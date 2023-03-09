@@ -24,6 +24,7 @@ flow:
       process_flow_params_jointly: false
       condition_on_x_proj: false
       gram_schmidt: false
+      add_small_identity: true
     proj_v2:
       process_flow_params_jointly: false
       condition_on_x_proj: false

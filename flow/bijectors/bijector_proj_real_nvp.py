@@ -172,7 +172,7 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
-        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]][None, None, :]*1e-6
+        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[:basis_vectors.shape[0]][:, None, :]*1e-6
 
     if global_frame:
         basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
