@@ -16,10 +16,10 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                             gram_schmidt: bool = False,
                             global_frame: bool = False,
                             process_flow_params_jointly: bool = False,
-                            use_mace: bool = False):
-    nets_config = get_minimal_nets_config('mace' if use_mace else 'e3gnn')
+                            type: str = 'egnn'):
+    nets_config = get_minimal_nets_config(type)
 
-    def make_dist(bijector_type='nice'):
+    def make_dist(bijector_type='proj'):
         def bijector_fn():
             bijectors = []
             for swap in (True, False):
@@ -75,14 +75,21 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
     key, subkey = jax.random.split(key)
     x_dummy = jax.random.normal(key=key, shape=(batch_size, n_nodes, dim*2))
     params = log_prob_with_info_fn.init(key, x_dummy)
+    params_check = log_prob_fn.init(key, x_dummy)
+    chex.assert_trees_all_equal(params, params_check)
 
     # test grads
-    def fake_loss(params):
-        log_prob, extra = log_prob_with_info_fn.apply(params, x_dummy)
+    def fake_loss_fn(params, use_extra=True, x=x_dummy):
+        if use_extra:
+            log_prob, extra = log_prob_with_info_fn.apply(params, x)
+        else:
+            log_prob = log_prob_fn.apply(params, x)
         return jnp.mean(log_prob)
 
-    fake_loss, grads = jax.value_and_grad(fake_loss)(params)
+    fake_loss, grads = jax.value_and_grad(fake_loss_fn)(params, True)
+    fake_loss_check, grads_check = jax.value_and_grad(fake_loss_fn)(params, False)
     chex.assert_tree_all_finite(grads)
+    chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
 
     # Test log-probing
     log_prob, info = log_prob_with_info_fn.apply(params, x_dummy)
