@@ -140,7 +140,7 @@ class ProjectedScalarAffine(BijectorWithExtra):
                 theta, aux_loss, log_barrier_in = self.get_vector_info_single(various_x_points)
             info_aggregator.update(
                 mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
-                min_log_barrier_in=jnp.min(log_barrier_in)
+                min_log_barrier_in=jnp.min
             )
             info.update(
                 mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
