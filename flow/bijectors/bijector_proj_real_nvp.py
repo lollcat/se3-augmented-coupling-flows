@@ -135,9 +135,8 @@ class ProjectedScalarAffine(BijectorWithExtra):
         extra = Extra(aux_loss=jnp.array(0.0), aux_info=self._info, info_aggregator=info_aggregator)
         if self._info['mean_abs_theta'].shape != ():
             extra = extra._replace(aux_info=extra.aggregate_info())
-        # extra = extra._replace(aux_info=jax.lax.stop_gradient(extra.aux_info),
-        #                        info_aggregator=jax.lax.stop_gradient(extra.info_aggregator))
-        return jax.lax.stop_gradient(extra)
+        extra = extra._replace(aux_info=jax.lax.stop_gradient(extra.aux_info))
+        return extra
 
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,

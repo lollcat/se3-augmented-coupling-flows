@@ -16,52 +16,16 @@ Params = chex.ArrayTree
 X = chex.Array
 LogProbWithExtraFn = Callable[[Params, X], Tuple[chex.Array, Extra]]
 
-def general_ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, use_equivariance_loss, weight):
-    if use_equivariance_loss:
-        loss, info = ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn, key, weight)
-    else:
-        loss, info = ml_loss_fn(params, x, log_prob_with_extra_fn)
-    return loss, info
-
-
-def ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn):
+def general_ml_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, use_aux_loss,
+                       aux_loss_weight):
     log_prob, extra = log_prob_with_extra_fn(params, x)
     loss = - jnp.mean(log_prob)
     info = {"ml_loss": loss}
+    aux_loss = jnp.mean(extra.aux_loss)
+    if use_aux_loss:
+        loss = loss + aux_loss * aux_loss_weight
     info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
-    return loss, info
-
-def ml_and_equivariance_loss_fn(params, x, log_prob_with_extra_fn: LogProbWithExtraFn, key, weight, batch_size_frac = 0.1):
-    batch_size, n_nodes, dim = x.shape
-    dim = dim // 2  # Account for augmentd coords.
-
-    # ML loss.
-    log_prob, extra = log_prob_with_extra_fn(params, x)
-    ml_loss = - jnp.mean(log_prob)
-    info = {"loss_ml": ml_loss}
-    info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
-
-    # Equivariance loss.
-    eq_batch_size = max(1, int(batch_size * batch_size_frac))
-    key1, key2, key3 = jax.random.split(key, 3)
-    theta = jax.random.uniform(key1, shape=(eq_batch_size,)) * 2 * jnp.pi
-    translation = jax.random.normal(key2, shape=(eq_batch_size, dim))
-    phi = jax.random.uniform(key3, shape=(eq_batch_size,)) * 2 * jnp.pi
-
-    def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
-        return x_and_a_rot
-
-
-    log_prob_g, _ = log_prob_with_extra_fn(params, group_action(x[:eq_batch_size]))
-    eq_loss = jnp.mean((log_prob_g - log_prob[:eq_batch_size])**2)
-    info.update(loss_equivariance=eq_loss)
-
-    loss = eq_loss*weight + ml_loss
-    info.update(loss=loss)
+    info.update(aux_loss=aux_loss)
     return loss, info
 
 
@@ -79,9 +43,9 @@ def get_tree_leaf_norm_info(tree):
 
 
 def ml_step(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
-            optimizer, key, use_equivariance_loss, eq_loss_weight):
+            optimizer, key, use_aux_loss, aux_loss_weight):
     grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
-        params, x, log_prob_with_extra_fn, key, use_equivariance_loss, eq_loss_weight)
+        params, x, log_prob_with_extra_fn, key, use_aux_loss, aux_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
     new_params = optax.apply_updates(params, updates)
     info.update(grad_norm=optax.global_norm(grad),

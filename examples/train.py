@@ -181,8 +181,8 @@ class TrainConfig(NamedTuple):
     n_eval: int
     n_checkpoints: int
     plot_batch_size: int
-    use_equivariance_loss: bool = False
-    equivariance_loss_weight: float = 1.0
+    use_flow_aux_loss: bool = False
+    aux_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
     reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
@@ -324,19 +324,21 @@ def train(config: TrainConfig):
                                                   aug_scale=config.aug_target_scale)
 
 
-    def fake_loss_fn(params, use_extra=True, x = train_data[:3]):
-        if use_extra:
-            log_prob, extra = flow_dist.log_prob_with_extra_apply(params, x)
-        else:
-            log_prob = flow_dist.log_prob_apply(params, x)
-            extra = Extra()
-        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
-        return loss, extra
+    nan_check = False
+    if nan_check:
+        def fake_loss_fn(params, use_extra=True, x = train_data[:3]):
+            if use_extra:
+                log_prob, extra = flow_dist.log_prob_with_extra_apply(params, x)
+            else:
+                log_prob = flow_dist.log_prob_apply(params, x)
+                extra = Extra()
+            loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
+            return loss, extra
 
-    (fake_loss, extra), grads = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, True)
-    (fake_loss_check, extra_check), grads_check = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, False)
-    chex.assert_tree_all_finite(grads)
-    chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
+        (fake_loss, extra), grads = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, True)
+        (fake_loss_check, extra_check), grads_check = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, False)
+        chex.assert_tree_all_finite(grads)
+        chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
 
 
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
@@ -354,7 +356,7 @@ def train(config: TrainConfig):
             x = xs
             params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                               subkey,
-                                              config.use_equivariance_loss, config.equivariance_loss_weight)
+                                              config.use_flow_aux_loss, config.aux_loss_weight)
             return (params, opt_state, key), info
 
     pbar = tqdm(range(config.n_epoch))
@@ -386,7 +388,7 @@ def train(config: TrainConfig):
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                                   subkey,
-                                                  config.use_equivariance_loss, config.equivariance_loss_weight
+                                                  config.use_flow_aux_loss, config.aux_loss_weight
                                                   )
                 config.logger.write(info)
                 info.update(epoch=i)
