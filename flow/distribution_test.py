@@ -5,7 +5,7 @@ import haiku as hk
 
 from flow.test_utils import test_fn_is_invariant, bijector_test
 from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
-from nets.en_gnn import HConfig, EgnnConfig, TransformerConfig
+from flow.test_utils import get_minimal_nets_config
 
 
 _N_FLOW_LAYERS = 4
@@ -21,16 +21,14 @@ def test_distribution(dim = 3):
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    base_config = BaseConfig(double_centrered_gaussian=False, global_centering=False,
+    base_config = BaseConfig(double_centered_gaussian=False, global_centering=False,
                              trainable_augmented_scale=False)
 
 
     config = FlowDistConfig(
         dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
-        egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-            linear_softmax=True, share_h=True)),
-        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2),
+        nets_config=get_minimal_nets_config('egnn'),
         base_config=base_config,
         act_norm=True
     )
@@ -73,16 +71,15 @@ def test_distribution(dim = 3):
 def test_flow(dim=3):
     n_nodes = _N_NODES
 
-    base_config = BaseConfig(double_centrered_gaussian=False, global_centering=False,
+    base_config = BaseConfig(double_centered_gaussian=False, global_centering=False,
                              trainable_augmented_scale=False)
 
     config = FlowDistConfig(
         dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
         type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
-        egnn_config=EgnnConfig(name="", mlp_units=(4,), n_layers=2, h_config=HConfig()._replace(
-            linear_softmax=True, share_h=True)),
-        transformer_config=TransformerConfig(mlp_units=(4,), n_layers=2),
-        base_config=base_config
+        nets_config=get_minimal_nets_config('egnn'),
+        base_config=base_config,
+        act_norm=True
     )
 
     @hk.without_apply_rng

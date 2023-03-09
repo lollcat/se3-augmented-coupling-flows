@@ -5,18 +5,21 @@ import jax.numpy as jnp
 
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
-from flow.distrax_with_extra import ChainWithExtra, TransformedWithExtra
+from flow.distrax_with_extra import ChainWithExtra, TransformedWithExtra, Extra
 from flow.fast_hk_chain import Chain as FastChain
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.test_utils import get_minimal_nets_config
 
 
-def test_dist_with_info(dim: int = 3, n_nodes = 5,
+def test_dist_with_info(
+        test_bijector_only: bool = False,
+        test_fast_chain: bool = True,
+        dim: int = 2, n_nodes = 5,
                         batch_size: int = 2,
-                            gram_schmidt: bool = False,
-                            global_frame: bool = False,
-                            process_flow_params_jointly: bool = False,
-                            type: str = 'egnn'):
+                        gram_schmidt: bool = False,
+                        global_frame: bool = False,
+                        process_flow_params_jointly: bool = False,
+                        type: str = 'egnn'):
     nets_config = get_minimal_nets_config(type)
 
     def make_dist(bijector_type='proj'):
@@ -37,10 +40,17 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
                         identity_init=False, nets_config=nets_config)
                 bijectors.append(bijector)
             bijector_block = ChainWithExtra(bijectors)
-            return bijector_block
-        flow = FastChain(bijector_fn=bijector_fn, n_layers=2)
+            if test_bijector_only:
+                return bijectors[0]
+            else:
+                return bijector_block
+        if test_fast_chain:
+            flow = FastChain(bijector_fn=bijector_fn, n_layers=4)
+        else:
+            flow = bijector_fn()
         base = CentreGravitryGaussianAndCondtionalGuassian(
-            dim=dim, n_nodes=n_nodes
+            dim=dim, n_nodes=n_nodes, trainable_augmented_scale=True,
+            augmented_scale_init=True
         )
         distribution = TransformedWithExtra(base, flow)
         return distribution
@@ -84,26 +94,26 @@ def test_dist_with_info(dim: int = 3, n_nodes = 5,
             log_prob, extra = log_prob_with_info_fn.apply(params, x)
         else:
             log_prob = log_prob_fn.apply(params, x)
-        return jnp.mean(log_prob)
+            extra = Extra()
+        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
+        return loss, extra
 
-    fake_loss, grads = jax.value_and_grad(fake_loss_fn)(params, True)
-    fake_loss_check, grads_check = jax.value_and_grad(fake_loss_fn)(params, False)
+    # Test log-probing
+    log_prob, extra = log_prob_with_info_fn.apply(params, x_dummy)
+    log_prob_check = log_prob_fn.apply(params, x_dummy)
+    chex.assert_trees_all_close(log_prob_check, log_prob)
+
+
+    (fake_loss, extra), grads = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, True)
+    (fake_loss_check, extra_check), grads_check = jax.value_and_grad(fake_loss_fn, has_aux=True)(params, False)
     chex.assert_tree_all_finite(grads)
     chex.assert_trees_all_equal((fake_loss, grads), (fake_loss_check, grads_check))
 
-    # Test log-probing
-    log_prob, info = log_prob_with_info_fn.apply(params, x_dummy)
-    log_prob_check = log_prob_fn.apply(params, x_dummy)
-    chex.assert_trees_all_close(log_prob_check, log_prob)
 
     # Test sample-n-and-log-prob
     sample, log_prob, info = sample_n_and_log_prob_with_info_fn.apply(params, subkey, 5)
     sample_check, log_prob_check = sample_n_and_log_prob_fn.apply(params, subkey, 5)
     chex.assert_trees_all_close((sample, log_prob), (sample_check, log_prob_check))
-
-
-
-
 
 
 

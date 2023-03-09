@@ -130,7 +130,7 @@ class ChainWithExtra(distrax.Chain):
 
 from distrax._src.utils import math
 
-class BlockWithExtra(distrax.Block):
+class BlockWithExtra(distrax.Block, BijectorWithExtra):
     def __init__(self, bijector: BijectorWithExtra, ndims: int):
         super().__init__(bijector, ndims)
 
@@ -162,6 +162,7 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -1):
         super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
+        self.use_block_with_extra = True  # Manual switch for debugging.
 
     def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
         """Returns an inner bijector for the passed params."""
@@ -178,7 +179,7 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
                 f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
                 f'bijector and {self.event_ndims_in} for the coupling bijector.')
         elif extra_ndims > 0:
-            if isinstance(bijector, BijectorWithExtra):
+            if isinstance(bijector, BijectorWithExtra) and self.use_block_with_extra:
                 bijector = BlockWithExtra(bijector, extra_ndims)
             else:
                 bijector = distrax.Block(bijector, extra_ndims)
@@ -206,6 +207,6 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
         if isinstance(inner_bijector, BijectorWithExtra):
             x2, logdet, extra = inner_bijector.inverse_and_log_det_with_extra(y2)
         else:
-            x2, logdet = inner_bijector.forward_and_log_det(y2)
+            x2, logdet = inner_bijector.inverse_and_log_det(y2)
             extra = Extra()
         return self._recombine(y1, x2), logdet, extra

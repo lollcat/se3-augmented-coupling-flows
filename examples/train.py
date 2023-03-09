@@ -346,6 +346,15 @@ def train(config: TrainConfig):
                                                   global_centering=config.aug_target_global_centering,
                                                   aug_scale=config.aug_target_scale)
 
+    def fake_loss_fn(params, use_extra=True, x = train_data[:3]):
+        if use_extra:
+            log_prob, extra = log_prob_with_extra_fn.apply(params, x)
+        else:
+            log_prob = log_prob_fn.apply(params, x)
+            extra = Extra()
+        loss = jnp.mean(log_prob)  # + jnp.mean(extra.aux_loss)
+        return loss, extra
+
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
