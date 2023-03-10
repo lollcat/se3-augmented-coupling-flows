@@ -10,6 +10,8 @@ from utils.numerical import rotate_translate_permute_2d, rotate_translate_permut
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
+from flow.distrax_with_extra import ChainWithExtra
+from flow.fast_hk_chain import Chain as FastChain
 
 
 def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
@@ -87,12 +89,14 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
                             process_flow_params_jointly: bool = True,
                             use_mace: bool = True):
     nets_config = NetsConfig(type='mace' if use_mace else "egnn",
-                             mace_lay_config=MACETorsoConfig(
-                                 bessel_number=5,
-                                 n_vectors_hidden=3,
-                                 n_invariant_feat_hidden=3,
-                                 r_max=10.),
-                             egnn_lay_config=EgnnTorsoConfig() if not use_mace else None,
+                             mace_torso_config=MACETorsoConfig(
+                                    n_vectors_residual = 3,
+                                    n_invariant_feat_residual = 3,
+                                    n_vectors_hidden_readout_block = 3,
+                                    n_invariant_hidden_readout_block = 3,
+                                    hidden_irreps = '4x0e+4x1o'
+                                 ),
+                             egnn_torso_config=EgnnTorsoConfig() if not use_mace else None,
                              mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
                              transformer_config=TransformerConfig() if process_flow_params_jointly else None
                              )

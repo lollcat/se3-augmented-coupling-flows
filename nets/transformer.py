@@ -12,8 +12,6 @@ class TransformerConfig(NamedTuple):
     w_init_scale: float = 0.1
     mlp_units: Sequence[int] = (32, 32)
     n_layers: int = 3
-    layer_stack: bool = True
-    compile_n_unroll: int = 1
     zero_init: bool = False
     layer_norm: bool = True
 
@@ -41,20 +39,15 @@ class TransformerBlock(hk.Module):
 
 class Transformer(hk.Module):
     def __init__(self, name: str, config: TransformerConfig = TransformerConfig()):
-        super().__init__(name=name)
+        super().__init__(name=name + "_vanilla_transformer")
         self.config = config
-        self.transformer_block_fn = lambda x: TransformerBlock(name=name, config=config)(x)
+        self.transformer_blocks = [TransformerBlock(name=name + 'vanilla_transformer' + str(i),
+                                                    config=config) for i in range(self.config.n_layers)]
 
     def __call__(self, x):
         x_out = jax.nn.relu(hk.Linear(self.config.num_heads * self.config.key_size)(x))
-        if self.config.layer_stack:
-            stack = hk.experimental.layer_stack(self.config.n_layers, with_per_layer_inputs=False,
-                                                name="EGCL_layer_stack",
-                                                unroll=self.config.compile_n_unroll)
-            x_out = stack(self.transformer_block_fn)(x_out)
-        else:
-            for i in range(self.config.n_layers):
-                x_out = self.transformer_block_fn(x_out)
+        for transformer in self.transformer_blocks:
+                x_out = transformer(x_out)
         if self.config.output_dim is not None:
             final_layer = hk.Linear(self.config.output_dim, w_init=jnp.zeros, b_init=jnp.zeros) \
                 if self.config.zero_init else hk.Linear(self.config.output_dim,

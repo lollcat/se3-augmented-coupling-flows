@@ -3,20 +3,11 @@ import distrax
 
 from flow.test_utils import bijector_test
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
-from nets.base import EgnnTorsoConfig, MACETorsoConfig, NetsConfig
+from flow.test_utils import get_minimal_nets_config
 
 
-def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, use_mace=False):
-    if use_mace:
-        nets_config = NetsConfig(use_mace=use_mace,
-                                 mace_lay_config=MACETorsoConfig(
-                                     bessel_number=1,
-                                     n_vectors_hidden=1,
-                                    n_invariant_feat_hidden=1,
-                                    r_max = 1.))
-    else:
-        nets_config = NetsConfig(use_mace=use_mace,
-                                 egnn_lay_config=EgnnTorsoConfig())
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, type='egnn'):
+    nets_config = get_minimal_nets_config(type=type)
 
     def make_flow():
         bijectors = []

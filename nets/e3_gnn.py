@@ -15,6 +15,7 @@ from nets.e3gnn_linear_haiku import Linear as e3nnLinear
 
 class EGCL(hk.Module):
     def __init__(self,
+                 name: str,
                  mlp_units: Sequence[int],
                  n_vectors_hidden: int,
                  n_invariant_feat_hidden: int,
@@ -28,7 +29,7 @@ class EGCL(hk.Module):
                  vector_scaling_init: float,
                  use_e3nn_haiku: bool
                  ):
-        super().__init__()
+        super().__init__(name=name)
         self.vector_scaling_init = vector_scaling_init
         self.variance_scaling_init = variance_scaling_init
         self.mlp_units = mlp_units
@@ -142,7 +143,6 @@ class E3GNNTorsoConfig(NamedTuple):
     residual_h: bool = True
     residual_x: bool = True
     linear_softmax: bool = True
-    layer_stack: bool = True
     get_shifts_via_tensor_product: bool = True
     normalization_constant: float = 1.
     variance_scaling_init: float = 0.001
@@ -179,8 +179,8 @@ class E3Gnn(hk.Module):
         super().__init__(name=config.name)
         assert config.n_vectors_readout <= config.torso_config.n_vectors_hidden
         self.config = config
-        self.egcl_fn = lambda x, h: EGCL(
-            **config.torso_config.get_EGCL_kwargs())(x, h)
+        self.egcl_blocks = [EGCL(config.name + str(i), **config.torso_config.get_EGCL_kwargs())
+                                 for i in range(self.config.torso_config.n_blocks)]
         self.output_irreps_vector = e3nn.Irreps(f"{config.n_vectors_readout}x1o")
         self.output_irreps_scalars = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e")
 
@@ -200,13 +200,8 @@ class E3Gnn(hk.Module):
         vectors = jnp.repeat(vectors_in[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
-        if self.config.torso_config.layer_stack:
-            stack = hk.experimental.layer_stack(self.config.torso_config.n_blocks, with_per_layer_inputs=False,
-                                                name="EGCL_layer_stack")
-            vectors, h = stack(self.egcl_fn)(vectors, h)
-        else:
-            for i in range(self.config.torso_config.n_blocks):
-                vectors, h = self.egcl_fn(vectors, h)
+        for egcl in self.egcl_blocks:
+            vectors, h = egcl(vectors, h)
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
 
         # Get vector out.

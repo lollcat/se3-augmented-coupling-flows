@@ -16,7 +16,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 
-from flow.distribution import make_equivariant_augmented_flow_dist, FlowDistConfig, BaseConfig
+from flow.build_flow import build_flow, FlowDistConfig, BaseConfig
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
 from nets.transformer import TransformerConfig
@@ -24,7 +24,7 @@ from utils.plotting import plot_history
 from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
-
+from flow.distrax_with_extra import Extra
 
 
 mpl.rcParams['figure.dpi'] = 150
@@ -181,8 +181,8 @@ class TrainConfig(NamedTuple):
     n_eval: int
     n_checkpoints: int
     plot_batch_size: int
-    use_equivariance_loss: bool = False
-    equivariance_loss_weight: float = 1.0
+    use_flow_aux_loss: bool = False
+    aux_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
     reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
@@ -192,6 +192,9 @@ class TrainConfig(NamedTuple):
     wandb_upload_each_time: bool = True
     scan_run: bool = True  # Set to False is useful for debugging.
     use_64_bit: bool = False
+    with_train_info: bool = True  # Grab info from the flow during each forward pass.
+    # Only log the info from the last iteration within each epoch. Reduces runtime a lot if an epoch has many iter.
+    last_iter_info_only: bool = True
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -293,26 +296,18 @@ def train(config: TrainConfig):
     eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))
     plot_iter = list(np.linspace(0, config.n_epoch - 1, config.n_plots, dtype="int"))
 
-    @hk.without_apply_rng
-    @hk.transform
-    def log_prob_fn(x):
-        distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        log_prob = distribution.log_prob(x)
-        return log_prob
 
-    @hk.transform
-    def sample_and_log_prob_fn(sample_shape=()):
-        distribution = make_equivariant_augmented_flow_dist(config.flow_dist_config)
-        return distribution.sample_and_log_prob(seed=hk.next_rng_key(), sample_shape=sample_shape)
+    flow_dist = build_flow(config.flow_dist_config)
 
 
-    sample_fn = jax.jit(lambda params, key, shape: sample_and_log_prob_fn.apply(params, key, shape)[0],
-                        static_argnums=2)
+    sample_fn = jax.jit(chex.assert_max_traces(flow_dist.sample_apply, 2), static_argnums=2)
 
 
     key = jax.random.PRNGKey(config.seed)
     key, subkey = jax.random.split(key)
-    params = log_prob_fn.init(rng=subkey, x=jnp.zeros((1, config.n_nodes, config.dim*2)))
+    params = flow_dist.init(subkey, jnp.zeros((1, config.n_nodes, config.dim*2)))
+    params_test = flow_dist.init(subkey, jnp.zeros((config.n_nodes, config.dim*2)))
+    chex.assert_trees_all_equal_shapes(params, params_test)
 
 
     train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
@@ -330,6 +325,7 @@ def train(config: TrainConfig):
                                                   global_centering=config.aug_target_global_centering,
                                                   aug_scale=config.aug_target_scale)
 
+
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
@@ -338,18 +334,52 @@ def train(config: TrainConfig):
                               total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
 
+    # Need this to infer structure of info.
+    _, _, info_blank = ml_step(params, train_data[:1], opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                               subkey,
+                               config.use_flow_aux_loss, config.aux_loss_weight
+                               )
+
+    # Check that we haven't given an unstable init
+    assert jnp.isfinite(info_blank['grad_norm']), ("Gradient on first step is nan!")
+
+
     if config.scan_run:
         def scan_fn(carry, xs):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer, subkey,
-                                              config.use_equivariance_loss, config.equivariance_loss_weight)
+            params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                                              subkey,
+                                              config.use_flow_aux_loss, config.aux_loss_weight)
+            if config.last_iter_info_only:
+                info = None
             return (params, opt_state, key), info
+
+        @jax.jit
+        # @chex.assert_max_traces(2)
+        def scan_epoch(params, opt_state, key, batched_data):
+            if config.last_iter_info_only:
+                final_batch = batched_data[-1]
+                batched_data = batched_data[:-1]
+            (params, opt_state, key), info = jax.lax.scan(scan_fn, (params, opt_state, key),
+                                                                 batched_data,
+                                                                 unroll=1)
+            if config.last_iter_info_only:
+                key, subkey = jax.random.split(key)
+                params, opt_state, info = ml_step(params, final_batch, opt_state,
+                                                  flow_dist.log_prob_with_extra_apply,
+                                                  optimizer,
+                                                  subkey,
+                                                  config.use_flow_aux_loss, config.aux_loss_weight)
+            return params, opt_state, key, info
+
 
     pbar = tqdm(range(config.n_epoch))
 
-    for i in pbar:
+    @jax.jit
+    # @chex.assert_max_traces(n=2)
+    def shuffle_and_batchify_data(key, train_data=train_data, config=config):
         key, subkey = jax.random.split(key)
         train_data = jax.random.permutation(subkey, train_data, axis=0)
         if config.reload_aug_per_epoch:
@@ -357,13 +387,18 @@ def train(config: TrainConfig):
             train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey,
                                                            global_centering=config.aug_target_global_centering,
                                                            aug_scale=config.aug_target_scale)
+        batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
+        return batched_data
+
+    for i in pbar:
+        key, subkey = jax.random.split(key)
+        batched_data = shuffle_and_batchify_data(subkey)
 
         if config.scan_run:
-            batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
-            (params, opt_state, key), infos = jax.lax.scan(scan_fn, (params, opt_state, key), batched_data, unroll=1)
-
-            for batch_index in range(batched_data.shape[0]):
-                info = jax.tree_map(lambda x: x[batch_index], infos)
+            key, subkey = jax.random.split(key)
+            params, opt_state, key, info_out = scan_epoch(params, opt_state, subkey, batched_data)
+            if config.last_iter_info_only:
+                info = info_out
                 info.update(epoch=i)
                 info.update(n_optimizer_steps=opt_state[-1][0].count)
                 if hasattr(lr, "__call__"):
@@ -371,12 +406,22 @@ def train(config: TrainConfig):
                 config.logger.write(info)
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
+            else:
+                for batch_index in range(batched_data.shape[0]):
+                    info = jax.tree_map(lambda x: x[batch_index], info_out)
+                    info.update(epoch=i)
+                    info.update(n_optimizer_steps=opt_state[-1][0].count)
+                    if hasattr(lr, "__call__"):
+                        info.update(lr=lr(info["n_optimizer_steps"]))
+                    config.logger.write(info)
+                    if jnp.isnan(info["grad_norm"]):
+                        print("nan grad")
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, x, opt_state, log_prob_fn, optimizer,
+                params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                                   subkey,
-                                                  config.use_equivariance_loss, config.equivariance_loss_weight
+                                                  config.use_flow_aux_loss, config.aux_loss_weight
                                                   )
                 config.logger.write(info)
                 info.update(epoch=i)
@@ -390,8 +435,8 @@ def train(config: TrainConfig):
 
         if i in eval_iter:
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_fn=log_prob_fn,
-                                flow_sample_and_log_prob_fn=sample_and_log_prob_fn,
+            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_apply_fn=flow_dist.log_prob_apply,
+                                flow_sample_and_log_prob_apply_fn=flow_dist.sample_and_log_prob_apply,
                                 global_centering=config.aug_target_global_centering,
                                 aug_scale=config.aug_target_scale,
                                 key=subkey,
@@ -411,4 +456,4 @@ def train(config: TrainConfig):
         plot_history(config.logger.history)
         plt.show()
 
-    return config.logger, params, log_prob_fn, sample_and_log_prob_fn
+    return config.logger, params, flow_dist

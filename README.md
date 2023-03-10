@@ -16,17 +16,15 @@ ListLogger that can may used if you don't want to use wandb.
 # TODO:
 
 ## Burning
-    - Add code that allows visualisation of what's happening in the flow.
     - Rewrite for e3nn
         1. Let networks take in positional and feature info.
         2. Alanine dipeptide
-    - Code diffusion/CNF
     - Rewrite with jgraph, generalise to varying number of nodes
     - Add more augmented variables.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
 
 ## Less burning
-    - marginal stats look spurious
+    - Generalse FlowWithInfo interface to work for all flows. 
     - Spline flows
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
     - e3nn outputs are typically shift **invariant** rather than equivariant. 
@@ -38,3 +36,4 @@ ListLogger that can may used if you don't want to use wandb.
     - Move shift to come before scale?
     - Seems like we could try enforce q(x, a) \propto p(a) = N(\mu=x, \sigma) in an additional loss?
       This would help decrease the variance in the estimate of the marginal q(x) = E_{p(a)}[q(x, a)/p(a)]. 
+    - Lots of *_test.py files are no longer working, as the code has changed since they were written. These should be rewritten. 

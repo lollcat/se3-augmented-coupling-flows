@@ -8,7 +8,8 @@ import haiku as hk
 
 from nets.transformer import Transformer
 from nets.base import NetsConfig, build_egnn_fn
-from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection
+from utils.numerical import gram_schmidt_fn, rotate_2d, vector_rejection, safe_norm
+from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra, Array, Extra
 
 
 def affine_transform_in_new_space(point, change_of_basis_matrix, origin, scale, shift):
@@ -30,12 +31,13 @@ def inverse_affine_transform_in_new_space(point, change_of_basis_matrix, origin,
     return new_point_original_space
 
 
-class ProjectedScalarAffine(distrax.Bijector):
+class ProjectedScalarAffine(BijectorWithExtra):
     """Following style of `ScalarAffine` distrax Bijector.
 
     Note: Doesn't need to operate on batches, as it gets called with vmap."""
-    def __init__(self, change_of_basis_matrix, origin, log_scale, shift, activation=jax.nn.softplus):
+    def __init__(self, change_of_basis_matrix, origin, log_scale, shift, info, activation=jax.nn.softplus):
         super().__init__(event_ndims_in=1, is_constant_jacobian=True)
+        self._info = info
         self._change_of_basis_matrix = change_of_basis_matrix
         self._origin = origin
         self._shift = shift
@@ -50,7 +52,6 @@ class ProjectedScalarAffine(distrax.Bijector):
             self._scale = jax.nn.softplus(log_scale_param)
             self._inv_scale = 1. / self._scale
             self._log_scale = jnp.log(jnp.abs(self._scale))
-
 
     @property
     def shift(self) -> chex.Array:
@@ -110,9 +111,64 @@ class ProjectedScalarAffine(distrax.Bijector):
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         return self.inverse(y), self.inverse_log_det_jacobian(y)
 
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        y, log_det = self.forward_and_log_det(x)
+        return y, log_det, self.get_extra(log_det, forward=True)
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        x, log_det = self.inverse_and_log_det(y)
+        return x, log_det, self.get_extra(log_det, forward=False)
+
+    def get_vector_info_single(self, various_x_points):
+        basis_vectors = various_x_points[:, 1:]
+        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :]*1e-30
+        vec1 = basis_vectors[:, 0]
+        vec2 = basis_vectors[:, 1]
+        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jax.vmap(jnp.arccos)(arccos_in)
+        log_barrier_in = 1 - jnp.abs(arccos_in) + 1e-6
+        aux_loss = - jnp.log(log_barrier_in)
+        return theta, aux_loss, log_barrier_in
+    def get_extra(self, log_dets, forward: bool) -> Extra:
+        info = {}
+        info_aggregator = {}
+        various_x_points = self._info['various_x_points']
+        if various_x_points.shape[-1] == 3:
+            if len(various_x_points.shape) == 4:
+                theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
+            else:
+                theta, aux_loss, log_barrier_in = self.get_vector_info_single(various_x_points)
+            info_aggregator.update(
+                mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
+                min_log_barrier_in=jnp.min
+            )
+            info.update(
+                mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
+                min_log_barrier_in=jnp.min(log_barrier_in)
+            )
+            aux_loss = jnp.mean(aux_loss)
+        else:
+            aux_loss = jnp.array(0.)
+
+        log_dets = -log_dets if forward else log_dets
+        info_aggregator.update(
+            log_det_max=jnp.max, log_det_min=jnp.min,
+            shift_norm=jnp.mean,
+                               )
+        info.update(
+            log_det_max=log_dets, log_det_min=log_dets,
+            shift_norm=jnp.linalg.norm(self._shift, axis=-1)
+        )
+        extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
+        if info['shift_norm'].shape != ():
+            extra = extra._replace(aux_info=extra.aggregate_info())
+        extra = extra._replace(aux_info=jax.lax.stop_gradient(extra.aux_info))
+        return extra
+
 
 def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmidt: bool, global_frame: bool,
                         add_small_identity: bool = False):
+
     n_nodes, dim = x.shape
 
     # Calculate new basis for the affine transform
@@ -123,15 +179,15 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
-        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[basis_vectors.shape[-2]][None, None, :]*1e-6
+        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[:basis_vectors.shape[0]][:, None, :]*1e-6
 
     if global_frame:
         basis_vectors = jnp.mean(basis_vectors, axis=1, keepdims=True)
         origin = jnp.mean(origin, axis=0, keepdims=True)
 
     if gram_schmidt:
-        basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim, axis=0))
-        assert len(basis_vectors) == dim
+        basis_vectors = jax.tree_map(lambda x: jnp.squeeze(x, axis=0), jnp.split(basis_vectors, dim-1, axis=0))
+        assert len(basis_vectors) == (dim - 1)
 
         orthonormal_vectors = jax.vmap(gram_schmidt_fn)(basis_vectors)
         change_of_basis_matrix = jnp.stack(orthonormal_vectors, axis=-1)
@@ -152,7 +208,7 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
             y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
             change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
-        change_of_basis_matrix = change_of_basis_matrix / jnp.linalg.norm(change_of_basis_matrix, axis=-2,
+        change_of_basis_matrix = change_of_basis_matrix / safe_norm(change_of_basis_matrix, axis=-2,
                                                                           keepdims=True)
 
 
@@ -188,6 +244,10 @@ def make_conditioner(
 
         # Calculate new basis for the affine transform
         various_x_points, h = multi_x_equivariant_fn(x)
+
+        # Get info
+        info = {}
+        info.update(various_x_points=various_x_points)
 
         origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
                                                              add_small_identity=add_small_identity)
@@ -232,7 +292,7 @@ def make_conditioner(
 
         chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
         chex.assert_trees_all_equal_shapes(origin, log_scale, shift, x)
-        return change_of_basis_matrix, origin, log_scale, shift
+        return change_of_basis_matrix, origin, log_scale, shift, info
 
     def conditioner(x):
         if len(x.shape) == 2:
@@ -251,17 +311,17 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
                                                        identity_init: bool = True,
                                                        gram_schmidt: bool = False,
                                                        global_frame: bool = False,
-                                                       process_flow_params_jointly: bool = True,
-                                                       condition_on_x_proj: bool = False,
+                                                       process_flow_params_jointly: bool = False,
+                                                       condition_on_x_proj: bool = True,
                                                        add_small_identity: bool = False
-                                                       ):
+                                                       ) -> BijectorWithExtra:
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
-        change_of_basis_matrix, origin, log_scale, shift = params
-        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift)
+        change_of_basis_matrix, origin, log_scale, shift, info = params
+        return ProjectedScalarAffine(change_of_basis_matrix, origin, log_scale, shift, info)
 
-    n_heads = dim + (1 if gram_schmidt else 0)
+    n_heads = dim
     n_invariant_params = dim*2
 
     if nets_config.type == "mace":
@@ -306,7 +366,7 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
         add_small_identity=add_small_identity
     )
 
-    return distrax.SplitCoupling(
+    return SplitCouplingWithExtra(
         split_index=dim,
         event_ndims=2,  # [nodes, dim]
         conditioner=conditioner,

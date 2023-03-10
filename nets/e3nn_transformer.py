@@ -16,6 +16,7 @@ from utils.graph import get_senders_and_receivers_fully_connected
 
 class EnTransformerBlock(hk.Module):
     def __init__(self,
+                name: str,
                 num_heads: int,
                 mlp_units: Sequence[int],
                 n_vectors_hidden: int,
@@ -28,7 +29,7 @@ class EnTransformerBlock(hk.Module):
                 num_species: int = 1,
                 sh_irreps_max_ell: int = 3,
                 residual_h: bool = True):
-        super().__init__()
+        super().__init__(name=name)
         self.residual_h = residual_h
         self.num_heads = num_heads
         self.mlp_units = mlp_units
@@ -139,7 +140,6 @@ class EnTransformerTorsoConfig(NamedTuple):
     activation_fn: Callable = jax.nn.silu
     num_species: int = 1
     sh_irreps_max_ell: int = 3
-    layer_stack: bool = True
     residual_h: bool = True
 
     def get_transformer_layer_kwargs(self):
@@ -171,8 +171,8 @@ class EnTransformer(hk.Module):
     def __init__(self, config: EnTransformerConfig):
         super().__init__(name=config.name)
         self.config = config
-        self.transformer_block_fn = lambda x, h: EnTransformerBlock(
-            **config.torso_config.get_transformer_layer_kwargs())(x, h)
+        self.transformer_blocks = [EnTransformerBlock(config.name + str(i),
+            **config.torso_config.get_transformer_layer_kwargs()) for i in range(config.torso_config.n_blocks)]
         self.output_irreps = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e+"
                                           f"{config.n_vectors_readout}x1o")
 
@@ -190,13 +190,8 @@ class EnTransformer(hk.Module):
         vectors = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 
-        if self.config.torso_config.layer_stack:
-            stack = hk.experimental.layer_stack(self.config.torso_config.n_blocks, with_per_layer_inputs=False,
-                                                name="EGCL_layer_stack")
-            vectors, h = stack(self.transformer_block_fn)(vectors, h)
-        else:
-            for i in range(self.config.torso_config.n_blocks):
-                vectors, h = self.transformer_block_fn(vectors, h)
+        for transformer_block in self.transformer_blocks:
+            vectors, h = transformer_block(vectors, h)
 
         # Get vector features for final layer.
         vector_feat = e3nn.IrrepsArray('1x1o', vectors)
