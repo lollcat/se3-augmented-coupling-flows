@@ -11,3 +11,29 @@
 ListLogger that can may used if you don't want to use wandb.
 - `qmp.py` the whole folder is a copy and paste (with some small adjustments). The key file is `dataset.py` which 
 **MUST** be run before running `examples/qm9.py`.
+
+
+# TODO:
+
+## Burning
+    - Add more augmented variables.
+    - Rewrite for e3nn
+        1. Let networks take in positional and feature info.
+        2. Alanine dipeptide
+    - Rewrite with jgraph, generalise to varying number of nodes
+    - Think of directly parameterizing the basis (3 free params) for the proj flow. 
+
+## Less burning
+    - Generalse FlowWithInfo interface to work for all flows. 
+    - Spline flows
+    - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
+    - e3nn outputs are typically shift **invariant** rather than equivariant. 
+    The flow transforms should use this, which also allows for simplification. 
+        - For example, we no longer need to calculate vectors in such a hacky way, as this is the typical output. 
+        - For the projected flow, we can set the origin to the "current point" and then do (x + shift)*scale as 
+          our transform. This completely the pesky calculation of origin, and basis vectors - origin etc.  
+    - Cut down number of forward passes during evaluation.
+    - Move shift to come before scale?
+    - Seems like we could try enforce q(x, a) \propto p(a) = N(\mu=x, \sigma) in an additional loss?
+      This would help decrease the variance in the estimate of the marginal q(x) = E_{p(a)}[q(x, a)/p(a)]. 
+    - Lots of *_test.py files are no longer working, as the code has changed since they were written. These should be rewritten. 

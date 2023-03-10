@@ -39,30 +39,37 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.training.lr = 1e-3
-    cfg.flow.egnn.tanh = False
-    cfg.flow.act_norm = True
-    cfg.target.aug_global_centering = False
-    cfg.flow.type = ['proj_v2', 'proj']
-    cfg.flow.egnn.mlp_units = (8,)
-    cfg.flow.kwargs.proj_v2.mlp_function_units = (16,)
-    cfg.flow.kwargs.proj_v2.global_frame = False
-    cfg.flow.kwargs.proj_v2.process_flow_params_jointly = False
-    cfg.flow.kwargs.proj_v2.condition_on_x_proj = True
-    cfg.flow.transformer.mlp_units = (16,)
-    cfg.flow.transformer.n_layers = 2
-    cfg.flow.n_layers = 2
-    cfg.training.batch_size = 32
+    # Training
+    cfg.training.optimizer.init_lr = 2e-4
+    cfg.training.batch_size = 8
     cfg.training.n_epoch = 100
     cfg.training.save = False
-    cfg.training.n_plots = 6
-    cfg.training.plot_batch_size = 128
-    cfg.training.K_marginal_log_lik = 5
+    cfg.training.n_plots = 0
+    cfg.training.n_eval = 0
+    cfg.training.plot_batch_size = 8
+    cfg.training.K_marginal_log_lik = 2
     cfg.logger = DictConfig({"list_logger": None})
 
-    debug = False
+    # Flow
+    cfg.target.aug_global_centering = False
+    # cfg.flow.type = ['realnvp_non_eq']
+    cfg.flow.n_layers = 2
+    cfg.flow.act_norm = False
+
+    # proj flow settings
+    cfg.flow.kwargs.proj.global_frame = False
+    cfg.flow.kwargs.proj.process_flow_params_jointly = False
+    cfg.flow.kwargs.proj.condition_on_x_proj = True
+
+    # Configure NNs
+    cfg.flow.nets.transformer.mlp_units = (16,)
+    cfg.flow.nets.transformer.n_layers = 2
+    cfg.flow.nets.mlp_head_config.mlp_units = (16,)
+    cfg.flow.nets.egnn.tanh = False
+    cfg.flow.nets.egnn.mlp_units = (8,)
+
+    debug = True
     if debug:
-        cfg.flow.fast_compile = False
         cfg_train = dict(cfg['training'])
         cfg_train['scan_run'] = False
         cfg.training = DictConfig(cfg_train)
@@ -71,7 +78,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = True
+    # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
+    local_config = False
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)

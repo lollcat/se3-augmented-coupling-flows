@@ -4,19 +4,17 @@ import chex
 import jax
 import jax.numpy as jnp
 
+def safe_norm(x: jnp.ndarray, axis: int = None, keepdims=False) -> jnp.ndarray:
+    """nan-safe norm. Copied from mace-jax"""
+    x2 = jnp.sum(x**2, axis=axis, keepdims=keepdims)
+    return jnp.where(x2 == 0, 1, x2) ** 0.5
+
 
 def get_pairwise_distances(x):
     chex.assert_rank(x, 2)
     diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-    diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-    norms = jnp.linalg.norm(diff_combos, ord=2, axis=-1)
+    norms = safe_norm(diff_combos, axis=-1)
     return norms
-
-
-def set_diagonal_to_zero(x):
-    chex.assert_rank(x, 2)
-    return jnp.where(jnp.eye(x.shape[0]), jnp.zeros_like(x), x)
-
 
 def rotate_3d(x, theta, phi):
     rotation_matrix_1 = jnp.array(
@@ -89,9 +87,10 @@ def vector_rejection(a, b):
 
 
 def gram_schmidt_fn(vectors: List[chex.Array]):
+    vectors.append(jnp.ones_like(vectors[0]))
     n_vectors = len(vectors)
     orthonormal_vectors = []
-    u0 = vectors[0] / jnp.linalg.norm(vectors[0])
+    u0 = vectors[0] / safe_norm(vectors[0])
     orthonormal_vectors.append(u0)
 
     for i in range(n_vectors - 1):
@@ -99,9 +98,21 @@ def gram_schmidt_fn(vectors: List[chex.Array]):
         temp_vector = vectors[current_vector_indx]
         for j in range(current_vector_indx):
             temp_vector = vector_rejection_single(temp_vector, vectors[j])
-        orthonormal_vectors.append(temp_vector / jnp.linalg.norm(temp_vector))
+        orthonormal_vectors.append(temp_vector / safe_norm(temp_vector))
 
     return orthonormal_vectors
 
+
+def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
+    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
+    x_rot = rotate_translate_permute_2d(x, theta, translation)
+    a_rot = rotate_translate_permute_2d(a, theta, translation)
+    return jnp.concatenate([x_rot, a_rot], axis=-1)
+
+def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
+    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
+    x_rot = rotate_translate_permute_3d(x, theta, phi, translation)
+    a_rot = rotate_translate_permute_3d(a, theta, phi, translation)
+    return jnp.concatenate([x_rot, a_rot], axis=-1)
 
 

@@ -25,7 +25,7 @@ class Logger(abc.ABC):
 class ListLogger(Logger):
     """Manually save the data to the class in a dict. Currently only supports scalar history
     inputs."""
-    def __init__(self, save: bool = True, save_path: str = "/tmp/logging_hist.pkl",
+    def __init__(self, save: bool = False, save_path: str = "/tmp/logging_hist.pkl",
                  save_period: int = 100):
         self.save = save
         self.save_path = save_path

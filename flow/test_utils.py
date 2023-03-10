@@ -2,19 +2,29 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
+from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
 
-def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
-    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
-    x_rot = rotate_translate_permute_2d(x, theta, translation)
-    a_rot = rotate_translate_permute_2d(a, theta, translation)
-    return jnp.concatenate([x_rot, a_rot], axis=-1)
 
-def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
-    x, a = jnp.split(x_and_a, axis=-1, indices_or_sections=2)
-    x_rot = rotate_translate_permute_3d(x, theta, phi, translation)
-    a_rot = rotate_translate_permute_3d(a, theta, phi, translation)
-    return jnp.concatenate([x_rot, a_rot], axis=-1)
+def get_minimal_nets_config(type = 'egnn'):
+    nets_config = NetsConfig(type=type,
+                             mace_torso_config=MACETorsoConfig(
+                                 n_vectors_residual=3,
+                                 n_invariant_feat_residual=3,
+                                 n_vectors_hidden_readout_block=3,
+                                 n_invariant_hidden_readout_block=3,
+                                 hidden_irreps='4x0e+4x1o'
+                             ),
+                             egnn_torso_config=EgnnTorsoConfig(),
+                             e3gnn_torso_config=E3GNNTorsoConfig(
+                                 n_blocks=2,
+                                 mlp_units=(4,),
+                                 n_vectors_hidden=3,
+                                 n_invariant_feat_hidden=3),
+                             mlp_head_config=MLPHeadConfig((4,)),
+                             transformer_config=TransformerConfig()
+                             )
+    return nets_config
 
 
 def get_pairwise_distances(x):
