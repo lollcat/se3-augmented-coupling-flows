@@ -41,7 +41,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
     cfg.training.optimizer.init_lr = 2e-4
-    cfg.training.batch_size = 8
+    cfg.training.batch_size = 16
     cfg.training.n_epoch = 100
     cfg.training.save = False
     cfg.training.n_plots = 0
@@ -79,7 +79,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
     # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)

@@ -21,8 +21,8 @@ from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNN
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset # , ml_step
-from utils.train_and_eval import ml_step_second_order_opt as ml_step
+from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
+# from utils.train_and_eval import ml_step_second_order_opt as ml_step
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
 from flow.distrax_with_extra import Extra
