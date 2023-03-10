@@ -96,7 +96,7 @@ training:
     max_global_norm: 1.0
   use_64_bit: false
   n_epoch: 128
-  batch_size: 32
+  batch_size: 64
   plot_batch_size: 128
   seed: 0
   reload_aug_per_epoch: true
