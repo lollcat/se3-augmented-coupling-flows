@@ -87,11 +87,11 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-5
+    init_lr: 1e-3
     optimizer_name: adam
-    use_schedule: true
-    peak_lr: 6e-4 # can be null
-    end_lr: 1e-5 # can be null
+    use_schedule: false
+    peak_lr: 1e-3 # can be null
+    end_lr: 4e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
   use_64_bit: false
@@ -110,7 +110,7 @@ training:
   save_dir: qm9pos_results
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
-  with_train_info: false
+  last_iter_info_only: true
 
 logger:
 #  list_logger: null
