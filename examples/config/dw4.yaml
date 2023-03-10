@@ -87,7 +87,7 @@ training:
 logger:
 #  list_logger: null
   wandb:
-    name: dw4_${flow.type}
+    name: dw4_${flow.type}_second_order_opt
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4]

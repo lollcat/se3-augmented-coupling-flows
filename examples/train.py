@@ -21,7 +21,8 @@ from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNN
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
+from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset # , ml_step
+from utils.train_and_eval import ml_step_second_order_opt as ml_step
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
 from flow.distrax_with_extra import Extra
@@ -333,16 +334,6 @@ def train(config: TrainConfig):
                               n_iter_per_epoch=train_data.shape[0] // config.batch_size,
                               total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
-
-    # Need this to infer structure of info.
-    _, _, info_blank = ml_step(params, train_data[:1], opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
-                               subkey,
-                               config.use_flow_aux_loss, config.aux_loss_weight
-                               )
-
-    # Check that we haven't given an unstable init
-    assert jnp.isfinite(info_blank['grad_norm']), ("Gradient on first step is nan!")
-
 
     if config.scan_run:
         def scan_fn(carry, xs):
