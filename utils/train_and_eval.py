@@ -57,7 +57,10 @@ def ml_step(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
 
 
 def ml_step_second_order_opt(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
-            optimizer, key, use_aux_loss, aux_loss_weight, damping=1e-5):
+            optimizer, key, use_aux_loss, aux_loss_weight,
+                             damping=1e-5,
+                             step_size_min: float = 0.1,
+                             step_size_max: float = 10.0):
     grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
         params, x, log_prob_with_extra_fn, key, use_aux_loss, aux_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
@@ -70,7 +73,7 @@ def ml_step_second_order_opt(params, x, opt_state, log_prob_with_extra_fn: LogPr
                                   opt_update=updates,
                                   damping=damping)
     info.update(opt_step_size=opt_step_size)
-    opt_step_size = jnp.clip(opt_step_size, a_min=1.0)
+    opt_step_size = jnp.clip(opt_step_size, a_min=step_size_min, a_max=step_size_max)
     new_params = optax.apply_updates(params, jax.tree_util.tree_map(lambda x: x*opt_step_size, updates))
     info.update(grad_norm=optax.global_norm(grad),
                 update_norm=optax.global_norm(updates))

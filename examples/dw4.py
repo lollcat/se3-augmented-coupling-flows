@@ -44,8 +44,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.batch_size = 16
     cfg.training.n_epoch = 100
     cfg.training.save = False
-    cfg.training.n_plots = 0
-    cfg.training.n_eval = 0
+    cfg.training.n_plots = 3
+    cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 8
     cfg.training.K_marginal_log_lik = 2
     cfg.logger = DictConfig({"list_logger": None})
@@ -68,7 +68,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.egnn.tanh = False
     cfg.flow.nets.egnn.mlp_units = (8,)
 
-    debug = True
+    debug = False
     if debug:
         cfg_train = dict(cfg['training'])
         cfg_train['scan_run'] = False
