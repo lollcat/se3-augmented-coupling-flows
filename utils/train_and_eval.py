@@ -11,6 +11,7 @@ from flow.base_dist import get_conditional_gaussian_augmented_dist
 from flow.test_utils import get_max_diff_log_prob_invariance_test
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
 from flow.distrax_with_extra import Extra
+from utils.optimise import line_search_by_jvp
 
 Params = chex.ArrayTree
 X = chex.Array
@@ -48,6 +49,32 @@ def ml_step(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
         params, x, log_prob_with_extra_fn, key, use_aux_loss, aux_loss_weight)
     updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
     new_params = optax.apply_updates(params, updates)
+    info.update(grad_norm=optax.global_norm(grad),
+                update_norm=optax.global_norm(updates))
+    info.update({"grad_" + key: value for key, value in get_tree_leaf_norm_info(grad).items()})
+    info.update({"update_" + key: value for key, value in get_tree_leaf_norm_info(updates).items()})
+    return new_params, new_opt_state, info
+
+
+def ml_step_second_order_opt(params, x, opt_state, log_prob_with_extra_fn: LogProbWithExtraFn,
+            optimizer, key, use_aux_loss, aux_loss_weight,
+                             damping=1e-5,
+                             step_size_min: float = 0.1,
+                             step_size_max: float = 10.0):
+    grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
+        params, x, log_prob_with_extra_fn, key, use_aux_loss, aux_loss_weight)
+    updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
+    loss_fn = lambda params: general_ml_loss_fn(params, x=x, log_prob_with_extra_fn=log_prob_with_extra_fn,
+                      key=key, use_aux_loss=use_aux_loss,
+                       aux_loss_weight=aux_loss_weight)[0]
+    opt_step_size = line_search_by_jvp(f=loss_fn,
+                                  grad_direction=grad,
+                                  func_params=params,
+                                  opt_update=updates,
+                                  damping=damping)
+    info.update(opt_step_size=opt_step_size)
+    opt_step_size = jnp.clip(opt_step_size, a_min=step_size_min, a_max=step_size_max)
+    new_params = optax.apply_updates(params, jax.tree_util.tree_map(lambda x: x*opt_step_size, updates))
     info.update(grad_norm=optax.global_norm(grad),
                 update_norm=optax.global_norm(updates))
     info.update({"grad_" + key: value for key, value in get_tree_leaf_norm_info(grad).items()})
