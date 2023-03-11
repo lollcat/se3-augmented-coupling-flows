@@ -94,7 +94,7 @@ training:
     end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
-    second_order_opt: true
+    second_order_opt: false
     damping: 1e-5
     max_second_order_step_size: 10.
     min_second_order_step_size: 0.1
