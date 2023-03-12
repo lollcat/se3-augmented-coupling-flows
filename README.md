@@ -1,6 +1,7 @@
 # Equivariant Augmented Normalizing Flows
 
 
+
 # Overview of the repo
 - For blackjax we need `pip install blackjax-nightly` (latest version) otherwise we get errors.
 - `flow`: Contains the base distributions, bijectors (e.g. projected flow transform), and EGNNs.
@@ -11,6 +12,16 @@
 ListLogger that can may used if you don't want to use wandb.
 - `qmp.py` the whole folder is a copy and paste (with some small adjustments). The key file is `dataset.py` which 
 **MUST** be run before running `examples/qm9.py`.
+
+
+## Instalation
+
+1. Install packages in requirements.txt
+2. Run 
+
+```
+pip install -e .
+```
 
 
 # TODO:
