@@ -34,7 +34,6 @@ pip install -e .
         1. Let networks take in positional and feature info.
         2. Alanine dipeptide
     - Rewrite with jgraph, generalise to varying number of nodes
-    - Add more augmented variables.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
 
 ## Less burning
