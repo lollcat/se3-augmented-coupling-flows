@@ -16,6 +16,8 @@ ListLogger that can may used if you don't want to use wandb.
 # TODO:
 
 ## Burning
+    - Add augmented target to flow definition, and loss. 
+    - Loss can take in whole flow object. 
     - Add more augmented variables.
     - Rewrite for e3nn
         1. Let networks take in positional and feature info.
