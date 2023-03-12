@@ -15,14 +15,15 @@ import pathlib
 from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
+from functools import partial
 
 from flow.build_flow import build_flow, FlowDistConfig, BaseConfig
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset # , ml_step
-from utils.train_and_eval import ml_step_second_order_opt as ml_step
+from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
+from utils.train_and_eval import ml_step_second_order_opt
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
 from flow.distrax_with_extra import Extra
@@ -138,9 +139,13 @@ class OptimizerConfig(NamedTuple):
     peak_lr: Optional[float] = None
     end_lr: Optional[float] = None
     warmup_n_epoch: Optional[int] = None
+    second_order_opt: bool = False
+    damping: float = 1e-5
+    max_second_order_step_size: float = 10.
+    min_second_order_step_size: float = 0.1
 
 
-def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
+def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
     if optimizer_config.use_schedule:
         lr = optax.warmup_cosine_decay_schedule(
             init_value=optimizer_config.init_lr,
@@ -162,7 +167,12 @@ def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_e
 
     grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
     optimizer = optax.chain(*grad_transforms)
-    return optimizer, lr
+    if optimizer_config.second_order_opt:
+        step_fn = partial(ml_step_second_order_opt, step_size_min=optimizer_config.min_second_order_step_size,
+        step_size_max=optimizer_config.max_second_order_step_size, damping=optimizer_config.damping)
+    else:
+        step_fn = ml_step
+    return optimizer, lr, step_fn
 
 
 class TrainConfig(NamedTuple):
@@ -330,17 +340,18 @@ def train(config: TrainConfig):
     plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
-    optimizer, lr = get_optimizer(config.optimizer_config,
-                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
-                              total_n_epoch=config.n_epoch)
+    optimizer, lr, step_fn = get_optimizer_and_step_fn(config.optimizer_config,
+                                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
+                                              total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
+
 
     if config.scan_run:
         def scan_fn(carry, xs):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+            params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                               subkey,
                                               config.use_flow_aux_loss, config.aux_loss_weight)
             if config.last_iter_info_only:
@@ -358,7 +369,7 @@ def train(config: TrainConfig):
                                                                  unroll=1)
             if config.last_iter_info_only:
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, final_batch, opt_state,
+                params, opt_state, info = step_fn(params, final_batch, opt_state,
                                                   flow_dist.log_prob_with_extra_apply,
                                                   optimizer,
                                                   subkey,
@@ -410,7 +421,7 @@ def train(config: TrainConfig):
         else:
             for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = ml_step(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
                                                   subkey,
                                                   config.use_flow_aux_loss, config.aux_loss_weight
                                                   )
