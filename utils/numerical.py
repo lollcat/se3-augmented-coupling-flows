@@ -16,6 +16,10 @@ def get_pairwise_distances(x):
     norms = safe_norm(diff_combos, axis=-1)
     return norms
 
+def set_diagonal_to_zero(x):
+    chex.assert_rank(x, 2)
+    return jnp.where(jnp.eye(x.shape[0]), jnp.zeros_like(x), x)
+
 def rotate_3d(x, theta, phi):
     rotation_matrix_1 = jnp.array(
         [[jnp.cos(theta), -jnp.sin(theta), 0],

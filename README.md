@@ -1,6 +1,7 @@
 # Equivariant Augmented Normalizing Flows
 
 
+
 # Overview of the repo
 - For blackjax we need `pip install blackjax-nightly` (latest version) otherwise we get errors.
 - `flow`: Contains the base distributions, bijectors (e.g. projected flow transform), and EGNNs.
@@ -13,14 +14,27 @@ ListLogger that can may used if you don't want to use wandb.
 **MUST** be run before running `examples/qm9.py`.
 
 
+## Instalation
+
+1. Install packages in requirements.txt
+2. Run 
+
+```
+pip install -e .
+```
+
+
 # TODO:
 
 ## Burning
+    - Add augmented target to flow definition, and loss. 
+    - Loss can take in whole flow object. 
     - Add more augmented variables.
     - Rewrite for e3nn
         1. Let networks take in positional and feature info.
         2. Alanine dipeptide
     - Rewrite with jgraph, generalise to varying number of nodes
+    - Add more augmented variables.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
 
 ## Less burning
