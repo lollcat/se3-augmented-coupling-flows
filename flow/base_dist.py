@@ -11,6 +11,7 @@ import distrax
 
 from flow.conditional_dist import get_conditional_gaussian_augmented_dist
 
+
 class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
     """x ~ CentreGravityGaussian, a ~ Normal(x, I)"""
     def __init__(self, dim, n_nodes: int, n_aux: int, global_centering: bool = False,

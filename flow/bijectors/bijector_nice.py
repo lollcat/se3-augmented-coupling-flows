@@ -33,9 +33,9 @@ def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, i
     conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn)
     return SplitCouplingWithExtra(
         split_index=dim,
-        event_ndims=2,  # [nodes, dim]
+        event_ndims=2,  # [n_vectors, nodes, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-1
+        split_axis=-3
     )
