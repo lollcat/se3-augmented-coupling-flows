@@ -21,7 +21,7 @@ class ConditionalAuxDistConfig(NamedTuple):
 
 class FlowDistConfig(NamedTuple):
     dim: int
-    n_aux: int
+    n_aug: int
     nodes: int
     n_layers: int
     nets_config: NetsConfig
@@ -55,7 +55,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             dim=config.dim, n_nodes=config.nodes, global_centering=config.base_aux_config.global_centering,
             trainable_augmented_scale=config.base_aux_config.trainable_augmented_scale,
             augmented_scale_init=config.base_aux_config.aug_scale_init,
-            n_aux=config.n_aux
+            n_aux=config.n_aug
         )
         return base
     def make_bijector(graph_features: chex.Array):
@@ -75,7 +75,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     layer_number=layer_number,
                     graph_features=graph_features,
                     dim=config.dim,
-                    n_aux=config.n_aux,
+                    n_aux=config.n_aug,
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
@@ -83,11 +83,11 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         return ChainWithExtra(bijectors)
 
     make_aug_target = build_aux_dist(
-        n_aux = config.n_aux,
-        name = 'target',
-        global_centering = config.target_aux_config.global_centering,
-        augmented_scale_init = config.target_aux_config.aug_scale_init,
-        trainable_scale = config.target_aux_config.trainable_augmented_scale)
+        n_aux=config.n_aug,
+        name='target',
+        global_centering=config.target_aux_config.global_centering,
+        augmented_scale_init=config.target_aux_config.aug_scale_init,
+        trainable_scale=config.target_aux_config.trainable_augmented_scale)
 
 
     definition = AugmentedFlowRecipe(make_base=make_base,
@@ -96,7 +96,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                                      n_layers=config.n_layers,
                                      config=config,
                                      dim_x=config.dim,
-                                     n_augmented=config.n_aux,
+                                     n_augmented=config.n_aug,
                                      compile_n_unroll=config.compile_n_unroll,
                                      )
     return definition

@@ -12,12 +12,12 @@ def get_broadcasted_loc_and_scalediag(x: chex.Array, n_aux: int, global_centerin
     chex.assert_shape(scale, (n_aux,))
     chex.assert_rank(x, 2)
 
-    scale_diag = jnp.zeros((n_aux, *x.shape)) + scale[:, None, None]
-    loc = jnp.zeros((n_aux, *x.shape))
+    scale_diag = jnp.zeros((x.shape[0], n_aux, x.shape[-1])) + scale[None, :, None]
+    loc = jnp.zeros((x.shape[0], n_aux, x.shape[-1]))
     if global_centering:
-        loc = loc + jnp.mean(x, axis=-2, keepdims=True)[None, ...]
+        loc = loc + jnp.mean(x, axis=-2, keepdims=True)[:, None, :]
     else:
-        loc = loc + x
+        loc = loc + x[:, None, :]
     return loc, scale_diag
 
 def get_conditional_gaussian_augmented_dist(x: chex.Array, n_aux: int, global_centering: bool, scale: chex.Array):
@@ -40,7 +40,7 @@ def build_aux_dist(n_aux: int,
                    trainable_scale: bool = True):
     def make_aux_target(sample: FullGraphSample):
         if trainable_scale:
-            log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(),
+            log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(n_aux,),
                                          init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
             scale = jnp.exp(log_scale)
         else:

@@ -19,6 +19,9 @@ Positions = chex.Array
 class FullGraphSample(NamedTuple):
     positions: Positions
     features: GraphFeatures
+    def __getitem__(self, i):
+        return FullGraphSample(self.positions[i], self.features[i])
+
 
 
 class AugmentedFlowRecipe(NamedTuple):
@@ -192,42 +195,47 @@ def create_flow(recipe: AugmentedFlowRecipe):
     @hk.transform
     def aux_target_sample_n_and_log_prob(sample_x: FullGraphSample, key: chex.PRNGKey, n: int) -> \
             Tuple[Positions, LogProb]:
-        positions_a, log_prob = recipe.make_aug_target(sample_x)._sample_n_and_log_prob(key, n)
+        dist = recipe.make_aug_target(sample_x)
+        positions_a, log_prob = dist._sample_n_and_log_prob(key, n)
         return positions_a, log_prob
 
     @hk.without_apply_rng
     @hk.transform
     def aux_target_sample_n(sample_x: FullGraphSample, key: chex.PRNGKey, n: int) -> \
             Tuple[Positions, LogProb]:
-        sample, log_prob = recipe.make_aug_target(sample_x)._sample_n_and_log_prob(key, n)
-        return sample, log_prob
+        dist = recipe.make_aug_target(sample_x)
+        sample = dist._sample_n(key, n)
+        return sample
 
     @hk.without_apply_rng
     @hk.transform
-    def aux_target_log_prob(features: GraphFeatures,
-                            positions_x: Positions, postions_a: Positions) -> LogProb:
-        log_prob = recipe.make_aug_target(features, positions_x).log_prob(postions_a)
+    def aux_target_log_prob(sample_x: FullGraphSample, postions_a: Positions) -> LogProb:
+        dist = recipe.make_aug_target(sample_x)
+        chex.assert_tree_shape_suffix(postions_a, dist.event_shape)
+        log_prob = dist.log_prob(postions_a)
         return log_prob
 
     def separate_samples_to_full_joint(features: GraphFeatures, positions_x: Positions, postions_a: Positions) -> \
             FullGraphSample:
-        positions = jnp.concatenate(positions_x[..., None, :, :], postions_a, axis=-3)
+        positions = jnp.concatenate([jnp.expand_dims(positions_x, axis=-2), postions_a], axis=-2)
         return FullGraphSample(positions=positions, features=features)
 
 
     def init(seed: chex.PRNGKey, sample: FullGraphSample) -> AugmentedFlowParams:
-        params_aux_target = aux_target_log_prob.init(sample.features, sample.positions)
-        sample_a = aux_target_sample_n.apply(params_aux_target,
-                                             sample.features, sample.positions, hk.next_rng_key(), n=1)
+        key1, key2, key3, key4 = jax.random.split(seed, 4)
+        params_aux_target = aux_target_log_prob.init(key1, sample,
+                                                     jnp.repeat(jnp.expand_dims(sample.positions, axis=-2),
+                                                        recipe.n_augmented, axis=-2))
+        sample_a = aux_target_sample_n.apply(params_aux_target, sample, key2, n=1)
         sample_a = jnp.squeeze(sample_a, axis=0)
 
         # Check shapes.
         chex.assert_tree_shape_suffix(sample.positions, (recipe.dim_x, ))
-        assert sample_a.shape[-3] == recipe.n_augmented
+        assert sample_a.shape[-2] == recipe.n_augmented
 
         sample_joint = separate_samples_to_full_joint(sample.features, sample.positions, sample_a)
-        params_base = base_log_prob_fn.init(seed, sample_joint)
-        params_bijector_single = bijector_inverse_and_log_det.init(seed, sample_joint)
+        params_base = base_log_prob_fn.init(key3, sample_joint)
+        params_bijector_single = bijector_inverse_and_log_det.init(key4, sample_joint)
         params_bijectors = jax.tree_map(lambda x: jnp.repeat(x[None, ...], recipe.n_layers, axis=0),
                                         params_bijector_single)
         return AugmentedFlowParams(base=params_base, bijector=params_bijectors, aux_target=params_aux_target)

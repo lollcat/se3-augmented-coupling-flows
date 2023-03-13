@@ -5,7 +5,8 @@ import jax.numpy as jnp
 
 from flow.test_utils import test_fn_is_invariant
 from flow.test_utils import get_minimal_nets_config
-from flow.build_flow import build_flow, BaseConfig, FlowDistConfig
+from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig
+from flow.fast_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
 
@@ -14,9 +15,10 @@ _N_NODES = 16
 _FLOW_TYPE = "proj"
 _FAST_COMPILE_FLOW = False
 _IDENTITY_INIT = False
+_FEATURE_DIM = 2
 
 
-def test_distribution(dim = 3):
+def test_distribution(dim: int = 3, n_aug: int = 3):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -27,27 +29,37 @@ def test_distribution(dim = 3):
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    base_config = BaseConfig(double_centered_gaussian=False, global_centering=False,
-                             trainable_augmented_scale=False)
+    base_aux_config = ConditionalAuxDistConfig(global_centering=False,
+                             trainable_augmented_scale=True)
+    target_aux_config = base_aux_config
 
 
     config = FlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS, nodes=_N_NODES, identity_init=_IDENTITY_INIT,
-        type=_FLOW_TYPE, fast_compile=_FAST_COMPILE_FLOW, compile_n_unroll=2,
+        dim=dim, n_layers=_N_FLOW_LAYERS,
+        nodes=_N_NODES,
+        identity_init=_IDENTITY_INIT,
+        type=_FLOW_TYPE,
+        compile_n_unroll=2,
         nets_config=get_minimal_nets_config('egnn'),
-        base_config=base_config,
-        act_norm=False
+        base_aux_config=base_aux_config,
+        target_aux_config=target_aux_config,
+        n_aug=n_aug
     )
 
     flow = build_flow(config)
 
 
     # Init params.
-    dummy_samples = jnp.zeros((batch_size, n_nodes, dim*2))
+    dummy_samples = FullGraphSample(positions=jnp.zeros((batch_size, n_nodes, dim)),
+                                    features=jnp.zeros((batch_size, n_nodes, _FEATURE_DIM)))
     key, subkey = jax.random.split(key)
     params = flow.init(subkey, dummy_samples)
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
+
+    #TODO: Laurence here last.
+    # TODO: Laurence: we are setting -2 to the aux_axis (multiplicity). In the base it is currently -3 so this must be fixed
+    # TODO: Laurence: use jnp.expand_dims instead of ugly 'None' where applicable.
 
     key, subkey = jax.random.split(key)
     sample, log_prob = flow.sample_and_log_prob_apply(params, subkey, (batch_size,))
