@@ -1,9 +1,8 @@
-from flow.fast_flow_dist import FlowRecipe, Flow, create_flow
+from flow.fast_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
 
 from typing import NamedTuple, Sequence, Union
 import distrax
 
-from flow.base_dist import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijectors.bijector_proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection as proj_v2
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
@@ -14,8 +13,7 @@ from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
 
-class BaseConfig(NamedTuple):
-    double_centered_gaussian: bool = False
+class ConditionalAuxDistConfig(NamedTuple):
     global_centering: bool = False
     trainable_augmented_scale: bool = True
     aug_scale_init: float = 1.0
@@ -31,16 +29,17 @@ class FlowDistConfig(NamedTuple):
     compile_n_unroll: int = 2
     act_norm: bool = False
     kwargs: dict = {}
-    base_config: BaseConfig = BaseConfig()
+    base_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
+    target_aux_config: ConditionalAuxDistConfig = C
 
 
-def build_flow(config: FlowDistConfig) -> Flow:
+def build_flow(config: FlowDistConfig) -> AugmentedFlow:
     recipe = create_flow_recipe(config)
     flow = create_flow(recipe)
     return flow
 
 
-def create_flow_recipe(config: FlowDistConfig) -> FlowRecipe:
+def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     if config.type not in ['proj', 'nice'] or config.act_norm:
         raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
 
@@ -101,6 +100,6 @@ def create_flow_recipe(config: FlowDistConfig) -> FlowRecipe:
 
         return ChainWithExtra(bijectors)
 
-    definition = FlowRecipe(make_base=make_base, make_bijector=make_bijector,
-                            n_layers=config.n_layers, config=config, compile_n_unroll=config.compile_n_unroll)
+    definition = AugmentedFlowRecipe(make_base=make_base, make_bijector=make_bijector,
+                                     n_layers=config.n_layers, config=config, compile_n_unroll=config.compile_n_unroll)
     return definition

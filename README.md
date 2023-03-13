@@ -28,6 +28,7 @@ pip install -e .
 
 ## Burning
     - Add augmented target to flow definition, and loss. 
+    - Flow takes in conditioning info. For positional flows this will be zeros. 
     - Loss can take in whole flow object. 
     - Add more augmented variables.
     - Rewrite for e3nn
@@ -36,6 +37,7 @@ pip install -e .
     - Rewrite with jgraph, generalise to varying number of nodes
     - Add more augmented variables.
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
+    - Make sure non-equivariant flow is working well.
 
 ## Less burning
     - Generalse FlowWithInfo interface to work for all flows. 

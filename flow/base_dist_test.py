@@ -1,7 +1,7 @@
 import chex
 import jax
 
-from flow.base_dist import DoubleCentreGravitryGaussian, CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
+from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
 from flow.test_utils import test_fn_is_invariant
 
 
@@ -11,26 +11,20 @@ def test_base_distribution():
     key = jax.random.PRNGKey(0)
     dim = 2
     n_nodes = 3
+    n_aux = 3
     batch_size = 2
-    shape = (batch_size, n_nodes, dim*2)
-    double_centrered_gaussian = False
+    shape = (batch_size, n_aux + 1, n_nodes, dim)
     global_centering = False
 
-    if double_centrered_gaussian:
-        dist = DoubleCentreGravitryGaussian(dim=dim, n_nodes=n_nodes)
-    else:
-        dist = CentreGravitryGaussianAndCondtionalGuassian(
-            dim=dim, n_nodes=n_nodes, global_centering=global_centering,
-            trainable_augmented_scale=False,
-        )
+    dist = CentreGravitryGaussianAndCondtionalGuassian(
+        dim=dim, n_nodes=n_nodes, n_aux=n_aux, global_centering=global_centering,
+        trainable_augmented_scale=False,
+    )
 
     # Sample: Test that it does not smoke.
     sample = dist.sample(seed=key, sample_shape=batch_size)
     chex.assert_shape(sample, shape)
-    if double_centrered_gaussian:
-        assert_mean_zero(sample)
-    else:
-        assert_mean_zero(sample[..., :dim])
+    assert_mean_zero(sample[..., 0, :, :])
 
     # Log prob: Test that it is invariant to translation and rotation.
     log_prob = dist.log_prob(sample)

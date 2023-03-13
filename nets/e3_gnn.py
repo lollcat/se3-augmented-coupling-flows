@@ -185,10 +185,7 @@ class E3Gnn(hk.Module):
         self.output_irreps_scalars = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e")
 
 
-    def __call__(self, x: chex.Array, h: Optional[chex.Array] = None):
-        if h is None:
-            # No node feature, so initialise them zeros.
-            h = jnp.zeros((*x.shape[:-1], self.config.torso_config.n_invariant_feat_hidden))
+    def __call__(self, x: chex.Array, h: chex.Array):
         if len(x.shape) == 2:
             return self.call_single(x, h)
         else:
@@ -200,6 +197,8 @@ class E3Gnn(hk.Module):
 
         vectors_in = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors_in[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
+
+        # TODO: embed h into shape self.config.torso_config.n_invariant_feat_hidden
 
         chex.assert_shape(vectors, (n_nodes, self.config.torso_config.n_vectors_hidden, 3))
         for egcl in self.egcl_blocks:
