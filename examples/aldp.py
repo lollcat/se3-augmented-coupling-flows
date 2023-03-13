@@ -11,9 +11,8 @@ from base import DataPoint
 
 def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None) -> \
         Tuple[DataPoint, DataPoint]:
-    train_traj = mdtraj.load('target/data/aldp_500K_train.h5')
-    # test_traj = mdtraj.load('target/data/aldp_500K_test.h5')
-    test_traj = mdtraj.load('target/data/aldp_500K_val.h5') # use val set for now as it is smaller
+    train_traj = mdtraj.load('target/data/aldp_500K_train_mini.h5')
+    test_traj = mdtraj.load('target/data/aldp_500K_test_mini.h5')
     features = get_atom_encoding(train_traj)
 
     positions_train = train_traj.xyz
