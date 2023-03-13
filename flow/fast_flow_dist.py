@@ -24,7 +24,7 @@ class FullGraphSample(NamedTuple):
 class AugmentedFlowRecipe(NamedTuple):
     """Defines input needed to create an instance of the `Flow` callables."""
     make_base: Callable[[], distrax.Distribution]
-    make_bijector: Callable[[], BijectorWithExtra]
+    make_bijector: Callable[[GraphFeatures], BijectorWithExtra]
     make_aug_target: Callable[[FullGraphSample], distrax.Distribution]
     n_layers: int
     config: Any
@@ -82,37 +82,39 @@ def create_flow(recipe: AugmentedFlowRecipe):
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward_and_log_det(x: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
-        return recipe.make_bijector().forward_and_log_det(x)
+        y = recipe.make_bijector(x.features).forward_and_log_det(x.positions)
+        return FullGraphSample(positions=y, features=x.features)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_inverse_and_log_det(y: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
-        return recipe.make_bijector().inverse_and_log_det(y)
+        x = recipe.make_bijector(y.features).inverse_and_log_det(y.positions)
+        return FullGraphSample(positions=x, features=y.features)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward_and_log_det_with_extra(x: FullGraphSample) -> \
             Tuple[FullGraphSample, LogDet, Extra]:
-        bijector = recipe.make_bijector()
+        bijector = recipe.make_bijector(x.features)
         if isinstance(bijector, BijectorWithExtra):
-            y, log_det, extra = bijector.forward_and_log_det_with_extra(x)
+            y, log_det, extra = bijector.forward_and_log_det_with_extra(x.positions)
         else:
-            y, log_det = bijector.forward_and_log_det(x)
+            y, log_det = bijector.forward_and_log_det(x.positions)
             extra = Extra()
-        return y, log_det, extra
+        return FullGraphSample(positions=y, features=x.features), log_det, extra
 
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_inverse_and_log_det_with_extra(y: FullGraphSample) -> \
             Tuple[FullGraphSample, LogDet, Extra]:
-        bijector = recipe.make_bijector()
+        bijector = recipe.make_bijector(y.features)
         if isinstance(bijector, BijectorWithExtra):
-            x, log_det, extra = bijector.inverse_and_log_det_with_extra(y)
+            x, log_det, extra = bijector.inverse_and_log_det_with_extra(y.positions)
         else:
-            x, log_det = bijector.inverse_and_log_det(y)
+            x, log_det = bijector.inverse_and_log_det(y.positions)
             extra = Extra()
-        return x, log_det, extra
+        return FullGraphSample(positions=x, features=y.features), log_det, extra
 
 
     def log_prob_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> LogProb:

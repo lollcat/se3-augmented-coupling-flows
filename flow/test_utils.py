@@ -30,13 +30,14 @@ def get_minimal_nets_config(type = 'egnn'):
 def get_pairwise_distances(x):
     return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
 
-def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
+
+def test_fn_is_equivariant(equivariant_fn, key, event_shape):
+    dim = event_shape[-1]
     assert dim in (2, 3)
 
     # Setup
     key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jnp.zeros((n_nodes, dim * 2))
-    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape)
+    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
 
     rtol = 1e-5 if x_and_a.dtype == jnp.float64 else 1e-3
 
@@ -63,13 +64,13 @@ def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
     chex.assert_trees_all_close(x_and_a_new_rot, group_action(x_and_a_new), rtol=rtol)
 
 
-def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):
+def test_fn_is_invariant(invariante_fn, key, event_shape):
+    dim = event_shape[-1]
     assert dim in (2, 3)
 
     # Setup
     key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jnp.zeros((n_nodes, dim * 2))
-    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape) * 0.1
+    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2 * jnp.pi
@@ -100,17 +101,16 @@ def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):
 
 
 def bijector_test(bijector_forward, bijector_backward,
-                  dim: int, n_nodes: int):
+                  dim: int, n_nodes: int, n_aux: int):
     """Test that the bijector is equivariant, and that it's log determinant is invariant.
     Assumes bijectors are haiku transforms."""
     assert dim in (2, 3)
+    event_shape = (n_nodes, n_aux+1, dim)
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
 
-    # Create dummy x and a.
-    x_and_a = jnp.zeros((n_nodes, dim*2))
-    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+    x_and_a = jax.random.normal(subkey, shape=event_shape) * 0.1
 
     if x_and_a.dtype == jnp.float64:
         rtol = 1e-4
@@ -132,21 +132,20 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Test the transformation is equivariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, dim)
+    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, dim)
+    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
 
     # Check the change to the log det is invariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, dim)
+    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, dim)
+    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
 
 
     # Forward reverse test but with a batch.
     batch_size = 11
-    x_and_a = jnp.zeros((batch_size, n_nodes, dim*2))
-    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+    x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))

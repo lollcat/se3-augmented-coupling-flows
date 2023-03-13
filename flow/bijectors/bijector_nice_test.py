@@ -4,18 +4,27 @@ import distrax
 from flow.test_utils import bijector_test
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
 from flow.test_utils import get_minimal_nets_config
+import jax.numpy as jnp
 
 
-def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, type='egnn'):
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, type='egnn',
+                            n_nodes: int = 4, n_aux=3):
     nets_config = get_minimal_nets_config(type=type)
+
+    graph_features = jnp.zeros((n_nodes, (n_aux + 1)//2, 1))
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_se_equivariant_nice(layer_number=i, dim=dim, swap=swap,
-                                                              identity_init=False,
-                                                              nets_config=nets_config)
+            bijector = make_se_equivariant_nice(
+                graph_features=graph_features,
+                layer_number=i,
+                dim=dim,
+                n_aux=n_aux,
+                swap=swap,
+                identity_init=False,
+                nets_config=nets_config)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -32,7 +41,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, type='egnn'):
         flow = make_flow()
         return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=4)
+    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':

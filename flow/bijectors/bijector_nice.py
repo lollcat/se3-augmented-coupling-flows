@@ -6,13 +6,17 @@ from nets.base import build_egnn_fn, NetsConfig
 from flow.distrax_with_extra import SplitCouplingWithExtra
 
 
-def make_conditioner(equivariant_fn, get_scaling_weight_fn):
+def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
     def conditioner(x):
-        shift = equivariant_fn(x) * get_scaling_weight_fn()
+        shift = equivariant_fn(x, graph_features) * get_scaling_weight_fn()
+        shift = jnp.squeeze(shift, axis=-2)
         return shift
     return conditioner
 
-def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, identity_init: bool = True):
+def make_se_equivariant_nice(graph_features, layer_number,
+                             dim: int,
+                             n_aux: int,
+                             swap, nets_config: NetsConfig, identity_init: bool = True):
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
 
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
@@ -30,12 +34,13 @@ def make_se_equivariant_nice(layer_number, dim, swap, nets_config: NetsConfig, i
         shift = params
         return distrax.ScalarAffine(log_scale=jnp.zeros_like(shift), shift=shift)
 
-    conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn)
+    conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn,
+                                   graph_features=graph_features)
     return SplitCouplingWithExtra(
-        split_index=dim,
-        event_ndims=2,  # [n_vectors, nodes, dim]
+        split_index=(n_aux + 1)//2,
+        event_ndims=3,  # [n_vectors, nodes, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-3
+        split_axis=-2
     )
