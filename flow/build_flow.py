@@ -1,11 +1,12 @@
 import chex
 
-from flow.fast_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
+from flow.fast_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow, FullGraphSample
 
 from typing import NamedTuple, Sequence, Union
 import distrax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
+from flow.conditional_dist import build_aux_dist
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijectors.bijector_nice import make_se_equivariant_nice
 from nets.base import NetsConfig
@@ -70,12 +71,32 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 bijectors.append(bijector)
 
             if "nice" in flow_type:
-                bijector = make_se_equivariant_nice(layer_number=layer_number, dim=config.dim, swap=swap,
-                                                    identity_init=config.identity_init,
-                                                    nets_config=config.nets_config)
+                bijector = make_se_equivariant_nice(
+                    layer_number=layer_number,
+                    graph_features=graph_features,
+                    dim=config.dim,
+                    n_aux=config.n_aux,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config)
                 bijectors.append(bijector)
         return ChainWithExtra(bijectors)
 
-    definition = AugmentedFlowRecipe(make_base=make_base, make_bijector=make_bijector,
-                                     n_layers=config.n_layers, config=config, compile_n_unroll=config.compile_n_unroll)
+    make_aug_target = build_aux_dist(
+        n_aux = config.n_aux,
+        name = 'target',
+        global_centering = config.target_aux_config.global_centering,
+        augmented_scale_init = config.target_aux_config.aug_scale_init,
+        trainable_scale = config.target_aux_config.trainable_augmented_scale)
+
+
+    definition = AugmentedFlowRecipe(make_base=make_base,
+                                     make_bijector=make_bijector,
+                                     make_aug_target=make_aug_target,
+                                     n_layers=config.n_layers,
+                                     config=config,
+                                     dim_x=config.dim,
+                                     n_augmented=config.n_aux,
+                                     compile_n_unroll=config.compile_n_unroll,
+                                     )
     return definition

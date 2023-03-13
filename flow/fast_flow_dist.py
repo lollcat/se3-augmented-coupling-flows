@@ -31,7 +31,6 @@ class AugmentedFlowRecipe(NamedTuple):
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
     compile_n_unroll: int = 2
-    augmented = True
 
 
 class AugmentedFlowParams(NamedTuple):
