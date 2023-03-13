@@ -73,18 +73,19 @@ class MaceNet(hk.Module):
 
 
 
-    def __call__(self, x):
+    def __call__(self, x: chex.Array, h: Optional[chex.Array] = None):
+        node_specie = h
+        if h is None:
+            # No node feature, so initialise them zeros.
+            node_specie = jnp.zeros(x.shape[:-1], dtype=int)
         if len(x.shape) == 2:
-            return self.call_single(x)
+            return self.call_single(x, node_specie)
         else:
-            return hk.vmap(self.call_single, split_rng=False)(x)
+            return hk.vmap(self.call_single, split_rng=False)(x, h, node_specie)
 
-    def call_single(self, x):
+    def call_single(self, x, node_specie):
         """We manually keep track of the centre of mass to ensure translation equivariance."""
         chex.assert_rank(x, 2)
-        # vectors: jnp.ndarray,  # [n_edges, 3]
-        # node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
-        node_specie = jnp.zeros(x.shape[0], dtype=int)
 
         # avg_num_neighbors defaults to fully connected.
         avg_num_neighbors = self.config.torso_config.avg_num_neighbors if self.config.torso_config.avg_num_neighbors \

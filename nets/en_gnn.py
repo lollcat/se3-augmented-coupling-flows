@@ -1,4 +1,4 @@
-from typing import NamedTuple, Sequence, Callable
+from typing import NamedTuple, Sequence, Callable, Optional
 
 import chex
 import jax
@@ -167,19 +167,19 @@ class EnGNN(hk.Module):
             if config.invariant_feat_zero_init else hk.Linear(config.n_invariant_feat_out)
         self.config = config
 
-    def __call__(self, x):
+    def __call__(self, x: chex.Array, h: Optional[chex.Array] = None):
+        if h is None:
+            # No node feature, so initialise them zeros.
+            h = jnp.zeros((*x.shape[:-1], self.config.torso_config.h_embedding_dim))
         if len(x.shape) == 2:
-            return self.forward_single(x)
+            return self.forward_single(x, h)
         else:
-            return hk.vmap(self.forward_single, split_rng=False)(x)
+            return hk.vmap(self.forward_single, split_rng=False)(x, h)
     
-    def forward_single(self, x):
+    def forward_single(self, x, h):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
         x_in = x
         # Perform forward pass of EGNN.
-
-        # No node feature, so initialise them zeros.
-        h = jnp.zeros((*x.shape[:-1], self.config.torso_config.h_embedding_dim))
 
         x_out, h_egnn = x, h
         for layer in self.egnn_layers:

@@ -185,17 +185,19 @@ class E3Gnn(hk.Module):
         self.output_irreps_scalars = e3nn.Irreps(f"{config.n_invariant_feat_readout}x0e")
 
 
-    def __call__(self, x):
+    def __call__(self, x: chex.Array, h: Optional[chex.Array] = None):
+        if h is None:
+            # No node feature, so initialise them zeros.
+            h = jnp.zeros((*x.shape[:-1], self.config.torso_config.n_invariant_feat_hidden))
         if len(x.shape) == 2:
-            return self.call_single(x)
+            return self.call_single(x, h)
         else:
             chex.assert_rank(x, 3)
-            return hk.vmap(self.call_single, split_rng=False)(x)
+            return hk.vmap(self.call_single, split_rng=False)(x, h)
 
-    def call_single(self, x):
+    def call_single(self, x, h):
         n_nodes = x.shape[0]
 
-        h = jnp.zeros((n_nodes, self.config.torso_config.n_invariant_feat_hidden))
         vectors_in = x - jnp.mean(x, axis=0, keepdims=True)
         vectors = jnp.repeat(vectors_in[:, None, :], self.config.torso_config.n_vectors_hidden, axis=-2)
 

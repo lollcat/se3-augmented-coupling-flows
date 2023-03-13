@@ -13,3 +13,4 @@ hydra-joblib-launcher
 joblib
 e3nn-jax
 git+https://github.com/ACEsuit/mace-jax@main#egg=mace_jax
+mdtraj

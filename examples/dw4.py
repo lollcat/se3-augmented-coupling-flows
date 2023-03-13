@@ -10,7 +10,6 @@ from examples.train import train, create_train_config
 from target.double_well import make_dataset
 
 
-
 def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000):
     # dataset from https://github.com/vgsatorras/en_flows
     # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.

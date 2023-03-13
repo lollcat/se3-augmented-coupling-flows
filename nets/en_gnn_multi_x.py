@@ -1,4 +1,4 @@
-from typing import NamedTuple, Sequence, Callable
+from typing import NamedTuple, Sequence, Callable, Optional
 
 import chex
 import jax
@@ -182,19 +182,20 @@ class multi_se_equivariant_net(hk.Module):
         self.n_heads = config.n_equivariant_vectors_out
 
 
-    def __call__(self, x):
+    def __call__(self, x: chex.Array, h: Optional[chex.Array] = None):
+        if h is None:
+            # No node feature, so initialise them zeros.
+            h = jnp.zeros((*x.shape[:-1], self.egnn_config.h_embedding_dim))
         if len(x.shape) == 2:
-            return self.forward_single(x)
+            return self.forward_single(x, h)
         else:
-            return hk.vmap(self.forward_single, split_rng=False)(x)
-    
-    def forward_single(self, x):
+            return hk.vmap(self.forward_single, split_rng=False)(x, h)
+
+
+    def forward_single(self, x: chex.Array, h: chex.Array):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
         x_original = x
         # Perform forward pass of EGNN.
-
-        # No node feature, so initialise them zeros.
-        h = jnp.zeros((*x.shape[:-1], self.egnn_config.h_embedding_dim))
 
         # Project to number of heads
         x = jnp.repeat(x[:, None, ...], repeats=self.n_heads, axis=1)
