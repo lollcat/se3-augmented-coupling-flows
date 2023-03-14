@@ -22,7 +22,7 @@ flow:
       trainable_augmented_scale: true
   dim: 2
   nodes: 4
-  n_aug: 3
+  n_aug: 1
   n_layers: 4
   identity_init: true
   type: proj # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
@@ -33,11 +33,6 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       add_small_identity: true
-    proj_v2:
-      process_flow_params_jointly: true # if True then specify transformer config lower down.
-      condition_on_x_proj: true
-      gram_schmidt: false
-      n_vectors: 4
   act_norm: false
   compile_n_unroll: 1
   nets:

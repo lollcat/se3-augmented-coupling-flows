@@ -27,10 +27,8 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Add augmented target to flow definition, and loss. 
-    - Flow takes in conditioning info. For positional flows this will be zeros. 
-    - Loss can take in whole flow object. 
-    - Add more augmented variables.
+    - fix permutation syymetry test
+    - Add whether sample has aux to sample info?
     - Rewrite for e3nn
         1. Let networks take in positional and feature info.
         2. Alanine dipeptide

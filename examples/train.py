@@ -98,6 +98,7 @@ def default_plotter(params: AugmentedFlowParams, flow: AugmentedFlow, key, n_sam
 
     # Augmented info.
     fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
+    axs2 = [axs2] if isinstance(axs2, plt.Subplot) else axs2
     for i in range(flow.n_augmented):
         positions_a_single = positions_a[:, :, i]  # get single group of augmented coordinates
         positions_a_target_single = positions_a_target[:, :, i]  # Get first set of aux variables.

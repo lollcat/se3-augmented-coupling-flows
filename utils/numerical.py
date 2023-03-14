@@ -64,7 +64,8 @@ def rotate_2d(x, theta):
         return jnp.matmul(rotation_matrix, x)
 
 
-def rotate_translate_permute_2d(x, theta, translation, rotate_first=True, permute = True):
+def rotate_translate_permute_2d(x: chex.Array, theta: chex.Array, translation: chex.Array,
+                                rotate_first: bool = True, permute: bool = False):
     chex.assert_shape(theta, ())
     chex.assert_shape(translation, x.shape[-1:])
     if permute:

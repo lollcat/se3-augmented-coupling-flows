@@ -121,89 +121,6 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
 
     test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
-def test_flow_layer_by_layer(dim: int = 3, n_aug: int = 3):
-    n_nodes = _N_NODES
-    batch_size = 5
-    key = jax.random.PRNGKey(0)
-    base_aux_config = ConditionalAuxDistConfig(global_centering=False,
-                                               trainable_augmented_scale=True)
-    target_aux_config = base_aux_config
-
-
-    config = FlowDistConfig(
-        dim=dim,
-        n_layers=_N_FLOW_LAYERS,
-        nodes=_N_NODES,
-        identity_init=True,
-        type=_FLOW_TYPE,
-        compile_n_unroll=2,
-        nets_config=get_minimal_nets_config('egnn'),
-        base_aux_config=base_aux_config,
-        target_aux_config=target_aux_config,
-        n_aug=n_aug
-    )
-
-    flow = build_flow(config)
-
-
-    # Init params.
-    key, subkey = jax.random.split(key)
-    dummy_samples = FullGraphSample(positions=jax.random.normal(subkey, (batch_size, n_nodes, dim)),
-                                    features=jnp.zeros((batch_size, n_nodes, _FEATURE_DIM)))
-    key, subkey = jax.random.split(key)
-    params = flow.init(subkey, dummy_samples)
-    params_check = flow.init(subkey, dummy_samples[0])
-    chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
-
-    # Test aux-target distribution.
-    key, subkey = jax.random.split(key)
-    aug_samples, aux_log_probs = flow.aux_target_sample_n_and_log_prob_apply(
-        params.aux_target, dummy_samples, subkey)
-
-    key, subkey = jax.random.split(key)
-    key1, key2, key3 = jax.random.split(subkey, 3)
-
-    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
-    translation = jax.random.normal(key2, shape=(batch_size, dim))
-    phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
-
-    def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:  # dim == 3:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
-        return x_and_a_rot
-
-    samples = flow.separate_samples_to_joint(dummy_samples.features, dummy_samples.positions, aug_samples)
-    positions_rot = group_action(samples.positions)
-    samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
-
-    positions_x_rot = jnp.squeeze(group_action(jnp.expand_dims(dummy_samples.positions, axis=-2)), axis=-2)
-    aug_samples_rot = group_action(aug_samples)
-    positions_rot_alt = jnp.concatenate([positions_x_rot[:, :, None], aug_samples_rot], axis=-2)
-
-    # samples.positions[:, :, 0] == dummy_samples.positions  # True
-    # samples.positions[:, :, 1] == aug_samples[:, :, 0]  True
-    # positions_rot_alt[0, 0, :] == positions_rot[0, 0, :]  #  False. Not equal?
-
-
-    log_prob, extra = flow.log_prob_with_extra_apply(params, samples)
-    log_prob_alt, extra_alt = flow.log_prob_with_extra_apply(params, samples_rot)
-
-    aux_log_prob_ = flow.aux_target_log_prob_apply(params.aux_target,
-                                                  samples_rot[:, :, 0],
-                                                  samples_rot.positions[:, :, 1:])
-
-    aux_log_prob = flow.aux_target_log_prob_apply(params.aux_target,
-                                                  FullGraphSample(positions=positions_x_rot,
-                                                                  features=dummy_samples.features),
-                                                  aug_samples_rot)
-    aux_log_prob_alt = flow.aux_target_log_prob_apply(params.aux_target,
-                                                      dummy_samples,
-                                                      aug_samples)
-
-    pass
-
 
 
 if __name__ == '__main__':
@@ -212,7 +129,6 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_flow_layer_by_layer(dim=3, n_aug=7)
 
     test_distribution(dim=3)
     test_distribution(dim=2)

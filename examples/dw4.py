@@ -41,7 +41,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # Training
     cfg.training.optimizer.init_lr = 2e-4
     cfg.training.batch_size = 16
-    cfg.training.n_epoch = 100
+    cfg.training.n_epoch = 200
     cfg.training.save = False
     cfg.training.n_plots = 3
     cfg.training.n_eval = 10

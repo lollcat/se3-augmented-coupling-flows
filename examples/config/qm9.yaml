@@ -6,13 +6,18 @@ hydra:
     chdir: false
 
 target:
-  aug_global_centering: false
-  aug_scale: 0.1
+  aux:
+    global_centering: false
+    scale_init: 1.0
+    trainable_augmented_scale: false
 
 flow:
+  n_aug: 3
   base:
-    aug_scale_init: ${target.aug_scale}
-    double_centered_gaussian: false
+    aux:
+      global_centering: false
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: true
   dim: 3
   nodes: 19
   n_layers: 8
@@ -26,11 +31,6 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       add_small_identity: false
-    proj_v2:
-      process_flow_params_jointly: false
-      condition_on_x_proj: true
-      gram_schmidt: false
-      n_vectors: 10
   compile_n_unroll: 1
   nets:
     type: e3gnn # mace or egnn or e3transformer or e3gnn
@@ -94,10 +94,6 @@ training:
     end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
-    second_order_opt: false
-    damping: 1e-5
-    max_second_order_step_size: 10.
-    min_second_order_step_size: 0.1
   use_64_bit: false
   n_epoch: 128
   batch_size: 64

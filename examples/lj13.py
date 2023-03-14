@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from examples.train import train, create_train_config
+from utils.data import positional_dataset_only_to_full_graph
 
 
 
@@ -23,7 +24,7 @@ def load_dataset(batch_size, train_set_size: int = 1000, val_set_size:int = 1000
     dataset = np.load(test_data_path)
     dataset = jnp.reshape(dataset, (-1, 13, 3))
     test_set = dataset[:val_set_size]
-    return train_set, test_set
+    return positional_dataset_only_to_full_graph(train_set), positional_dataset_only_to_full_graph(test_set)
 
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
@@ -45,6 +46,9 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.mace.hidden_irreps = '4x0e+3x1o+1x2e'
 
 
+    cfg.flow.type = 'nice'
+
+
     cfg.training.n_epoch = 32
     cfg.training.save = False
     # cfg.flow.type = 'proj'
@@ -64,7 +68,6 @@ def run(cfg: DictConfig):
                                             n_nodes=13,
                                             load_dataset=load_dataset)
     train(experiment_config)
-
 
 
 if __name__ == '__main__':
