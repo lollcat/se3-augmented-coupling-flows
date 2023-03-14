@@ -16,7 +16,7 @@ from flow.distrax_with_extra import ChainWithExtra
 class ConditionalAuxDistConfig(NamedTuple):
     global_centering: bool = False
     trainable_augmented_scale: bool = True
-    aug_scale_init: float = 1.0
+    scale_init: float = 1.0
 
 
 class FlowDistConfig(NamedTuple):
@@ -54,7 +54,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         base = CentreGravitryGaussianAndCondtionalGuassian(
             dim=config.dim, n_nodes=config.nodes, global_centering=config.base_aux_config.global_centering,
             trainable_augmented_scale=config.base_aux_config.trainable_augmented_scale,
-            augmented_scale_init=config.base_aux_config.aug_scale_init,
+            augmented_scale_init=config.base_aux_config.scale_init,
             n_aux=config.n_aug
         )
         return base
@@ -86,7 +86,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         n_aux=config.n_aug,
         name='target',
         global_centering=config.target_aux_config.global_centering,
-        augmented_scale_init=config.target_aux_config.aug_scale_init,
+        augmented_scale_init=config.target_aux_config.scale_init,
         trainable_scale=config.target_aux_config.trainable_augmented_scale)
 
 

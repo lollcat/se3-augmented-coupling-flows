@@ -6,9 +6,9 @@ hydra:
     chdir: false
 
 target:
-  aux_target:
-    aug_global_centering: false
-    aug_scale_init: 1.0
+  aux:
+    global_centering: false
+    scale_init: 1.0
     trainable_augmented_scale: true
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
@@ -16,12 +16,13 @@ target:
 
 flow:
   base:
-    aug_scale_init: ${target.aug_scale}
-    double_centered_gaussian: false
-    trainable_augmented_scale: true
+    aux:
+      global_centering: false
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: true
   dim: 2
   nodes: 4
-  n_aux: 3
+  n_aug: 3
   n_layers: 4
   identity_init: true
   type: proj # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
@@ -46,9 +47,7 @@ flow:
       n_layers: 3
       normalize_by_norms: true
       variance_scaling_init: 0.001
-      tanh: false
       agg: mean
-      phi_x_max: 1.0
       h_linear_softmax: true
       h_embedding_dim: 16
     transformer: # for proj and proj_v2 flows.
@@ -70,10 +69,6 @@ training:
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 2. # can be null
     max_global_norm: 0.5
-    second_order_opt: true
-    damping: 1e-5
-    max_second_order_step_size: 10.
-    min_second_order_step_size: 0.1
   use_64_bit: false
   n_epoch: 50
   batch_size: 200

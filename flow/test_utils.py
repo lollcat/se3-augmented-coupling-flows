@@ -4,6 +4,7 @@ import jax
 
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
+from flow.aug_flow_dist import FullGraphSample
 
 
 def get_minimal_nets_config(type = 'egnn'):
@@ -164,9 +165,10 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_tree_all_finite(grad)
 
 
-def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
-    batch_size, n_nodes, joint_dim = samples.shape
-    dim = joint_dim // 2
+def get_max_diff_log_prob_invariance_test(samples: FullGraphSample, log_prob_fn, key):
+    # Used in evaluation
+    batch_size, n_nodes, n_var_groups, dim = samples.positions.shape
+    n_aux = n_var_groups - 1
 
     key1, key2, key3 = jax.random.split(key, 3)
 
@@ -178,12 +180,13 @@ def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
     def group_action(x_and_a):
         if dim == 2:
             x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:  #  dim == 3:
+        else:  # dim == 3:
             x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
         return x_and_a_rot
 
 
-    samples_rot = group_action(samples)
+    positions_rot = group_action(samples.positions)
+    samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
 
     log_prob = log_prob_fn(samples)
 
@@ -191,10 +194,9 @@ def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
 
     max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
     mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
-    mean_diff_x_space = jnp.mean(jnp.abs(samples - samples_rot))
-    return {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
-            "mean_abs_diff_log_prob_after_group_action": mean_abs_diff,
-            "mean_diff_x_space_after_group_action": mean_diff_x_space}
+    info = {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
+            "mean_abs_diff_log_prob_after_group_action": mean_abs_diff}
+    return info
 
 
 

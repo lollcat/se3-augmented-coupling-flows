@@ -15,7 +15,7 @@ def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:
     # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
 
     data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
-    dataset = np.asarray(np.load(data_path, allow_pickle=True)[0])
+    dataset = jnp.asarray(np.load(data_path, allow_pickle=True)[0])
     dataset = jnp.reshape(dataset, (-1, 4, 2))
 
     train_set = dataset[:train_set_size]
@@ -45,13 +45,12 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.save = False
     cfg.training.n_plots = 3
     cfg.training.n_eval = 10
-    cfg.training.plot_batch_size = 8
+    cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
     cfg.logger = DictConfig({"list_logger": None})
 
     # Flow
-    cfg.target.aug_global_centering = False
-    # cfg.flow.type = ['realnvp_non_eq']
+    cfg.flow.type = 'nice'
     cfg.flow.n_layers = 2
     cfg.flow.act_norm = False
 
@@ -64,7 +63,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.transformer.mlp_units = (16,)
     cfg.flow.nets.transformer.n_layers = 2
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
-    cfg.flow.nets.egnn.tanh = False
     cfg.flow.nets.egnn.mlp_units = (8,)
 
     debug = False

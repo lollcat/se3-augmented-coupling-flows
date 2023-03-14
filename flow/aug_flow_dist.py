@@ -1,4 +1,4 @@
-from typing import NamedTuple, Callable, Tuple, Union, Any
+from typing import NamedTuple, Callable, Tuple, Union, Any, Optional
 
 import chex
 import distrax
@@ -19,6 +19,7 @@ Positions = chex.Array
 class FullGraphSample(NamedTuple):
     positions: Positions
     features: GraphFeatures
+
     def __getitem__(self, i):
         return FullGraphSample(self.positions[i], self.features[i])
 
@@ -51,8 +52,8 @@ class AugmentedFlow(NamedTuple):
     sample_and_log_prob_with_extra_apply: Callable[[AugmentedFlowParams, GraphFeatures, chex.PRNGKey, chex.Shape], Tuple[FullGraphSample, LogProb, Extra]]
     config: Any
     aux_target_log_prob_apply: Callable[[Params, FullGraphSample, Positions], LogProb]
-    aux_target_sample_n_and_log_prob_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, int], Tuple[Positions, LogProb]]
-    aux_target_sample_n_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, int], Positions]
+    aux_target_sample_n_and_log_prob_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, Optional[int]], Tuple[Positions, LogProb]]
+    aux_target_sample_n_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, Optional[int]], Positions]
     separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample]
     joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]]
     dim_x: int
@@ -77,8 +78,9 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return FullGraphSample(positions=positions, features=features)
 
     def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions, Positions, GraphFeatures]:
-        positions_x, positions_a = jnp.split(joint_sample.positions, indices_or_sections=jnp.array([1]),
+        positions_x, positions_a = jnp.split(joint_sample.positions, indices_or_sections=[1],
                                              axis=-2)
+        positions_x = jnp.squeeze(positions_x, axis=-2)
         features = jnp.squeeze(joint_sample.features, axis=-2)
         return features, positions_x, positions_a
 
@@ -228,18 +230,25 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
     @hk.without_apply_rng
     @hk.transform
-    def aux_target_sample_n_and_log_prob(sample_x: FullGraphSample, key: chex.PRNGKey, n: int) -> \
+    def aux_target_sample_n_and_log_prob(sample_x: FullGraphSample, key: chex.PRNGKey, n: Optional[int] = None) -> \
             Tuple[Positions, LogProb]:
         dist = recipe.make_aug_target(sample_x)
-        positions_a, log_prob = dist._sample_n_and_log_prob(key, n)
+        if n is None:
+            positions_a, log_prob = dist._sample_n_and_log_prob(key, 1)
+            positions_a, log_prob = jnp.squeeze(positions_a, axis=0), jnp.squeeze(log_prob, axis=0)
+        else:
+            positions_a, log_prob = dist._sample_n_and_log_prob(key, n)
         return positions_a, log_prob
 
     @hk.without_apply_rng
     @hk.transform
-    def aux_target_sample_n(sample_x: FullGraphSample, key: chex.PRNGKey, n: int) -> \
+    def aux_target_sample_n(sample_x: FullGraphSample, key: chex.PRNGKey, n: Optional[int] = None) -> \
             Positions:
         dist = recipe.make_aug_target(sample_x)
-        sample = dist._sample_n(key, n)
+        if n is None:
+            sample = jnp.squeeze(dist._sample_n(key, 1), axis=0)
+        else:
+            sample = dist._sample_n(key, n)
         return sample
 
     @hk.without_apply_rng
@@ -271,6 +280,9 @@ def create_flow(recipe: AugmentedFlowRecipe):
                                         params_bijector_single)
         return AugmentedFlowParams(base=params_base, bijector=params_bijectors, aux_target=params_aux_target)
 
+    def sample_apply(*args, **kwargs):
+        return sample_and_log_prob_apply(*args, **kwargs)[0]
+
 
     flow = AugmentedFlow(
         dim_x=recipe.dim_x,
@@ -280,7 +292,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         sample_and_log_prob_apply=sample_and_log_prob_apply,
         log_prob_with_extra_apply=log_prob_with_extra_apply,
         sample_and_log_prob_with_extra_apply=sample_and_log_prob_with_extra_apply,
-        sample_apply=lambda params, key, shape: sample_and_log_prob_apply(params, key, shape)[0],
+        sample_apply=sample_apply,
         config=recipe.config,
         aux_target_log_prob_apply=aux_target_log_prob.apply,
         aux_target_sample_n_apply=aux_target_sample_n.apply,

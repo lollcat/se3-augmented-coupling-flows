@@ -42,9 +42,7 @@ class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
         return joint_coords
 
     def log_prob(self, value: Array) -> Array:
-        original_coords, augmented_coords = jnp.split(value,
-                                                      indices_or_sections=jnp.array([1,]),
-                                                      axis=-2)
+        original_coords, augmented_coords = jnp.split(value, indices_or_sections=[1, ], axis=-2)
         assert original_coords.shape[-2] == 1
         assert augmented_coords.shape[-2] == self.n_aux
         original_coords = jnp.squeeze(original_coords, axis=-2)

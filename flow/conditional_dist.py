@@ -4,8 +4,7 @@ import distrax
 import haiku as hk
 import jax
 
-from aug_flow_dist import FullGraphSample
-
+from flow.aug_flow_dist import FullGraphSample
 
 
 def get_broadcasted_loc_and_scalediag(x: chex.Array, n_aux: int, global_centering: bool, scale: chex.Array):

@@ -21,7 +21,7 @@ def general_ml_loss_fn(params: AugmentedFlowParams,
                        key: chex.PRNGKey,
                        use_aux_loss: bool,
                        aux_loss_weight: float) -> Tuple[chex.Array, dict]:
-    aux_samples = jnp.squeeze(flow.aux_target_sample_n_apply(params.aux_target, key, x, 1), axis=0)
+    aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
     log_prob, extra = flow.log_prob_with_extra_apply(params, joint_samples)
     loss = - jnp.mean(log_prob)
@@ -65,14 +65,16 @@ def ml_step(params: AugmentedFlowParams, x: FullGraphSample,
     return new_params, new_opt_state, info
 
 
-def get_marginal_log_lik_info(flow: AugmentedFlow,
-                              params: AugmentedFlowParams,
-                              x: FullGraphSample,
-                              key: chex.PRNGKey,
-                              K: int) -> dict:
-    x_augmented, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x, key, K)
-    x = jax.tree_map(lambda x: jnp.repeat(x[None, ...], K, axis=0), x)
-    joint_sample = flow.separate_samples_to_joint(x.features, x.positions, x_augmented)
+def get_eval_on_test_batch(flow: AugmentedFlow,
+                           params: AugmentedFlowParams,
+                           x_test: FullGraphSample,
+                           key: chex.PRNGKey,
+                           K: int,
+                           test_invariances: bool = True) -> dict:
+    key, subkey = jax.random.split(key)
+    x_augmented, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x_test, subkey, K)
+    x_test = jax.tree_map(lambda x: jnp.repeat(x[None, ...], K, axis=0), x_test)
+    joint_sample = flow.separate_samples_to_joint(x_test.features, x_test.positions, x_augmented)
 
     log_q = jax.vmap(flow.log_prob_apply, in_axes=(None, 0))(params, joint_sample)
     chex.assert_equal_shape((log_p_a, log_q))
@@ -85,10 +87,17 @@ def get_marginal_log_lik_info(flow: AugmentedFlow,
 
     info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
     info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
+
+    if test_invariances:
+        log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
+        key, subkey = jax.random.split(key)
+        invariances_info = get_max_diff_log_prob_invariance_test(joint_sample[0], log_prob_fn=log_prob_samples_only_fn,
+                                                                 key=subkey)
+        info.update(invariances_info)
     return info
 
 
-@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7, 8))
+@partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def eval_fn(params: AugmentedFlowParams,
             x: FullGraphSample,
             key: chex.PRNGKey,
@@ -97,7 +106,7 @@ def eval_fn(params: AugmentedFlowParams,
             batch_size=None,
             K: int = 20,
             test_invariances: bool = True):
-    # TODO: Has excessive amount of forward passes currently, cut this down.
+
     if batch_size is None:
         batch_size = x.positions.shape[0]
     else:
@@ -106,42 +115,36 @@ def eval_fn(params: AugmentedFlowParams,
 
     key1, key2 = jax.random.split(key)
 
-    log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
-
     def scan_fn(carry, xs):
+        # Scan over data in the test set. Vmapping all at once causes memory issues I think?
         x_batch, key = xs
         info = {}
-        if test_invariances:
-            invariances_info = get_max_diff_log_prob_invariance_test(
-            x_batch,  log_prob_fn=log_prob_samples_only_fn, key=key)
-            info.update(invariances_info)
-
-        marginal_log_lik_info = get_marginal_log_lik_info(flow,
-                                                          params,
-                                                          x=x_batch,
-                                                          key=key, K=K
-                                                          )
-        info.update(marginal_log_lik_info)
+        test_eval_info = get_eval_on_test_batch(
+            flow, params, x_test=x_batch, key=key, K=K, test_invariances=test_invariances)
+        info.update(test_eval_info)
         return None, info
 
-    x_batched = jnp.reshape(x, (-1, batch_size, *x.shape[1:]))
+    x_batched = jax.tree_map(lambda x: jnp.reshape(x, (-1, batch_size, *x.shape[1:])), x)
     _, info = jax.lax.scan(
-        scan_fn, None, (x_batched, jax.random.split(key1, x_batched.shape[0])))
-
+        scan_fn, None, (x_batched, jax.random.split(key1, x_batched.positions.shape[0])))
+    # Aggregate test set info.
     info = jax.tree_map(jnp.mean, info)
 
 
     joint_x_flow, log_prob_flow = flow.sample_and_log_prob_apply(params, x.features[0], key2, (batch_size,))
-    x_flow_original, x_flow_aug = jnp.split(joint_x_flow.positions, axis=-2, indices_or_sections=jnp.array([1, ]))
-    original_centre = jnp.mean(x_flow_original, axis=-2)
-    aug_centre = jnp.mean(x_flow_aug[:, :, 0, :], axis=-2)
+    features, x_positions, a_positions = flow.joint_to_separate_samples(joint_x_flow)
+    original_centre = jnp.mean(x_positions, axis=-2)
+    aug_centre = jnp.mean(a_positions[:, :, 0, :], axis=-2)
     info.update(mean_aug_orig_norm=jnp.mean(jnp.linalg.norm(original_centre-aug_centre, axis=-1)))
 
     if target_log_prob is not None:
 
         # Calculate ESS
-        log_w = target_log_prob(x_flow_original) + flow.aux_target_log_prob_apply(params.aux_target, joint_x_flow) - \
-                log_prob_flow
+        log_w = target_log_prob(x_positions) + \
+                flow.aux_target_log_prob_apply(params.aux_target,
+                                       FullGraphSample(features=features, positions=x_positions),
+                                       a_positions
+                                       ) - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
             {"eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],
