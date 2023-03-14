@@ -24,8 +24,8 @@ def get_conditional_gaussian_augmented_dist(x: chex.Array, n_aux: int, global_ce
         loc, scale_diag = get_broadcasted_loc_and_scalediag(x, n_aux, global_centering, scale)
     else:
         assert len(x.shape) == 3
-        loc, scale_diag = jax.vmap(get_broadcasted_loc_and_scalediag, in_axes=(0, None, None, None))(x, n_aux,
-                                                                                                 global_centering, scale)
+        loc, scale_diag = jax.vmap(get_broadcasted_loc_and_scalediag, in_axes=(0, None, None, None))(
+            x, n_aux, global_centering, scale)
 
     dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=loc,
                                                               scale_diag=scale_diag), reinterpreted_batch_ndims=2)
@@ -43,7 +43,7 @@ def build_aux_dist(n_aux: int,
                                          init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
             scale = jnp.exp(log_scale)
         else:
-            scale = augmented_scale_init
+            scale = jnp.ones(n_aux) * augmented_scale_init
         dist = get_conditional_gaussian_augmented_dist(sample.positions,
                                                        n_aux=n_aux,
                                                        global_centering=global_centering,

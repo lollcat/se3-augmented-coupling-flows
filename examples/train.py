@@ -77,45 +77,54 @@ def default_plotter(params: AugmentedFlowParams, flow: AugmentedFlow, key, n_sam
                     plotting_n_nodes: Optional[int] = None):
 
     # Plot interatomic distance histograms.
-    fig1, axs = plt.subplots(2, 2, figsize=(15, 10))
     key1, key2 = jax.random.split(key)
-    joint_samples_flow = flow.sample_apply(params, train_data.features[0], key1, (n_samples,))
-    features, positions_x, positions_a = flow.joint_to_separate_samples(joint_samples_flow)
-    positions_a = positions_a[:, :, 0]  # get first set of augmented coordinates
-    chex.assert_equal_shape((positions_x, positions_a))
+    joint_samples_flow = jax.jit(flow.sample_apply, static_argnums=3)(params, train_data.features[0], key1,
+                                                                      (n_samples,))
+    features, positions_x, positions_a = jax.jit(flow.joint_to_separate_samples)(joint_samples_flow)
+    positions_a_target = jax.jit(flow.aux_target_sample_n_apply)(params.aux_target, test_data[:n_samples], key2)
 
     # Plot original coords
-    plot_sample_hist(positions_x, axs[0, 0], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(positions_x, axs[1, 0], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(train_data.positions[:n_samples], axs[0, 0],  label="train samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(test_data.positions[:n_samples], axs[1, 0],  label="test samples", n_vertices=plotting_n_nodes)
+    fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
+    plot_sample_hist(positions_x, axs[0], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(positions_x, axs[1], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(train_data.positions[:n_samples], axs[0],  label="train samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(test_data.positions[:n_samples], axs[1],  label="test samples", n_vertices=plotting_n_nodes)
 
-    # Augmented info
-    plot_sample_hist(positions_a, axs[0, 1], label="flow samples", n_vertices=plotting_n_nodes)
-    positions_a_target = flow.aux_target_sample_n_apply(params.aux_target, test_data[:n_samples], key2)
-    positions_a_target = positions_a_target[:, :, 0]  # Get first set of aux variables.
-    plot_sample_hist(positions_a_target, axs[0, 1], label="test samples", n_vertices=plotting_n_nodes)
-    plot_original_aug_norms_sample_hist(positions_x, positions_a, axs[1, 1], label='flow samples')
-    plot_original_aug_norms_sample_hist(test_data[:n_samples].positions, positions_a_target, axs[1, 1], label='test samples')
-
-    axs[0, 0].set_title(f"norms between original coordinates train")
-    axs[1, 0].set_title(f"norms between original coordinates test")
-    axs[0, 1].set_title(f"norms between augmented coordinates (first aug group)")
-    axs[1, 1].set_title(f"norms between original-aug pairs test (first aug group)")
-    axs[0, 0].legend()
-    axs[1, 0].legend()
+    axs[0].set_title(f"norms between original coordinates train")
+    axs[1].set_title(f"norms between original coordinates test")
+    axs[0].legend()
+    axs[1].legend()
     fig1.tight_layout()
 
-    # Plot histogram for centre of mean
-    fig2, axs2 = plt.subplots(1, 1, figsize=(5, 5))
-    plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a, ax=axs2, label='flow samples')
-    plot_orig_aug_centre_mass_diff_hist(test_data[:n_samples].positions, positions_a_target, ax=axs2,
-                                        label='test samples')
-    axs2.legend()
-    axs2.set_title("norms between original - aug centre of mass histogram (first aug group)")
+    # Augmented info.
+    fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
+    for i in range(flow.n_augmented):
+        positions_a_single = positions_a[:, :, i]  # get single group of augmented coordinates
+        positions_a_target_single = positions_a_target[:, :, i]  # Get first set of aux variables.
+        chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
+        plot_sample_hist(positions_a_single, axs2[i], label="flow samples", n_vertices=plotting_n_nodes)
+        plot_sample_hist(positions_a_target_single, axs2[i], label="test samples", n_vertices=plotting_n_nodes)
+        axs2[i].set_title(f"norms between augmented coordinates (aug group {i})")
+    axs[0].legend()
     fig2.tight_layout()
 
-    return [fig1, fig2]
+    # Plot histogram for centre of mean
+    fig3, axs3 = plt.subplots(1, 2, figsize=(10, 5))
+    positions_a_single = positions_a[:, :, 0]  # get single group of augmented coordinates
+    positions_a_target_single = positions_a_target[:, :, 0]  # Get first set of aux variables.
+
+    plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a_single, ax=axs3[0], label='flow samples')
+    plot_orig_aug_centre_mass_diff_hist(test_data[:n_samples].positions, positions_a_target_single, ax=axs3[0],
+                                        label='test samples')
+    plot_original_aug_norms_sample_hist(positions_x, positions_a_single, axs3[1], label='flow samples')
+    plot_original_aug_norms_sample_hist(test_data[:n_samples].positions, positions_a_target_single, axs3[1],
+                                        label='test samples')
+    axs3[0].legend()
+    axs3[0].set_title("norms orig - aug centre of mass (aug group 1) ")
+    axs3[1].set_title("norms orig - augparticles (aug group 1)")
+    fig3.tight_layout()
+
+    return [fig1, fig2, fig3]
 
 
 def plot_and_maybe_save(plotter,

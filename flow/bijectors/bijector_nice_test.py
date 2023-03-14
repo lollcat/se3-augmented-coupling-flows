@@ -7,11 +7,11 @@ from flow.test_utils import get_minimal_nets_config
 import jax.numpy as jnp
 
 
-def test_bijector_with_proj(dim: int = 3, n_layers: int = 2, type='egnn',
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                             n_nodes: int = 4, n_aux=3):
     nets_config = get_minimal_nets_config(type=type)
 
-    graph_features = jnp.zeros((n_nodes, (n_aux + 1)//2, 1))
+    graph_features = jnp.zeros((n_nodes, 1, 1))
 
     def make_flow():
         bijectors = []
