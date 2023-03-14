@@ -10,9 +10,9 @@ def test_base_distribution():
     rotation and translation."""
     key = jax.random.PRNGKey(0)
     dim = 2
-    n_nodes = 3
+    n_nodes = 5
     n_aux = 3
-    batch_size = 2
+    batch_size = 7
     shape = (batch_size, n_nodes,  n_aux + 1, dim)
     global_centering = False
 

@@ -89,10 +89,8 @@ def get_eval_on_test_batch(flow: AugmentedFlow,
     info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
 
     if test_invariances:
-        log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
         key, subkey = jax.random.split(key)
-        invariances_info = get_max_diff_log_prob_invariance_test(joint_sample[0], log_prob_fn=log_prob_samples_only_fn,
-                                                                 key=subkey)
+        invariances_info = get_max_diff_log_prob_invariance_test(joint_sample[0], flow=flow, params=params, key=subkey)
         info.update(invariances_info)
     return info
 

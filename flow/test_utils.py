@@ -4,7 +4,7 @@ import jax
 
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
-from flow.aug_flow_dist import FullGraphSample
+from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 def get_minimal_nets_config(type = 'egnn'):
@@ -75,7 +75,7 @@ def test_fn_is_invariant(invariante_fn, key, event_shape):
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2 * jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,))
+    translation = jax.random.normal(key3, shape=(dim,)) * 10
     phi = jax.random.uniform(key4) * 2 * jnp.pi
 
     def group_action(x_and_a):
@@ -165,7 +165,12 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_tree_all_finite(grad)
 
 
-def get_max_diff_log_prob_invariance_test(samples: FullGraphSample, log_prob_fn, key):
+def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
+                                          flow: AugmentedFlow,
+                                          params: AugmentedFlowParams,
+                                          key: chex.PRNGKey):
+    log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
+
     # Used in evaluation
     batch_size, n_nodes, n_var_groups, dim = samples.positions.shape
     n_aux = n_var_groups - 1
@@ -188,9 +193,9 @@ def get_max_diff_log_prob_invariance_test(samples: FullGraphSample, log_prob_fn,
     positions_rot = group_action(samples.positions)
     samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
 
-    log_prob = log_prob_fn(samples)
-
-    log_prob_alt = log_prob_fn(samples_rot)
+    chex.assert_trees_all_equal_shapes(samples, samples_rot)
+    log_prob = log_prob_samples_only_fn(samples)
+    log_prob_alt = log_prob_samples_only_fn(samples_rot)
 
     max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
     mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))

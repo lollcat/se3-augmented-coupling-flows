@@ -42,6 +42,21 @@ class AugmentedFlowParams(NamedTuple):
     bijector: Params
     aux_target: Params
 
+def separate_samples_to_full_joint(features: GraphFeatures, positions_x: Positions, positions_a: Positions) -> \
+        FullGraphSample:
+    features = jnp.expand_dims(features, axis=-2)
+    assert len(features.shape) == len(positions_a.shape)
+    assert len(positions_x.shape) == (len(positions_a.shape) - 1)
+    positions = jnp.concatenate([jnp.expand_dims(positions_x, axis=-2), positions_a], axis=-2)
+    return FullGraphSample(positions=positions, features=features)
+
+def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions, Positions, GraphFeatures]:
+    positions_x, positions_a = jnp.split(joint_sample.positions, indices_or_sections=[1],
+                                         axis=-2)
+    positions_x = jnp.squeeze(positions_x, axis=-2)
+    features = jnp.squeeze(joint_sample.features, axis=-2)
+    return features, positions_x, positions_a
+
 
 class AugmentedFlow(NamedTuple):
     init: Callable[[chex.PRNGKey, FullGraphSample], AugmentedFlowParams]
@@ -54,10 +69,11 @@ class AugmentedFlow(NamedTuple):
     aux_target_log_prob_apply: Callable[[Params, FullGraphSample, Positions], LogProb]
     aux_target_sample_n_and_log_prob_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, Optional[int]], Tuple[Positions, LogProb]]
     aux_target_sample_n_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, Optional[int]], Positions]
-    separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample]
-    joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]]
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
+    separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample] = separate_samples_to_full_joint
+    joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]] = joint_to_separate_samples
+
 
 
 def create_flow(recipe: AugmentedFlowRecipe):
@@ -68,21 +84,6 @@ def create_flow(recipe: AugmentedFlowRecipe):
     #   still does conditional distribution of graph.
     # For this to be done we would make the passing of features to the sampling step optional, so the full joint
     # may be sampled from.
-
-    def separate_samples_to_full_joint(features: GraphFeatures, positions_x: Positions, positions_a: Positions) -> \
-            FullGraphSample:
-        features = jnp.expand_dims(features, axis=-2)
-        assert len(features.shape) == len(positions_a.shape)
-        assert len(positions_x.shape) == (len(positions_a.shape) - 1)
-        positions = jnp.concatenate([jnp.expand_dims(positions_x, axis=-2), positions_a], axis=-2)
-        return FullGraphSample(positions=positions, features=features)
-
-    def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions, Positions, GraphFeatures]:
-        positions_x, positions_a = jnp.split(joint_sample.positions, indices_or_sections=[1],
-                                             axis=-2)
-        positions_x = jnp.squeeze(positions_x, axis=-2)
-        features = jnp.squeeze(joint_sample.features, axis=-2)
-        return features, positions_x, positions_a
 
 
     @hk.without_apply_rng
@@ -128,6 +129,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         else:
             y, log_det = bijector.forward_and_log_det(x.positions)
             extra = Extra()
+        extra.aux_info.update(mean_log_det=jnp.mean(log_det))
+        extra.info_aggregator.update(mean_log_det=jnp.mean)
         return FullGraphSample(positions=y, features=x.features), log_det, extra
 
 
@@ -141,6 +144,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         else:
             x, log_det = bijector.inverse_and_log_det(y.positions)
             extra = Extra()
+        extra.aux_info.update(mean_log_det=jnp.mean(log_det))
+        extra.info_aggregator.update(mean_log_det=jnp.mean)
         return FullGraphSample(positions=x, features=y.features), log_det, extra
 
 
@@ -174,6 +179,9 @@ def create_flow(recipe: AugmentedFlowRecipe):
         for i in reversed(range(recipe.n_layers)):
           info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
           aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+
+        info.update(mean_base_log_prob=jnp.mean(base_log_prob))
+        aggregators.update(mean_base_log_prob=jnp.mean)
         extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
 
         return base_log_prob + log_det, extra
@@ -216,6 +224,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         for i in range(recipe.n_layers):
           info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
           aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+        info.update(mean_base_log_prob=jnp.mean(base_log_prob))
+        aggregators.update(mean_base_log_prob=jnp.mean)
         extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
         return y, log_prob, extra
 
@@ -297,7 +307,5 @@ def create_flow(recipe: AugmentedFlowRecipe):
         aux_target_log_prob_apply=aux_target_log_prob.apply,
         aux_target_sample_n_apply=aux_target_sample_n.apply,
         aux_target_sample_n_and_log_prob_apply=aux_target_sample_n_and_log_prob.apply,
-        separate_samples_to_joint=separate_samples_to_full_joint,
-        joint_to_separate_samples=joint_to_separate_samples
                         )
     return flow

@@ -113,11 +113,11 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         y, log_det = self.forward_and_log_det(x)
-        return y, log_det, self.get_extra(log_det, forward=True)
+        return y, log_det, self.get_extra()
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
         x, log_det = self.inverse_and_log_det(y)
-        return x, log_det, self.get_extra(log_det, forward=False)
+        return x, log_det, self.get_extra()
 
     def get_vector_info_single(self, various_x_points):
         basis_vectors = various_x_points[:, 1:]
@@ -129,7 +129,8 @@ class ProjectedScalarAffine(BijectorWithExtra):
         log_barrier_in = 1 - jnp.abs(arccos_in) + 1e-6
         aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
-    def get_extra(self, log_dets, forward: bool) -> Extra:
+
+    def get_extra(self) -> Extra:
         info = {}
         info_aggregator = {}
         various_x_points = self._info['various_x_points']
@@ -149,14 +150,7 @@ class ProjectedScalarAffine(BijectorWithExtra):
             aux_loss = jnp.mean(aux_loss)
         else:
             aux_loss = jnp.array(0.)
-
-        log_dets = -log_dets if forward else log_dets
-        info_aggregator.update(
-            log_det_max=jnp.max, log_det_min=jnp.min,
-            shift_norm=jnp.mean,
-                               )
         info.update(
-            log_det_max=log_dets, log_det_min=log_dets,
             shift_norm=jnp.linalg.norm(self._shift, axis=-1)
         )
         extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)

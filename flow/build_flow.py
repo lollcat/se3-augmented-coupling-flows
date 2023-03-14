@@ -83,7 +83,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         return ChainWithExtra(bijectors)
 
     make_aug_target = build_aux_dist(
-        n_aux=config.n_aug,
+        n_aug=config.n_aug,
         name='target',
         global_centering=config.target_aux_config.global_centering,
         augmented_scale_init=config.target_aux_config.scale_init,
