@@ -38,16 +38,16 @@ class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
         shape = (n, self.n_nodes, self.dim)
         original_coords = sample_center_gravity_zero_gaussian(key1, shape)
         augmented_coords = self.get_augmented_dist(original_coords).sample(seed=key2)
-        joint_coords = jnp.concatenate([original_coords[:, None, ...], augmented_coords], axis=1)
+        joint_coords = jnp.concatenate([jnp.expand_dims(original_coords, axis=-2), augmented_coords], axis=-2)
         return joint_coords
 
     def log_prob(self, value: Array) -> Array:
         original_coords, augmented_coords = jnp.split(value,
                                                       indices_or_sections=jnp.array([1,]),
-                                                      axis=-3)
-        assert original_coords.shape[-3] == 1
-        assert augmented_coords.shape[-3] == self.n_aux
-        original_coords = jnp.squeeze(original_coords, axis=-3)
+                                                      axis=-2)
+        assert original_coords.shape[-2] == 1
+        assert augmented_coords.shape[-2] == self.n_aux
+        original_coords = jnp.squeeze(original_coords, axis=-2)
 
         log_prob_a_given_x = self.get_augmented_dist(original_coords).log_prob(augmented_coords)
         log_p_x = center_gravity_zero_gaussian_log_likelihood(remove_mean(original_coords))

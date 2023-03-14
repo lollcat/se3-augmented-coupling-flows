@@ -115,10 +115,9 @@ class EGCL_Multi(hk.Module):
 
 
 class EgnnTorsoConfig(NamedTuple):
-    mlp_units: Sequence[int] = (3,)
-    identity_init_x: bool = False
+    mlp_units: Sequence[int]
+    h_embedding_dim: int  # Dimension of h embedding in the EGCL.
     zero_init_h: int = False
-    h_embedding_dim: int = 3   # Dimension of h embedding in the EGCL.
     h_linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
     h_residual: bool = True
     n_layers: int = 3  # Number of EGCL layers.
@@ -166,7 +165,7 @@ class multi_se_equivariant_net(hk.Module):
 
     def forward_single(self, x: chex.Array, h: chex.Array):
         """Compute forward pass of EGNN for a single x (no batch dimension)."""
-        assert x.shape[0:2] == h.shape[0:2]
+        assert x.shape[0] == h.shape[0]
         n_nodes, multiplicity_in = x.shape[:2]
 
         # Perform forward pass of EGNN.

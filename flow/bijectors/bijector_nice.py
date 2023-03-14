@@ -9,7 +9,7 @@ from flow.distrax_with_extra import SplitCouplingWithExtra
 def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
     def conditioner(x):
         shift = equivariant_fn(x, graph_features) * get_scaling_weight_fn()
-        shift = jnp.squeeze(shift, axis=-2)
+        shift = jnp.squeeze(shift, axis=-2)  # Only want 1 vector per input vector
         return shift
     return conditioner
 

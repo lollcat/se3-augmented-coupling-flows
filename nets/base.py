@@ -34,11 +34,12 @@ def build_egnn_fn(
     n_invariant_feat_out = max(1, n_invariant_feat_out)
 
     def egnn_forward(x, h):
+        assert h.shape[-3] == x.shape[-3]  # n_nodes
+        assert h.shape[-2] == 1  # Currently only have single h multiplicity.
         if (len(x.shape) - 1) == len(h.shape):  # h needs batch size.
             h = jnp.repeat(h[None], x.shape[0], axis=0)
 
         assert len(x.shape) == len(h.shape)
-        assert x.shape[:-1] == h.shape[:-1]
 
         if nets_config.type == "mace":
             mace_config = MACEConfig(name=name+"_mace",

@@ -15,7 +15,7 @@ def get_minimal_nets_config(type = 'egnn'):
                                  n_invariant_hidden_readout_block=3,
                                  hidden_irreps='4x0e+4x1o'
                              ),
-                             egnn_torso_config=EgnnTorsoConfig(),
+                             egnn_torso_config=EgnnTorsoConfig(mlp_units=(3,), h_embedding_dim=5),
                              e3gnn_torso_config=E3GNNTorsoConfig(
                                  n_blocks=2,
                                  mlp_units=(4,),

@@ -13,7 +13,7 @@ def test_base_distribution():
     n_nodes = 3
     n_aux = 3
     batch_size = 2
-    shape = (batch_size, n_aux + 1, n_nodes, dim)
+    shape = (batch_size, n_nodes,  n_aux + 1, dim)
     global_centering = False
 
     dist = CentreGravitryGaussianAndCondtionalGuassian(
@@ -24,12 +24,12 @@ def test_base_distribution():
     # Sample: Test that it does not smoke.
     sample = dist.sample(seed=key, sample_shape=batch_size)
     chex.assert_shape(sample, shape)
-    assert_mean_zero(sample[..., 0, :, :])
+    assert_mean_zero(sample[..., 0, :])
 
     # Log prob: Test that it is invariant to translation and rotation.
     log_prob = dist.log_prob(sample)
     chex.assert_shape(log_prob, (batch_size,))
-    test_fn_is_invariant(dist.log_prob, key, dim=dim)
+    test_fn_is_invariant(dist.log_prob, key, shape[1:])
 
 
     # Single sample and log prob: Test that it does not smoke.
