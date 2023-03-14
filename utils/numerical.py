@@ -4,6 +4,8 @@ import chex
 import jax
 import jax.numpy as jnp
 
+from flow.aug_flow_dist import FullGraphSample
+
 def safe_norm(x: jnp.ndarray, axis: int = None, keepdims=False) -> jnp.ndarray:
     """nan-safe norm. Copied from mace-jax"""
     x2 = jnp.sum(x**2, axis=axis, keepdims=keepdims)
@@ -36,7 +38,7 @@ def rotate_3d(x, theta, phi):
     return x
 
 
-def rotate_translate_permute_3d(x, theta, phi, translation, rotate_first=True, permute=True):
+def rotate_translate_permute_3d(x, theta, phi, translation, rotate_first=True, permute=False):
     chex.assert_shape(theta, ())
     chex.assert_shape(phi, ())
     chex.assert_shape(translation, x.shape[-1:])
@@ -108,11 +110,15 @@ def gram_schmidt_fn(vectors: List[chex.Array]):
 
 
 def rotate_translate_x_and_a_2d(x_and_a, theta, translation):
-    # TODO: delete
+    # TODO: delete or generalise nicely.
     return jax.vmap(rotate_translate_permute_2d, in_axes=(0, None, None))(x_and_a, theta, translation)
 
 def rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation):
     # TODO: delete
     return jax.vmap(rotate_translate_permute_3d, in_axes=(0, None, None, None))(x_and_a, theta, phi, translation)
 
+
+# def rotate_translate_full_graph(x: FullGraphSample, theta, phi, translation):
+#     positions_rot = jnp.squeeze(group_action(jnp.expand_dims(dummy_samples.positions, axis=-2)), axis=-2)
+#     aug_samples_rot = group_action(aug_samples)
 

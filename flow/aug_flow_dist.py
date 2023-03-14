@@ -19,9 +19,10 @@ Positions = chex.Array
 class FullGraphSample(NamedTuple):
     positions: Positions
     features: GraphFeatures
+    # has_aux: Optional[jnp.bool_] = False   # Whether or not positions contain auxilliary variables.
 
     def __getitem__(self, i):
-        return FullGraphSample(self.positions[i], self.features[i])
+        return FullGraphSample(self.positions[i], self.features[i])  # , self.has_aux)
 
 
 
