@@ -57,7 +57,21 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
 
+    # Test aux-target distribution.
+    key, subkey = jax.random.split(key)
+    n_aug_samples = 2
+    aug_samples, aux_log_probs = flow.aux_target_sample_n_and_log_prob_apply(
+        params.aux_target, dummy_samples, subkey, n_aug_samples)
+    chex.assert_shape(aug_samples, (n_aug_samples, batch_size, n_nodes, n_aug, dim))
+    chex.assert_shape(aux_log_probs, (n_aug_samples, batch_size))
+    aux_log_prob_check = flow.aux_target_log_prob_apply(
+        params.aux_target, dummy_samples, aug_samples[0])
+    chex.assert_trees_all_close(aux_log_prob_check, aux_log_probs[0])
+    aug_samples_check = flow.aux_target_sample_n_apply(
+        params.aux_target, dummy_samples, subkey, n_aug_samples)
+    chex.assert_trees_all_close(aug_samples_check, aug_samples_check)
 
+    # Test flow.
     key, subkey = jax.random.split(key)
     sample, log_prob = flow.sample_and_log_prob_apply(params, dummy_samples.features[0], subkey, (batch_size,))
     sample_old = sample  # save for later in this test.

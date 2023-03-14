@@ -50,7 +50,7 @@ class AugmentedFlow(NamedTuple):
     log_prob_with_extra_apply: Callable[[AugmentedFlowParams, FullGraphSample], Tuple[LogProb, Extra]]
     sample_and_log_prob_with_extra_apply: Callable[[AugmentedFlowParams, GraphFeatures, chex.PRNGKey, chex.Shape], Tuple[FullGraphSample, LogProb, Extra]]
     config: Any
-    aux_target_log_prob_apply: Callable[[Params, FullGraphSample], LogProb]
+    aux_target_log_prob_apply: Callable[[Params, FullGraphSample, Positions], LogProb]
     aux_target_sample_n_and_log_prob_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, int], Tuple[Positions, LogProb]]
     aux_target_sample_n_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, int], Positions]
     separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample]
