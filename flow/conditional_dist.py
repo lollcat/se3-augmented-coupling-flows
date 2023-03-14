@@ -4,7 +4,7 @@ import distrax
 import haiku as hk
 import jax
 
-from fast_flow_dist import FullGraphSample
+from aug_flow_dist import FullGraphSample
 
 
 

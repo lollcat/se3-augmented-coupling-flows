@@ -17,13 +17,13 @@ from omegaconf import DictConfig
 import matplotlib as mpl
 from functools import partial
 
-from flow.build_flow import build_flow, FlowDistConfig, BaseConfig
+from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
+from flow.aug_flow_dist import FullGraphSample, AugmentedFlow
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
-from utils.train_and_eval import ml_step_second_order_opt
+from utils.aug_flow_train_and_eval import eval_fn, ml_step
 from utils.numerical import get_pairwise_distances
 from utils.loggers import Logger, WandbLogger, ListLogger
 from flow.distrax_with_extra import Extra
@@ -119,10 +119,10 @@ def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_dat
     return [fig1, fig2]
 
 
-def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_data, test_data, epoch_n,
+def plot_and_maybe_save(plotter, params, flow: AugmentedFlow, key, plot_batch_size, train_data, test_data, epoch_n,
                         save: bool,
                         plots_dir):
-    figures = plotter(params, sample_fn, key, plot_batch_size, train_data, test_data)
+    figures = plotter(params, flow, key, plot_batch_size, train_data, test_data)
     for j, figure in enumerate(figures):
         if save:
             figure.savefig(os.path.join(plots_dir, f"{j}_iter_{epoch_n}.png"))
@@ -139,10 +139,6 @@ class OptimizerConfig(NamedTuple):
     peak_lr: Optional[float] = None
     end_lr: Optional[float] = None
     warmup_n_epoch: Optional[int] = None
-    second_order_opt: bool = False
-    damping: float = 1e-5
-    max_second_order_step_size: float = 10.
-    min_second_order_step_size: float = 0.1
 
 
 def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
@@ -167,12 +163,7 @@ def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoc
 
     grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
     optimizer = optax.chain(*grad_transforms)
-    if optimizer_config.second_order_opt:
-        step_fn = partial(ml_step_second_order_opt, step_size_min=optimizer_config.min_second_order_step_size,
-        step_size_max=optimizer_config.max_second_order_step_size, damping=optimizer_config.damping)
-    else:
-        step_fn = ml_step
-    return optimizer, lr, step_fn
+    return optimizer, lr, ml_step
 
 
 class TrainConfig(NamedTuple):
@@ -182,7 +173,7 @@ class TrainConfig(NamedTuple):
     flow_dist_config: FlowDistConfig
     aug_target_global_centering: bool
     aug_target_scale: float
-    load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
+    load_datasets: Callable[[int, int, int], Tuple[FullGraphSample, FullGraphSample]]
     optimizer_config: OptimizerConfig
     batch_size: int
     K_marginal_log_lik: int
@@ -195,7 +186,6 @@ class TrainConfig(NamedTuple):
     use_flow_aux_loss: bool = False
     aux_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
-    reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
     test_set_size: Optional[int] = None
     save: bool = True
@@ -239,17 +229,20 @@ def create_nets_config(nets_config: DictConfig):
                              mlp_head_config=mlp_head_config)
     return nets_config
 
-def create_flow_config(flow_cfg: DictConfig):
+def create_flow_config(cfg: DictConfig):
     """Create config for building the flow."""
+    flow_cfg = cfg.flow
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
     nets_config = create_nets_config(flow_cfg.pop("nets"))
     base_config = dict(flow_cfg.pop("base"))
-    base_config = BaseConfig(**base_config)
+    base_config = ConditionalAuxDistConfig(**base_config)
+    target_aux_config = ConditionalAuxDistConfig(**dict(cfg.target.aux_target))
     flow_dist_config = FlowDistConfig(
         **flow_cfg,
         nets_config=nets_config,
-        base_config=base_config,
+        base_aux_config=base_config,
+        target_aux_config=target_aux_config
     )
     return flow_dist_config
 
@@ -267,7 +260,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         save_path = ''
 
 
-    flow_config = create_flow_config(cfg.flow)
+    flow_config = create_flow_config(cfg)
 
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
 
@@ -307,41 +300,29 @@ def train(config: TrainConfig):
     eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))
     plot_iter = list(np.linspace(0, config.n_epoch - 1, config.n_plots, dtype="int"))
 
+    train_data, test_data = config.load_datasets(config.batch_size, config.train_set_size,
+                                                                   config.test_set_size)
 
+    # Define flow, and initialise params.
     flow_dist = build_flow(config.flow_dist_config)
-
-
-    sample_fn = jax.jit(chex.assert_max_traces(flow_dist.sample_apply, 2), static_argnums=2)
-
 
     key = jax.random.PRNGKey(config.seed)
     key, subkey = jax.random.split(key)
-    params = flow_dist.init(subkey, jnp.zeros((1, config.n_nodes, config.dim*2)))
-    params_test = flow_dist.init(subkey, jnp.zeros((config.n_nodes, config.dim*2)))
+    params = flow_dist.init(subkey, train_data[0:2])
+    params_test = flow_dist.init(subkey, train_data[0])
     chex.assert_trees_all_equal_shapes(params, params_test)
 
 
-    train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
-                                                                   config.test_set_size)
 
-    print(f"training data shape of {train_data_original.shape}")
-    chex.assert_tree_shape_suffix(train_data_original, (config.n_nodes, config.dim))
+    print(f"training data position shape of {train_data.positions.shape}, "
+          f"feature shape of {train_data.features.shape}")
+    chex.assert_tree_shape_suffix(train_data.positions, (config.n_nodes, config.dim))
 
-    # Load augmented coordinates.
-    key, subkey = jax.random.split(key)
-    train_data = original_dataset_to_joint_dataset(train_data_original, subkey,
-                                                   global_centering=config.aug_target_global_centering,
-                                                   aug_scale=config.aug_target_scale)
-    test_data = original_dataset_to_joint_dataset(test_data_original, subkey,
-                                                  global_centering=config.aug_target_global_centering,
-                                                  aug_scale=config.aug_target_scale)
-
-
-    plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
+    plot_and_maybe_save(config.plotter, params, flow_dist, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
     optimizer, lr, step_fn = get_optimizer_and_step_fn(config.optimizer_config,
-                                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
+                                              n_iter_per_epoch=train_data.positions.shape[0] // config.batch_size,
                                               total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
 
@@ -351,7 +332,7 @@ def train(config: TrainConfig):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+            params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
                                               subkey,
                                               config.use_flow_aux_loss, config.aux_loss_weight)
             if config.last_iter_info_only:
@@ -370,10 +351,11 @@ def train(config: TrainConfig):
             if config.last_iter_info_only:
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = step_fn(params, final_batch, opt_state,
-                                                  flow_dist.log_prob_with_extra_apply,
+                                                  flow_dist,
                                                   optimizer,
                                                   subkey,
-                                                  config.use_flow_aux_loss, config.aux_loss_weight)
+                                                  config.use_flow_aux_loss,
+                                                  config.aux_loss_weight)
             return params, opt_state, key, info
 
 
@@ -382,14 +364,9 @@ def train(config: TrainConfig):
     @jax.jit
     # @chex.assert_max_traces(n=2)
     def shuffle_and_batchify_data(key, train_data=train_data, config=config):
-        key, subkey = jax.random.split(key)
-        train_data = jax.random.permutation(subkey, train_data, axis=0)
-        if config.reload_aug_per_epoch:
-            key, subkey = jax.random.split(key)
-            train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey,
-                                                           global_centering=config.aug_target_global_centering,
-                                                           aug_scale=config.aug_target_scale)
-        batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
+        indices = jax.random.permutation(key, train_data.positions.shape[0])
+        train_data = train_data[indices]
+        batched_data = jax.tree_map(lambda x: jnp.reshape(x, (-1, config.batch_size, *x.shape[1:])), train_data)
         return batched_data
 
     for i in pbar:
@@ -419,9 +396,10 @@ def train(config: TrainConfig):
                     if jnp.isnan(info["grad_norm"]):
                         print("nan grad")
         else:
-            for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
+            for i in range(batched_data.shape[0]):
+                x = batched_data[i]
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
                                                   subkey,
                                                   config.use_flow_aux_loss, config.aux_loss_weight
                                                   )
@@ -431,14 +409,14 @@ def train(config: TrainConfig):
                     print("nan grad")
 
         if i in plot_iter:
-            plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data,
+            plot_and_maybe_save(config.plotter, params, flow_dist, key, config.plot_batch_size, train_data, test_data,
                                 i + 1, config.save,
                                 plots_dir)
 
         if i in eval_iter:
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_apply_fn=flow_dist.log_prob_apply,
-                                flow_sample_and_log_prob_apply_fn=flow_dist.sample_and_log_prob_apply,
+            eval_info = eval_fn(params=params, x=test_data,
+                                flow=flow_dist,
                                 global_centering=config.aug_target_global_centering,
                                 aug_scale=config.aug_target_scale,
                                 key=subkey,

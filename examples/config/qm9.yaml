@@ -103,7 +103,6 @@ training:
   batch_size: 64
   plot_batch_size: 128
   seed: 0
-  reload_aug_per_epoch: true
   train_set_size: null
   test_set_size: null
   n_plots: 10

@@ -1,6 +1,6 @@
 import chex
 
-from flow.fast_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow, FullGraphSample
+from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow, FullGraphSample
 
 from typing import NamedTuple, Sequence, Union
 import distrax

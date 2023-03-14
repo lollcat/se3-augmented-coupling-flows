@@ -2,12 +2,12 @@ import hydra
 from omegaconf import DictConfig
 from functools import partial
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 
 from examples.train import train, create_train_config
 from target.double_well import make_dataset
+from utils.data import positional_dataset_only_to_full_graph
 
 
 def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000):
@@ -22,7 +22,7 @@ def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
 
     test_set = dataset[-test_set_size:]
-    return train_set, test_set
+    return positional_dataset_only_to_full_graph(train_set), positional_dataset_only_to_full_graph(test_set)
 
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):
@@ -33,7 +33,7 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
     train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
 
     test_set = dataset[-test_set_size:]
-    return train_set, test_set
+    return positional_dataset_only_to_full_graph(train_set), positional_dataset_only_to_full_graph(test_set)
 
 
 def to_local_config(cfg: DictConfig) -> DictConfig:

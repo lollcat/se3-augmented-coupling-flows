@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from flow.test_utils import test_fn_is_invariant
 from flow.test_utils import get_minimal_nets_config
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig
-from flow.fast_flow_dist import FullGraphSample
+from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
 
@@ -115,5 +115,5 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_distribution(dim=2)
     test_distribution(dim=3)
+    test_distribution(dim=2)
