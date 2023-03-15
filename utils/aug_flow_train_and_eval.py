@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import chex
 import jax
@@ -21,11 +21,17 @@ def general_ml_loss_fn(params: AugmentedFlowParams,
                        key: chex.PRNGKey,
                        use_aux_loss: bool,
                        aux_loss_weight: float) -> Tuple[chex.Array, dict]:
-    aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
+    aux_samples, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
-    log_prob, extra = flow.log_prob_with_extra_apply(params, joint_samples)
-    loss = - jnp.mean(log_prob)
-    info = {"ml_loss": loss}
+    log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
+    mean_log_prob_q = jnp.mean(log_q)
+    mean_log_p_a = jnp.mean(log_p_a)
+    # kl = E_{p(x,a)}[log p(x,a) - log q(x,a)] = E_{p(x,a)}[log p(x) + log p(a | x) - log q(x,a)]
+    # Set loss to log p(a | x) - log q(x,a). Noting that log p(x) has no differentiable params.
+    loss = mean_log_p_a - mean_log_prob_q
+    info = {"mean_log_prob_q_joint": mean_log_prob_q,
+            "mean_log_p_a": mean_log_p_a
+            }
     aux_loss = jnp.mean(extra.aux_loss)
     if use_aux_loss:
         loss = loss + aux_loss * aux_loss_weight
@@ -100,8 +106,8 @@ def eval_fn(params: AugmentedFlowParams,
             x: FullGraphSample,
             key: chex.PRNGKey,
             flow: AugmentedFlow,
-            target_log_prob = None,
-            batch_size=None,
+            target_log_prob: Optional[Callable] = None,
+            batch_size: Optional[int] = None,
             K: int = 20,
             test_invariances: bool = True):
 

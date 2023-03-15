@@ -174,6 +174,7 @@ class en_gnn_net(hk.Module):
         x = jnp.repeat(x, repeats=self.n_heads, axis=1)
         x_original = x
         h = h.reshape(h.shape[0], np.prod(h.shape[1:]))  # flatten along last 2 axes.
+        h = hk.Linear(self.config.torso_config.h_embedding_dim)(h)
 
         x_out, h_egnn = x, h
         for layer in self.egnn_layers:

@@ -88,7 +88,7 @@ training:
     init_lr: 6e-5
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 6e-4 # can be null
+    peak_lr: 4e-4 # can be null
     end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0

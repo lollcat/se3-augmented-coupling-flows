@@ -27,7 +27,8 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - fix permutation syymetry test
+    - Code permutation layer that acts on auxilliary coordinates. 
+    - Update all nets. Make sure they embed h. 
     - Add whether sample has aux to sample info?
     - Rewrite for e3nn
         1. Let networks take in positional and feature info.
