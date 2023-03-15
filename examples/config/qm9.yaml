@@ -85,15 +85,15 @@ flow:
 
 training:
   optimizer:
-    init_lr: 6e-5
+    init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
     peak_lr: 6e-4 # can be null
-    end_lr: 6e-5 # can be null
+    end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
   use_64_bit: false
-  n_epoch: 128
+  n_epoch: 64
   batch_size: 64
   plot_batch_size: 128
   seed: 0

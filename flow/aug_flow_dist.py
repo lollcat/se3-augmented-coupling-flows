@@ -154,6 +154,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
             x, log_det = bijector_inverse_and_log_det.apply(bijector_params, y)
+            chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), None
 
         log_prob_shape = sample.positions.shape[:-3]
@@ -161,12 +162,14 @@ def create_flow(recipe: AugmentedFlowRecipe):
                                        xs=params.bijector, reverse=True,
                                        unroll=recipe.compile_n_unroll)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
+        chex.assert_equal_shape((base_log_prob, log_det))
         return base_log_prob + log_det
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
             x, log_det, extra = bijector_inverse_and_log_det_with_extra.apply(bijector_params, y)
+            chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), extra
 
         log_prob_shape = sample.positions.shape[:-3]
@@ -174,6 +177,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
                                            xs=params.bijector,
                                            reverse=True, unroll=recipe.compile_n_unroll)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
+        chex.assert_equal_shape((base_log_prob, log_det))
 
         info = {}
         aggregators = {}
@@ -211,6 +215,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det, extra = bijector_forward_and_log_det_with_extra.apply(bijector_params, x)
+            chex.assert_equal_shape((log_det_prev, log_det))
             return (y, log_det_prev + log_det), extra
 
         x = base_sample_fn.apply(params.base, features, key, shape)
