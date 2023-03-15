@@ -24,7 +24,7 @@ from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNN
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
 from utils.aug_flow_train_and_eval import eval_fn, ml_step
-from utils.numerical import get_pairwise_distances
+from utils.graph import get_senders_and_receivers_fully_connected
 from utils.loggers import Logger, WandbLogger, ListLogger
 from flow.distrax_with_extra import Extra
 
@@ -53,14 +53,11 @@ def plot_sample_hist(samples,
                      max_distance = 10, *args, **kwargs):
     """n_vertices argument allows us to look at pairwise distances for subset of vertices,
     to prevent plotting taking too long"""
-    dim = samples.shape[-1]
-    dims = jnp.arange(dim)
     n_vertices = samples.shape[1] if n_vertices is None else n_vertices
     n_vertices = min(samples.shape[1], n_vertices)
-    differences = jax.jit(jax.vmap(get_pairwise_distances))(samples[:, :n_vertices, dims])
-    mask = jnp.ones_like(differences, dtype=bool).at[:, jnp.arange(n_vertices), jnp.arange(n_vertices)].set(False)
-    d = differences.flatten()
-    d = d[mask.flatten()]
+    senders, receivers = get_senders_and_receivers_fully_connected(n_nodes=n_vertices)
+    norms = jnp.linalg.norm(samples[:, senders] - samples[:, receivers], axis=-1)
+    d = norms.flatten()
     d = d[jnp.isfinite(d)]
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
