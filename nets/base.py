@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from nets.e3nn_transformer import EnTransformerTorsoConfig, EnTransformer, EnTransformerConfig
 from nets.mace import MACETorsoConfig, MACEConfig, MaceNet
 from nets.e3_gnn import E3GNNConfig, E3Gnn, E3GNNTorsoConfig
-from nets.en_gnn_multi_x import multi_se_equivariant_net, MultiEgnnConfig, EgnnTorsoConfig
+from nets.en_gnn import en_gnn_net, MultiEgnnConfig, EgnnTorsoConfig
 from nets.transformer import TransformerConfig
 
 class MLPHeadConfig(NamedTuple):
@@ -57,7 +57,7 @@ def build_egnn_fn(
                                           n_equivariant_vectors_out=n_equivariant_vectors_out,
                                           invariant_feat_zero_init=zero_init_invariant_feat
                                           )
-            x, h = multi_se_equivariant_net(egnn_config)(x, h)
+            x, h = en_gnn_net(egnn_config)(x, h)
         elif nets_config.type == "e3transformer":
             config = EnTransformerConfig(name=name+"e3transformer",
                                          n_vectors_readout=n_equivariant_vectors_out,

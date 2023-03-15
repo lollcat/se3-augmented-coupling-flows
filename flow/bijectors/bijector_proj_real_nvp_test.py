@@ -9,9 +9,7 @@ from flow.test_utils import bijector_test
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
 from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig
-from flow.distrax_with_extra import ChainWithExtra
-from flow.fast_hk_chain import Chain as FastChain
+from flow.test_utils import get_minimal_nets_config
 
 
 def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
@@ -83,37 +81,24 @@ def test_matmul_transform_in_new_space(n_nodes: int = 5, dim: int = 3):
     chex.assert_trees_all_close(x_g_out, x_out_g)
 
 
-def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
-                            gram_schmidt: bool = False,
-                            global_frame: bool = False,
-                            process_flow_params_jointly: bool = True,
-                            use_mace: bool = True):
-    nets_config = NetsConfig(type='mace' if use_mace else "egnn",
-                             mace_torso_config=MACETorsoConfig(
-                                    n_vectors_residual = 3,
-                                    n_invariant_feat_residual = 3,
-                                    n_vectors_hidden_readout_block = 3,
-                                    n_invariant_hidden_readout_block = 3,
-                                    hidden_irreps = '4x0e+4x1o'
-                                 ),
-                             egnn_torso_config=EgnnTorsoConfig() if not use_mace else None,
-                             mlp_head_config=MLPHeadConfig((4,)) if not process_flow_params_jointly else None,
-                             transformer_config=TransformerConfig() if process_flow_params_jointly else None
-                             )
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
+                            n_nodes: int = 4, n_aux: int = 3):
+    nets_config = get_minimal_nets_config(type=type)
 
+    graph_features = jnp.zeros((n_nodes, 1, 1))
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
             bijector = make_se_equivariant_split_coupling_with_projection(
-                layer_number=i, dim=dim, swap=swap,
+                graph_features=graph_features,
+                layer_number=i,
+                dim=dim,
+                n_aux=n_aux,
+                swap=swap,
                 identity_init=False,
-                nets_config=nets_config,
-                global_frame=global_frame,
-                gram_schmidt=gram_schmidt,
-                process_flow_params_jointly=process_flow_params_jointly,
-                                                            )
+                nets_config=nets_config)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -121,41 +106,27 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 2,
     @hk.without_apply_rng
     @hk.transform
     def bijector_forward(x):
-        return make_flow().forward_and_log_det(x)
+        flow = make_flow()
+        return flow.forward_and_log_det(x)
 
     @hk.without_apply_rng
     @hk.transform
     def bijector_backward(x):
-        return make_flow().inverse_and_log_det(x)
+        flow = make_flow()
+        return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=4)
-
+    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':
-    USE_64_BIT = True  # Fails for 32-bit
-    gram_schmidt = False
-
-    test_matmul_transform_in_new_space()
-    print("affine transform passing tests")
-
+    USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
-
         config.update("jax_enable_x64", True)
 
-    use_mace = False
-    for global_frame in [False, True]:
-        for process_jointly in [False, True]:
-            print(f"running tests for global-frame={global_frame}, process jointly={process_jointly}")
-            test_bijector_with_proj(dim=3, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                    gram_schmidt=gram_schmidt, use_mace=use_mace)
-            print("passed 3D test")
-
-            if not use_mace:
-                test_bijector_with_proj(dim=2, process_flow_params_jointly=process_jointly, global_frame=global_frame,
-                                        gram_schmidt=gram_schmidt, use_mace=use_mace)
-                print("passed 2D test")
-
+    test_bijector_with_proj(dim=3)
+    print('passed test in 3D')
+    test_bijector_with_proj(dim=2)
+    print('passed test in 2D')
 
 

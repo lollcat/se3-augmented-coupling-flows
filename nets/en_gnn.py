@@ -138,7 +138,7 @@ class MultiEgnnConfig(NamedTuple):
     invariant_feat_zero_init: bool = True
 
 
-class multi_se_equivariant_net(hk.Module):
+class en_gnn_net(hk.Module):
     def __init__(self, config: MultiEgnnConfig):
         super().__init__(name=config.name + "_multi_x_egnn")
         self.egnn_layers = [EGCL_Multi(config.name + str(i),

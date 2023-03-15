@@ -75,14 +75,17 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
-        if len(x.shape) == 2:
-            return jax.vmap(affine_transform_in_new_space)(x, self._change_of_basis_matrix, self._origin, self._scale,
+        if len(x.shape) == 3:
+            # vmap over n_nodes, n_var_group
+            y = jax.vmap(jax.vmap(affine_transform_in_new_space))(x, self._change_of_basis_matrix, self._origin, self._scale,
                                                        self._shift)
-        elif len(x.shape) == 3:
-            return jax.vmap(jax.vmap(affine_transform_in_new_space))(x, self._change_of_basis_matrix, self._origin, self._scale,
+        elif len(x.shape) == 4:
+            y = jax.vmap(jax.vmap(jax.vmap(affine_transform_in_new_space)))(x, self._change_of_basis_matrix, self._origin, self._scale,
                                                            self._shift)
         else:
             raise Exception
+        chex.assert_equal_shape((x, y))
+        return y
 
     def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
         """Computes log|det J(f)(x)|."""
@@ -94,14 +97,18 @@ class ProjectedScalarAffine(BijectorWithExtra):
 
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
-        if len(y.shape) == 2:
-            return jax.vmap(inverse_affine_transform_in_new_space)(y, self._change_of_basis_matrix, self._origin, self._scale,
+        if len(y.shape) == 3:
+            # vmap over n_nodes, n_var_group
+            x = jax.vmap(jax.vmap(inverse_affine_transform_in_new_space))(y, self._change_of_basis_matrix, self._origin, self._scale,
                                                     self._shift)
-        elif len(y.shape) == 3:
-            return jax.vmap(jax.vmap(inverse_affine_transform_in_new_space))(
+        elif len(y.shape) == 4:
+            # vmap over batch_size, n_nodes, n_var_group
+            x = jax.vmap(jax.vmap(jax.vmap(inverse_affine_transform_in_new_space)))(
                 y, self._change_of_basis_matrix, self._origin, self._scale, self._shift)
         else:
             raise Exception
+        chex.assert_equal_shape((x, y))
+        return x
 
     def inverse_log_det_jacobian(self, y: chex.Array) -> chex.Array:
         """Computes log|det J(f^{-1})(y)|."""
@@ -135,10 +142,11 @@ class ProjectedScalarAffine(BijectorWithExtra):
         info_aggregator = {}
         various_x_points = self._info['various_x_points']
         if various_x_points.shape[-1] == 3:
-            if len(various_x_points.shape) == 4:
-                theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
+            if len(various_x_points.shape) == 5:
+                theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(self.get_vector_info_single))(various_x_points)
             else:
-                theta, aux_loss, log_barrier_in = self.get_vector_info_single(various_x_points)
+                assert len(various_x_points.shape) == 4
+                theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
             info_aggregator.update(
                 mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
                 min_log_barrier_in=jnp.min
@@ -218,6 +226,7 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, gram_schmi
 
 
 def make_conditioner(
+        graph_features: chex.Array,
         global_frame: bool,
         process_flow_params_jointly: bool,
         multi_x_equivariant_fn: Callable,
@@ -232,16 +241,10 @@ def make_conditioner(
     else:
         assert mlp_function is not None
 
-    def _conditioner(x):
+
+    def eq_net_out_to_params(x, various_x_points, h):
         chex.assert_rank(x, 2)
         n_nodes, dim = x.shape
-
-        # Calculate new basis for the affine transform
-        various_x_points, h = multi_x_equivariant_fn(x)
-
-        # Get info
-        info = {}
-        info.update(various_x_points=various_x_points)
 
         origin, change_of_basis_matrix = get_new_space_basis(x, various_x_points, gram_schmidt, global_frame,
                                                              add_small_identity=add_small_identity)
@@ -286,29 +289,54 @@ def make_conditioner(
 
         chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
         chex.assert_trees_all_equal_shapes(origin, log_scale, shift, x)
+        return change_of_basis_matrix, origin, log_scale, shift
+
+    def _conditioner(x):
+        chex.assert_rank(x, 3)
+        n_nodes, multiplicity, dim = x.shape
+
+        # Calculate new basis for the affine transform
+        various_x_points, h = multi_x_equivariant_fn(x, graph_features)
+        # various_x_points [n_nodes, multiplicity, n_vectors, dim]
+
+        # Get info
+        info = {}
+        info.update(various_x_points=various_x_points)
+
+        change_of_basis_matrix, origin, log_scale, shift = \
+            jax.vmap(eq_net_out_to_params, in_axes=(1, 1, 1),
+                     out_axes=1)(
+            x, various_x_points, h
+        )  # Vmap over multiplicity axis.
         return change_of_basis_matrix, origin, log_scale, shift, info
 
+
+
     def conditioner(x):
-        if len(x.shape) == 2:
+        if len(x.shape) == 3:
             return _conditioner(x)
         else:
-            assert len(x.shape) == 3
+            assert len(x.shape) == 4
             return jax.vmap(_conditioner)(x)
 
     return conditioner
 
 
-def make_se_equivariant_split_coupling_with_projection(layer_number,
-                                                       dim,
-                                                       swap,
-                                                       nets_config: NetsConfig,
-                                                       identity_init: bool = True,
-                                                       gram_schmidt: bool = False,
-                                                       global_frame: bool = False,
-                                                       process_flow_params_jointly: bool = False,
-                                                       condition_on_x_proj: bool = True,
-                                                       add_small_identity: bool = False
-                                                       ) -> BijectorWithExtra:
+def make_se_equivariant_split_coupling_with_projection(
+        graph_features: chex.Array,
+        layer_number: int,
+        dim: int,
+        n_aux: int,
+        swap: bool,
+        nets_config: NetsConfig,
+        identity_init: bool = True,
+        gram_schmidt: bool = False,
+        global_frame: bool = False,
+        process_flow_params_jointly: bool = False,
+        condition_on_x_proj: bool = True,
+        add_small_identity: bool = False
+        ) -> BijectorWithExtra:
+    assert n_aux % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
@@ -351,7 +379,9 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
                                       ])
 
     conditioner = make_conditioner(
-        global_frame=global_frame, process_flow_params_jointly=process_flow_params_jointly,
+        graph_features=graph_features,
+        global_frame=global_frame,
+        process_flow_params_jointly=process_flow_params_jointly,
         mlp_function=mlp_function,
         multi_x_equivariant_fn=equivariant_fn,
         permutation_equivariant_fn=permutation_equivariant_fn,
@@ -361,10 +391,10 @@ def make_se_equivariant_split_coupling_with_projection(layer_number,
     )
 
     return SplitCouplingWithExtra(
-        split_index=dim,
-        event_ndims=2,  # [nodes, dim]
+        split_index=(n_aux + 1)//2,
+        event_ndims=3,  # [n_var_groups, nodes, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-1
+        split_axis=-2
     )
