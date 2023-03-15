@@ -7,10 +7,10 @@ import jax.numpy as jnp
 import mdtraj
 
 from target.alanine_dipeptide import get_atom_encoding
-from base import DataPoint
+from flow.aug_flow_dist import FullGraphSample
 
 def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None) -> \
-        Tuple[DataPoint, DataPoint]:
+        Tuple[FullGraphSample, FullGraphSample]:
     train_traj = mdtraj.load('target/data/aldp_500K_train_mini.h5')
     test_traj = mdtraj.load('target/data/aldp_500K_test_mini.h5')
     features = get_atom_encoding(train_traj)
@@ -23,11 +23,11 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
     if test_data_n_points is not None:
         positions_test = positions_test[:test_data_n_points]
 
-    train_data = DataPoint(positions=positions_train,
+    train_data = FullGraphSample(positions=positions_train,
                            features=jnp.repeat(features[None, :], positions_train.shape[0], axis=0))
-    test_data = DataPoint(positions=positions_test,
+    test_data = FullGraphSample(positions=positions_test,
                           features=jnp.repeat(features[None, :], positions_test.shape[0], axis=0))
-    return train_data.positions, test_data.positions
+    return train_data, test_data
 
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
@@ -44,7 +44,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.logger = DictConfig({"list_logger": None})
 
     # Flow
-    cfg.target.aug_global_centering = False
     # cfg.flow.type = ['realnvp_non_eq']
     cfg.flow.n_layers = 2
     cfg.flow.act_norm = False
@@ -58,7 +57,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.transformer.mlp_units = (16,)
     cfg.flow.nets.transformer.n_layers = 2
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
-    cfg.flow.nets.egnn.tanh = False
     cfg.flow.nets.egnn.mlp_units = (8,)
 
     debug = False

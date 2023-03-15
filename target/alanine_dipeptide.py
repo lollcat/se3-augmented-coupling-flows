@@ -5,7 +5,7 @@ import jax.numpy as jnp
 def get_atom_encoding(traj):
     # First encode all atoms as different.
     # list(traj.topology.atoms)
-    return jnp.arange(traj.n_atoms)
+    return jnp.arange(traj.n_atoms, dtype=float)[:, None]
 
 def save_mini_datasets():
     traj_train = mdtraj.load('data/aldp_500K_train.h5')

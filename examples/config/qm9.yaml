@@ -12,7 +12,7 @@ target:
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
+  n_aug: 1
   base:
     aux:
       global_centering: false
@@ -94,7 +94,7 @@ training:
     max_global_norm: 1.0
   use_64_bit: false
   n_epoch: 64
-  batch_size: 64
+  batch_size: 32
   plot_batch_size: 128
   seed: 0
   train_set_size: null
