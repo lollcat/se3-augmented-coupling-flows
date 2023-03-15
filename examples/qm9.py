@@ -4,6 +4,7 @@ import jax
 import numpy as np
 
 from examples.train import train, create_train_config
+from utils.data import positional_dataset_only_to_full_graph
 
 
 
@@ -27,7 +28,7 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
 
     train_data = train_data[:train_data.shape[0] - (train_data.shape[0] % batch_size)]
 
-    return train_data, test_data
+    return positional_dataset_only_to_full_graph(train_data), positional_dataset_only_to_full_graph(test_data)
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""

@@ -46,7 +46,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.mace.hidden_irreps = '4x0e+3x1o+1x2e'
 
 
-    cfg.flow.type = 'nice'
+    cfg.flow.type = 'proj'
 
 
     cfg.training.n_epoch = 32

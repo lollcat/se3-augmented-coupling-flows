@@ -291,7 +291,7 @@ def make_conditioner(
         chex.assert_trees_all_equal_shapes(origin, log_scale, shift, x)
         return change_of_basis_matrix, origin, log_scale, shift
 
-    def _conditioner(x):
+    def _conditioner(x, graph_features):
         chex.assert_rank(x, 3)
         n_nodes, multiplicity, dim = x.shape
 
@@ -314,10 +314,10 @@ def make_conditioner(
 
     def conditioner(x):
         if len(x.shape) == 3:
-            return _conditioner(x)
+            return _conditioner(x, graph_features)
         else:
             assert len(x.shape) == 4
-            return jax.vmap(_conditioner)(x)
+            return jax.vmap(_conditioner)(x, graph_features)
 
     return conditioner
 

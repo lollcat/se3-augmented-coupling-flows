@@ -64,10 +64,12 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
         for swap in (True, False):  # For swap False we condition augmented on original.
             if "proj" in flow_type:
-                bijector = make_se_equivariant_split_coupling_with_projection(layer_number=layer_number, dim=config.dim, swap=swap,
-                                                                              identity_init=config.identity_init,
-                                                                              nets_config=config.nets_config,
-                                                                              **kwargs_proj)
+                bijector = make_se_equivariant_split_coupling_with_projection(
+                    graph_features=graph_features, n_aux=config.n_aug,
+                    layer_number=layer_number, dim=config.dim, swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_proj)
                 bijectors.append(bijector)
 
             if "nice" in flow_type:
