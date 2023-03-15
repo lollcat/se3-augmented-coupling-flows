@@ -8,7 +8,7 @@ hydra:
 target:
   aux:
     global_centering: false
-    scale_init: 1.0
+    scale_init: 0.1
     trainable_augmented_scale: false
 
 flow:

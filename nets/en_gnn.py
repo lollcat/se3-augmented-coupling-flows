@@ -186,7 +186,8 @@ class en_gnn_net(hk.Module):
 
 
         h_out = hk.Linear(self.config.n_invariant_feat_out*multiplicity_in, w_init=jnp.zeros, b_init=jnp.zeros) \
-            if self.config.invariant_feat_zero_init else hk.Linear(self.config.n_invariant_feat_out*multiplicity_in)(h_egnn)
+            if self.config.invariant_feat_zero_init else \
+            hk.Linear(self.config.n_invariant_feat_out*multiplicity_in)(h_egnn)
         x_out = x_out - x_original
         x_out = x_out.reshape((n_nodes, multiplicity_in, self.n_heads, x_out.shape[-1]))
         h_out = h_out.reshape((n_nodes, multiplicity_in, self.config.n_invariant_feat_out))
