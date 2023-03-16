@@ -1,7 +1,6 @@
 from typing import Callable, Tuple, Optional, List, NamedTuple
 
 import chex
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import optax
@@ -15,7 +14,6 @@ import pathlib
 from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
-from functools import partial
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -26,7 +24,6 @@ from utils.plotting import plot_history
 from utils.aug_flow_train_and_eval import eval_fn, ml_step
 from utils.graph import get_senders_and_receivers_fully_connected
 from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
-from flow.distrax_with_extra import Extra
 
 
 mpl.rcParams['figure.dpi'] = 150
