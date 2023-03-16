@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import hydra
 from omegaconf import DictConfig
@@ -41,7 +41,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
                     n_samples: int,
                     train_data: FullGraphSample,
                     test_data: FullGraphSample,
-                    plotting_n_nodes: Optional[int] = None):
+                    plotting_n_nodes: Optional[int] = None) -> List[plt.Subplot]:
 
     # Plot interatomic distance histograms.
     key1, key2 = jax.random.split(key)
