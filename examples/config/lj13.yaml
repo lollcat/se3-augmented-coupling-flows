@@ -6,14 +6,19 @@ hydra:
     chdir: false
 
 target:
-  aug_global_centering: false
-  aug_scale: 1.0
+  aux:
+    global_centering: false
+    scale_init: 1.0
+    trainable_augmented_scale: false
 
 flow:
   base:
-    aug_scale_init: ${target.aug_scale}
-    double_centered_gaussian: false
+    aux:
+      global_centering: false
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: true
   dim: 3
+  n_aug: 3
   nodes: 13
   n_layers: 4
   identity_init: true
@@ -25,17 +30,12 @@ flow:
       condition_on_x_proj: false
       gram_schmidt: false
       add_small_identity: false
-    proj_v2:
-      process_flow_params_jointly: false
-      condition_on_x_proj: false
-      gram_schmidt: false
-      n_vectors: 10
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: egnn # mace or egnn or e3transformer or e3gnn
+    type: mace # mace or egnn or e3transformer or e3gnn
     mace:
-      n_vectors_residual: 3
+      n_vec_residual_per_vec_in: 1
       n_invariant_feat_residual: 64
       n_vectors_hidden_readout_block: 16
       n_invariant_hidden_readout_block: 64
@@ -52,7 +52,7 @@ flow:
     e3gnn:
       n_blocks: 3
       mlp_units: [ 32, 32 ]
-      n_vectors_hidden: 3
+      n_vec_hidden_per_vec_in: 1
       n_invariant_feat_hidden: 64
       sh_irreps_max_ell: 1
       get_shifts_via_tensor_product: true
@@ -94,7 +94,6 @@ training:
   batch_size: 100
   plot_batch_size: 256
   seed: 0
-  reload_aug_per_epoch: true
   train_set_size: 1000
   test_set_size: 1000
   n_plots: 8
@@ -109,6 +108,8 @@ training:
 
 logger:
 #  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
     name: lj13_${flow.type}
     project: fab

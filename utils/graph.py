@@ -2,6 +2,7 @@ from typing import Callable
 
 import jax.numpy as jnp
 import e3nn_jax as e3nn
+
 def get_senders_and_receivers_fully_connected(n_nodes: int):
     receivers = []
     senders = []

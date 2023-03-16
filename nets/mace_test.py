@@ -16,12 +16,11 @@ def test_mace(dim: int = 3, n_nodes: int = 5):
         rtol = 1e-4
 
     torso_config = MACETorsoConfig(
-        n_vectors_mace_lay_out = 3,
-        n_invariant_feat_mace_lay_out = 3,
-        n_vectors_readout = 4,
-        n_invariant_feat_readout = 4,
-        n_vectors_hidden = 4,
-        n_invariant_feat_hidden = 4,
+        n_vec_residual_per_vec_in = 1,
+        n_invariant_feat_residual = 16,
+        n_vectors_hidden_readout_block = 3,
+        n_invariant_hidden_readout_block = 16,
+        hidden_irreps = '8x0e+6x1o',
         num_features = 5,
         max_ell=2
     )
@@ -36,9 +35,9 @@ def test_mace(dim: int = 3, n_nodes: int = 5):
 
     @hk.without_apply_rng
     @hk.transform
-    def mace_forward_fn(x: chex.Array):
+    def mace_forward_fn(x: chex.Array, h: chex.Array):
         mace_net = MaceNet(config)
-        x = mace_net(x)
+        x, h = mace_net(x, h)
         return x
 
 

@@ -111,18 +111,17 @@ class FlexMACE(hk.Module):
 
     def __call__(
         self,
-        # vectors: jnp.ndarray,  # [n_edges, 3]
-        positions: jnp.ndarray, # [n_nodes, 3]
+        positions: jnp.ndarray,  # [n_nodes, multiplicity, 3]
         node_specie: jnp.ndarray,  # [n_nodes] int between 0 and num_species-1
         shared_features: jnp.ndarray, # [dim_shared_features] features shared among all nodes, like time, or total number of atoms in system
         senders: jnp.ndarray,  # [n_edges]
         receivers: jnp.ndarray,  # [n_edges]
     ) -> e3nn.IrrepsArray:
-        assert positions.ndim == 2 and positions.shape[1] == 3
+        assert positions.ndim == 3 and positions.shape[2] == 3
         assert node_specie.ndim == 1
+        n_vectors_in = positions.shape[1]
         assert senders.ndim == 1 and receivers.ndim == 1
 
-        positions = positions[:, None, :]
         positions = e3nn.IrrepsArray("1x1o", positions - jnp.mean(positions, axis=0, keepdims=True))
         positions_in = positions
 
@@ -184,7 +183,8 @@ class FlexMACE(hk.Module):
                 receivers=receivers,
             )
             if first:
-                positions = irreps_array_repeat(positions, self.mace_layer_output_irreps.filter("1o").num_irreps, axis=1)
+                n_repeats = int(self.mace_layer_output_irreps.filter("1o").num_irreps / n_vectors_in)
+                positions = irreps_array_repeat(positions,  n_repeats, axis=1)
             # residual paths
 
             # update vectors and lengths note that this presserves equivariance
@@ -201,8 +201,7 @@ class FlexMACE(hk.Module):
 
         # Note that in this configuration only scalars will be outputed
         readout_in = e3nn.concatenate([residual_node_feats, (positions - positions_in).axis_to_mul(axis=1)]).regroup()
-        node_outputs = Linear(self.output_irreps,
-                name="output_linear", biases=True)(readout_in)
+        node_outputs = Linear(self.output_irreps, name="output_linear", biases=True)(readout_in)
         return node_outputs  # [n_nodes, output_irreps]
 
 

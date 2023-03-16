@@ -1,9 +1,12 @@
 import abc
-from typing import Any, Dict, List, Mapping, Union
+from typing import Any, Dict, List, Mapping, Union, Optional
+
 import pickle
 import numpy as np
 import pathlib
 import wandb
+import pandas as pd
+import os
 
 LoggingData = Mapping[str, Any]
 
@@ -78,3 +81,31 @@ class WandbLogger(Logger):
 
     def close(self) -> None:
         self.run.finish()
+
+class PandasLogger(Logger):
+    """A pandas logger that writes all info into a single dataframe."""
+    def __init__(self,
+                 save: bool = False,
+                 save_path: Optional[str] = None,
+                 save_period: int = 100):
+        if save_path is None:
+            self.save_path = "./logging_history.csv"
+        self.save_path = os.path.join(save_path, "logging_history.csv")
+        self.save = save
+        self.save_period = save_period
+        self.dataframe = pd.DataFrame()
+        self.iter: int = 0
+
+    def write(self, data: Dict[str, Any]) -> None:
+        self.dataframe = self.dataframe.join(pd.Series(data, name=self.iter), how='outer')
+        self.iter += 1
+        if self.save and (self.iter + 1) % self.save_period == 0:
+            if self.iter + 1 == self.save_period:  # First save
+                if not pathlib.Path(self.save_path).parent.exists():
+                    pathlib.Path(self.save_path).parent.mkdir(exist_ok=True, parents=True)
+            self.dataframe.to_csv(open(self.save_path, "w"))  # overwrite with latest version
+
+    def close(self) -> None:
+        if self.save:
+            self.dataframe.to_csv(open(self.save_path, "w"))  # overwrite with latest version
+

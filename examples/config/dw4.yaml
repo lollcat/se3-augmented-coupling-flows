@@ -6,18 +6,23 @@ hydra:
     chdir: false
 
 target:
-  aug_global_centering: false
-  aug_scale: 1.0
+  aux:
+    global_centering: false
+    scale_init: 1.0
+    trainable_augmented_scale: false
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
 
 flow:
   base:
-    aug_scale_init: ${target.aug_scale}
-    double_centered_gaussian: false
+    aux:
+      global_centering: false
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: true
   dim: 2
   nodes: 4
+  n_aug: 1
   n_layers: 4
   identity_init: true
   type: proj # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
@@ -28,11 +33,6 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       add_small_identity: true
-    proj_v2:
-      process_flow_params_jointly: true # if True then specify transformer config lower down.
-      condition_on_x_proj: true
-      gram_schmidt: false
-      n_vectors: 4
   act_norm: false
   compile_n_unroll: 1
   nets:
@@ -42,9 +42,7 @@ flow:
       n_layers: 3
       normalize_by_norms: true
       variance_scaling_init: 0.001
-      tanh: false
       agg: mean
-      phi_x_max: 1.0
       h_linear_softmax: true
       h_embedding_dim: 16
     transformer: # for proj and proj_v2 flows.
@@ -66,20 +64,15 @@ training:
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 2. # can be null
     max_global_norm: 0.5
-    second_order_opt: true
-    damping: 1e-5
-    max_second_order_step_size: 10.
-    min_second_order_step_size: 0.1
   use_64_bit: false
   n_epoch: 50
   batch_size: 200
   plot_batch_size: 256
   seed: 0
-  reload_aug_per_epoch: true
   train_set_size: 1000
   test_set_size: 1000
   n_plots: 6
-  n_checkpoints: 0
+  n_checkpoints: 2
   n_eval: 10
   K_marginal_log_lik: 20
   save: true
@@ -90,8 +83,10 @@ training:
 
 logger:
 #  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_${flow.type}_second_order_opt
+    name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4]
