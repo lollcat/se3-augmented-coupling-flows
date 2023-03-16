@@ -41,9 +41,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.mace.residual_mlp_width = 16
     cfg.flow.nets.mace.interaction_mlp_width = 16
     cfg.flow.nets.mace.interaction_mlp_depth = 1
-    cfg.flow.nets.mace.n_invariant_hidden_readout_block=16
+    cfg.flow.nets.mace.n_invariant_hidden_readout_block = 16
     cfg.flow.nets.mace.max_ell = 2
     cfg.flow.nets.mace.hidden_irreps = '4x0e+3x1o+1x2e'
+    cfg.flow.nets.mace.correlation = 2
 
 
     cfg.flow.type = 'proj'

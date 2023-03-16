@@ -45,6 +45,17 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.plot_batch_size = 2
     cfg.training.train_set_size = 1000
     cfg.training.test_set_size = 1000
+
+    # Make MACE small for local run.
+    cfg.flow.nets.mace.n_invariant_feat_residual = 16
+    cfg.flow.nets.mace.residual_mlp_width = 4
+    cfg.flow.nets.mace.interaction_mlp_width = 4
+    cfg.flow.nets.mace.interaction_mlp_depth = 1
+    cfg.flow.nets.mace.n_invariant_hidden_readout_block = 4
+    cfg.flow.nets.mace.max_ell = 1
+    cfg.flow.nets.mace.hidden_irreps = '4x0e+3x1o+1x2e'
+    cfg.flow.nets.mace.correlation = 2
+
     cfg.logger = DictConfig({"list_logger": None})
     return cfg
 
@@ -52,7 +63,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="qm9.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 

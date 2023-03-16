@@ -33,11 +33,11 @@ flow:
       add_small_identity: false
   compile_n_unroll: 1
   nets:
-    type: egnn # mace or egnn or e3transformer or e3gnn
+    type: mace # mace or egnn or e3transformer or e3gnn
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
-      n_vectors_hidden: 5
+      n_vec_hidden_per_vec_in: 1
       n_invariant_feat_hidden: 64
       sh_irreps_max_ell: 2
       get_shifts_via_tensor_product: true
@@ -52,7 +52,7 @@ flow:
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     mace:
-      n_vectors_residual: 3
+      n_vec_residual_per_vec_in: 1
       n_invariant_feat_residual: 64
       n_vectors_hidden_readout_block: 16
       n_invariant_hidden_readout_block: 64

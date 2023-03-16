@@ -33,9 +33,9 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: e3gnn # mace or egnn or e3transformer or e3gnn
+    type: mace # mace or egnn or e3transformer or e3gnn
     mace:
-      n_vectors_residual: 3
+      n_vec_residual_per_vec_in: 1
       n_invariant_feat_residual: 64
       n_vectors_hidden_readout_block: 16
       n_invariant_hidden_readout_block: 64
