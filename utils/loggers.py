@@ -1,10 +1,12 @@
 import abc
-from typing import Any, Dict, List, Mapping, Union
+from typing import Any, Dict, List, Mapping, Union, Optional
+
 import pickle
 import numpy as np
 import pathlib
 import wandb
 import pandas as pd
+import os
 
 LoggingData = Mapping[str, Any]
 
@@ -84,9 +86,11 @@ class PandasLogger(Logger):
     """A pandas logger that writes all info into a single dataframe."""
     def __init__(self,
                  save: bool = False,
-                 save_path: str ="./logging_history.csv",
+                 save_path: Optional[str] = None,
                  save_period: int = 100):
-        self.save_path = save_path
+        if save_path is None:
+            self.save_path = "./logging_history.csv"
+        self.save_path = os.path.join(save_path, "logging_history.csv")
         self.save = save
         self.save_period = save_period
         self.dataframe = pd.DataFrame()

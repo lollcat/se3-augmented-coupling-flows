@@ -32,8 +32,9 @@ from flow.distrax_with_extra import Extra
 mpl.rcParams['figure.dpi'] = 150
 TestData = chex.Array
 TrainData = chex.Array
-FlowSampleFn = Callable[[hk.Params, chex.PRNGKey, chex.Shape], chex.Array]
-Plotter = Callable[[hk.Params, FlowSampleFn, TestData, TrainData], List[plt.Figure]]
+PlottingBatchSize = int
+Plotter = Callable[[AugmentedFlowParams, AugmentedFlow, chex.PRNGKey, PlottingBatchSize,
+                    TestData, TrainData], List[plt.Figure]]
 
 
 def plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a,
@@ -68,7 +69,10 @@ def plot_original_aug_norms_sample_hist(samples_x, samples_a, ax, max_distance=1
     ax.hist(norms, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
-def default_plotter(params: AugmentedFlowParams, flow: AugmentedFlow, key, n_samples,
+def default_plotter(params: AugmentedFlowParams,
+                    flow: AugmentedFlow,
+                    key: chex.PRNGKey,
+                    n_samples: int,
                     train_data: FullGraphSample,
                     test_data: FullGraphSample,
                     plotting_n_nodes: Optional[int] = None):
@@ -216,7 +220,8 @@ def setup_logger(cfg: DictConfig) -> Logger:
     elif hasattr(cfg.logger, "list_logger"):
         logger = ListLogger()
     elif hasattr(cfg.logger, 'pandas_logger'):
-        logger = PandasLogger(**cfg.logger.pandas_logger, save=cfg.training.save)
+        logger = PandasLogger(save_path=cfg.training.save_dir, save_period=cfg.logger.pandas_logger.save_period,
+                              save=cfg.training.save)
     else:
         raise Exception("No logger specified, try adding the wandb or "
                         "pandas logger to the config file.")
