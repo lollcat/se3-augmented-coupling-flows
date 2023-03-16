@@ -160,6 +160,7 @@ class en_gnn_net(hk.Module):
         if len(x.shape) == 3:
             return self.forward_single(x, h)
         else:
+            chex.assert_rank(x, 4)
             return hk.vmap(self.forward_single, split_rng=False)(x, h)
 
 
@@ -168,7 +169,11 @@ class en_gnn_net(hk.Module):
         assert x.shape[0] == h.shape[0]
         n_nodes, multiplicity_in = x.shape[:2]
 
+        assert self.config.torso_config.h_embedding_dim >= (multiplicity_in * self.config.n_invariant_feat_out)
+
         # Perform forward pass of EGNN.
+        # Centre mass.
+        x = x - jnp.mean(x, axis=0, keepdims=True)
 
         # Project to number of heads
         x = jnp.repeat(x, repeats=self.n_heads, axis=1)

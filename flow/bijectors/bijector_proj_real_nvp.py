@@ -1,10 +1,10 @@
-from typing import Tuple, Optional, Callable, Sequence
+from typing import Tuple, Optional, Callable
 
-import distrax
 import chex
 import jax
 import jax.numpy as jnp
 import haiku as hk
+import numpy as np
 
 from nets.transformer import Transformer
 from nets.base import NetsConfig, build_egnn_fn
@@ -346,14 +346,19 @@ def make_se_equivariant_split_coupling_with_projection(
     n_heads = dim
     n_invariant_params = dim*2
 
+    n_coupling_variable_groups = n_aux + 1
     if nets_config.type == "mace":
-        n_invariant_feat_out = nets_config.mace_torso_config.n_invariant_feat_residual
+        n_invariant_feat_out = int(np.ceil(nets_config.mace_torso_config.n_invariant_feat_residual
+                                       / (n_coupling_variable_groups / 2)))
     elif nets_config.type == "egnn":
-        n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim
+        n_invariant_feat_out = int(np.ceil(nets_config.egnn_torso_config.h_embedding_dim
+                                       / (n_coupling_variable_groups / 2)))
     elif nets_config.type == 'e3transformer':
-        n_invariant_feat_out = nets_config.e3transformer_lay_config.n_invariant_feat_hidden
+        n_invariant_feat_out = int(np.ceil(nets_config.e3transformer_lay_config.n_invariant_feat_hidden
+                                       / (n_coupling_variable_groups / 2)))
     elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
+        n_invariant_feat_out = int(np.ceil(nets_config.e3gnn_torso_config.n_invariant_feat_hidden
+                                       / (n_coupling_variable_groups / 2)))
     else:
         raise NotImplementedError
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
