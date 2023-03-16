@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import pathlib
 import wandb
+import pandas as pd
 
 LoggingData = Mapping[str, Any]
 
@@ -78,3 +79,26 @@ class WandbLogger(Logger):
 
     def close(self) -> None:
         self.run.finish()
+
+class PandasLogger(Logger):
+    """A pandas logger that writes all info into a single dataframe."""
+    def __init__(self,
+                 save: bool = True,
+                 save_path: str ="/logging_history.csv",
+                 save_period: int = 100):
+        self.save_path = save_path
+        self.save = save
+        self.save_period = save_period
+        self.dataframe = pd.DataFrame()
+        self.iter: int = 0
+
+    def write(self, data: Dict[str, Any]) -> None:
+        self.dataframe = self.dataframe.append(data, ignore_index=True)
+        self.iter += 1
+        if self.save and (self.iter + 1) % self.save_period == 0:
+            self.dataframe.to_csv(open(self.save_path, "w"))  # overwrite with latest version
+
+    def close(self) -> None:
+        if self.save:
+            self.dataframe.to_csv(open(self.save_path, "w")) # overwrite with latest version
+

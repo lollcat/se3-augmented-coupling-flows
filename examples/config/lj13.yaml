@@ -108,6 +108,8 @@ training:
 
 logger:
 #  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
     name: lj13_${flow.type}
     project: fab
