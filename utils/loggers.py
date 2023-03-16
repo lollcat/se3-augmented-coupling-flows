@@ -83,8 +83,8 @@ class WandbLogger(Logger):
 class PandasLogger(Logger):
     """A pandas logger that writes all info into a single dataframe."""
     def __init__(self,
-                 save: bool = True,
-                 save_path: str ="/logging_history.csv",
+                 save: bool = False,
+                 save_path: str ="./logging_history.csv",
                  save_period: int = 100):
         self.save_path = save_path
         self.save = save
@@ -93,12 +93,15 @@ class PandasLogger(Logger):
         self.iter: int = 0
 
     def write(self, data: Dict[str, Any]) -> None:
-        self.dataframe = self.dataframe.append(data, ignore_index=True)
+        self.dataframe = self.dataframe.join(pd.Series(data, name=self.iter), how='outer')
         self.iter += 1
         if self.save and (self.iter + 1) % self.save_period == 0:
+            if self.iter + 1 == self.save_period:  # First save
+                if not pathlib.Path(self.save_path).parent.exists():
+                    pathlib.Path(self.save_path).parent.mkdir(exist_ok=True, parents=True)
             self.dataframe.to_csv(open(self.save_path, "w"))  # overwrite with latest version
 
     def close(self) -> None:
         if self.save:
-            self.dataframe.to_csv(open(self.save_path, "w")) # overwrite with latest version
+            self.dataframe.to_csv(open(self.save_path, "w"))  # overwrite with latest version
 

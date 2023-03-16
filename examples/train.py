@@ -25,7 +25,7 @@ from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
 from utils.aug_flow_train_and_eval import eval_fn, ml_step
 from utils.graph import get_senders_and_receivers_fully_connected
-from utils.loggers import Logger, WandbLogger, ListLogger
+from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from flow.distrax_with_extra import Extra
 
 
@@ -215,6 +215,8 @@ def setup_logger(cfg: DictConfig) -> Logger:
         logger = WandbLogger(**cfg.logger.wandb, config=dict(cfg))
     elif hasattr(cfg.logger, "list_logger"):
         logger = ListLogger()
+    elif hasattr(cfg.logger, 'pandas_logger'):
+        logger = PandasLogger(**cfg.logger.pandas_logger, save=cfg.training.save)
     else:
         raise Exception("No logger specified, try adding the wandb or "
                         "pandas logger to the config file.")
@@ -298,6 +300,7 @@ def train(config: TrainConfig):
     assert config.flow_dist_config.nodes == config.n_nodes
 
     if config.save:
+        pathlib.Path(config.save_dir).mkdir(exist_ok=True)
         plots_dir = os.path.join(config.save_dir, f"plots")
         pathlib.Path(plots_dir).mkdir(exist_ok=False)
         checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
@@ -444,4 +447,5 @@ def train(config: TrainConfig):
         plot_history(config.logger.history)
         plt.show()
 
+    config.logger.close()
     return config.logger, params, flow_dist
