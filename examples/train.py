@@ -14,6 +14,9 @@ import pathlib
 from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
+from functools import partial
+
+from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -21,7 +24,7 @@ from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNN
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.aug_flow_train_and_eval import eval_fn, ml_step
+from utils.aug_flow_train_and_eval import eval_fn, general_ml_loss_fn
 from utils.graph import get_senders_and_receivers_fully_connected
 from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 
@@ -178,7 +181,7 @@ def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoc
 
     grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
     optimizer = optax.chain(*grad_transforms)
-    return optimizer, lr, ml_step
+    return optimizer, lr
 
 
 class TrainConfig(NamedTuple):
@@ -336,61 +339,34 @@ def train(config: TrainConfig):
     plot_and_maybe_save(config.plotter, params, flow_dist, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
-    optimizer, lr, step_fn = get_optimizer_and_step_fn(config.optimizer_config,
+    optimizer, lr = get_optimizer_and_step_fn(config.optimizer_config,
                                               n_iter_per_epoch=train_data.positions.shape[0] // config.batch_size,
                                               total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
 
 
-    if config.scan_run:
-        def scan_fn(carry, xs):
-            params, opt_state, key = carry
-            key, subkey = jax.random.split(key)
-            x = xs
-            params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
-                                              subkey,
-                                              config.use_flow_aux_loss, config.aux_loss_weight)
-            if config.last_iter_info_only:
-                info = None
-            return (params, opt_state, key), info
-
-        @jax.jit
-        # @chex.assert_max_traces(2)
-        def scan_epoch(params, opt_state, key, batched_data):
-            if config.last_iter_info_only:
-                final_batch = batched_data[-1]
-                batched_data = batched_data[:-1]
-            (params, opt_state, key), info = jax.lax.scan(scan_fn, (params, opt_state, key),
-                                                                 batched_data,
-                                                                 unroll=1)
-            if config.last_iter_info_only:
-                key, subkey = jax.random.split(key)
-                params, opt_state, info = step_fn(params, final_batch, opt_state,
-                                                  flow_dist,
-                                                  optimizer,
-                                                  subkey,
-                                                  config.use_flow_aux_loss,
-                                                  config.aux_loss_weight)
-            return params, opt_state, key, info
-
-
     pbar = tqdm(range(config.n_epoch))
 
-    jax.jit
-    # @chex.assert_max_traces(n=2)
-    def shuffle_and_batchify_data(key, train_data: FullGraphSample = train_data, config: TrainConfig = config):
-        indices = jax.random.permutation(key, jnp.arange(train_data.positions.shape[0]))
-        train_data = train_data[indices]
-        batched_data = jax.tree_map(lambda x: jnp.reshape(x, (-1, config.batch_size, *x.shape[1:])), train_data)
-        return batched_data
+
+    shuffle_and_batchify_data = get_shuffle_and_batchify_data_fn(train_data, batch_size=config.batch_size)
+
+
+    loss_fn = partial(general_ml_loss_fn,
+                      flow=flow_dist,
+                      use_flow_aux_loss=config.use_flow_aux_loss,
+                      aux_loss_weight=config.aux_loss_weight)
+    training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
+    scan_epoch_fn = create_scan_epoch_fn(training_step_fn, config.last_iter_info_only)
+
 
     for i in pbar:
         key, subkey = jax.random.split(key)
+        # TODO: In boiler plate we can move this to happen internall to scan_epoch_fn.
         batched_data = shuffle_and_batchify_data(subkey)
 
         if config.scan_run:
             key, subkey = jax.random.split(key)
-            params, opt_state, key, info_out = scan_epoch(params, opt_state, subkey, batched_data)
+            params, opt_state, key, info_out = scan_epoch_fn(params, opt_state, subkey, batched_data)
             if config.last_iter_info_only:
                 info = info_out
                 info.update(epoch=i)
@@ -414,10 +390,8 @@ def train(config: TrainConfig):
             for i in range(batched_data.positions.shape[0]):
                 x = batched_data[i]
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
-                                                  subkey,
-                                                  config.use_flow_aux_loss, config.aux_loss_weight
-                                                  )
+                params, opt_state, info = training_step_fn(params, x, opt_state, flow_dist, optimizer,
+                                                  subkey)
                 config.logger.write(info)
                 info.update(epoch=i)
                 if jnp.isnan(info["grad_norm"]):

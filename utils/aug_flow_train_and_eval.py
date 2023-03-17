@@ -15,12 +15,14 @@ X = chex.Array
 LogProbWithExtraFn = Callable[[Params, X], Tuple[chex.Array, Extra]]
 
 
-def general_ml_loss_fn(params: AugmentedFlowParams,
-                       x: FullGraphSample,
-                       flow: AugmentedFlow,
-                       key: chex.PRNGKey,
-                       use_aux_loss: bool,
-                       aux_loss_weight: float) -> Tuple[chex.Array, dict]:
+def general_ml_loss_fn(
+        key: chex.PRNGKey,
+        params: AugmentedFlowParams,
+        x: FullGraphSample,
+        verbose_info: bool,
+        flow: AugmentedFlow,
+        use_flow_aux_loss: bool,
+        aux_loss_weight: float) -> Tuple[chex.Array, dict]:
     aux_samples, log_pi_a_given_x = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
@@ -32,7 +34,7 @@ def general_ml_loss_fn(params: AugmentedFlowParams,
             "mean_log_p_a": mean_log_p_a
             }
     aux_loss = jnp.mean(extra.aux_loss)
-    if use_aux_loss:
+    if use_flow_aux_loss:
         loss = loss + aux_loss * aux_loss_weight
     info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
     info.update(aux_loss=aux_loss)
