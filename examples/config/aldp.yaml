@@ -52,7 +52,7 @@ flow:
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     mace:
-      n_vectors_residual: 3
+      n_vec_residual_per_vec_in: 3
       n_invariant_feat_residual: 64
       n_vectors_hidden_readout_block: 16
       n_invariant_hidden_readout_block: 64
