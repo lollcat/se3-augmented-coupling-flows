@@ -102,10 +102,9 @@ def run(cfg: DictConfig):
     if local_config:
         cfg = to_local_config(cfg)
 
-    cfg.training.plotter = custom_aldp_plotter
-
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
-                                            load_dataset=load_dataset)
+                                            load_dataset=load_dataset,
+                                            plotter=custom_aldp_plotter)
     #experiment_config.plotter = custom_aldp_plotter
     train(experiment_config)
 

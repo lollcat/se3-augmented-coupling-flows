@@ -262,7 +262,7 @@ def create_flow_config(cfg: DictConfig):
     )
     return flow_dist_config
 
-def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainConfig:
+def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter=default_plotter) -> TrainConfig:
     logger = setup_logger(cfg)
 
     training_config = dict(cfg.training)
@@ -289,6 +289,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         **training_config,
         logger=logger,
         save_dir=save_path,
+        plotter=plotter
     )
     return experiment_config
 
