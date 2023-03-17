@@ -21,13 +21,12 @@ def general_ml_loss_fn(params: AugmentedFlowParams,
                        key: chex.PRNGKey,
                        use_aux_loss: bool,
                        aux_loss_weight: float) -> Tuple[chex.Array, dict]:
-    aux_samples, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x, key)
+    aux_samples, log_pi_a_given_x = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
     mean_log_prob_q = jnp.mean(log_q)
-    mean_log_p_a = jnp.mean(log_p_a)
-    # kl = E_{p(x,a)}[log p(x,a) - log q(x,a)] = E_{p(x,a)}[log p(x) + log p(a | x) - log q(x,a)]
-    # Set loss to log p(a | x) - log q(x,a). Noting that log p(x) has no differentiable params.
+    mean_log_p_a = jnp.mean(log_pi_a_given_x)
+    # Train log_pi_a_given_x via maximisation of the ELBO.
     loss = mean_log_p_a - mean_log_prob_q
     info = {"mean_log_prob_q_joint": mean_log_prob_q,
             "mean_log_p_a": mean_log_p_a
