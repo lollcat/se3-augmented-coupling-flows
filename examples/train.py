@@ -401,7 +401,7 @@ def train(config: TrainConfig):
                 if jnp.isnan(info["grad_norm"]):
                     print("nan grad")
             else:
-                for batch_index in range(batched_data.shape[0]):
+                for batch_index in range(batched_data.positions.shape[0]):
                     info = jax.tree_map(lambda x: x[batch_index], info_out)
                     info.update(epoch=i)
                     info.update(n_optimizer_steps=opt_state[-1][0].count)
