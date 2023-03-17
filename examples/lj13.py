@@ -55,12 +55,19 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.flow.type = 'proj'
     cfg.training.plot_batch_size = 4
     cfg.logger = DictConfig({"list_logger": None})
+
+    debug = False
+    if debug:
+        cfg_train = dict(cfg['training'])
+        cfg_train['scan_run'] = False
+        cfg.training = DictConfig(cfg_train)
+
     return cfg
 
 
 @hydra.main(config_path="./config", config_name="lj13.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 

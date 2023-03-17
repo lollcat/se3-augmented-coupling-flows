@@ -9,7 +9,7 @@ from nets.mace import MaceNet, MACEConfig, MACETorsoConfig
 from utils.plotting import plot_points_and_vectors
 
 
-def test_mace(dim: int = 3, n_nodes: int = 5):
+def test_mace(dim: int = 3, n_nodes: int = 5, multiplicity: int = 2):
     if jnp.ones(()).dtype == jnp.float64:
         rtol = 1e-5
     else:
@@ -21,7 +21,7 @@ def test_mace(dim: int = 3, n_nodes: int = 5):
         n_vectors_hidden_readout_block = 3,
         n_invariant_hidden_readout_block = 16,
         hidden_irreps = '8x0e+6x1o',
-        num_features = 5,
+        num_features = 1,
         max_ell=2
     )
 
@@ -38,25 +38,28 @@ def test_mace(dim: int = 3, n_nodes: int = 5):
     def mace_forward_fn(x: chex.Array, h: chex.Array):
         mace_net = MaceNet(config)
         x, h = mace_net(x, h)
-        return x
+        return x, h
 
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
-    positions = jax.random.normal(key=subkey, shape=(n_nodes, dim))*0.5
+    positions = jax.random.normal(key=subkey, shape=(n_nodes, multiplicity, dim))*0.5
+    key, subkey = jax.random.split(key)
+    features = jax.random.normal(key=subkey, shape=(n_nodes, 1, 1))
 
     key, subkey = jax.random.split(key)
-    params = mace_forward_fn.init(subkey, positions)
-    vectors_out, h = jax.jit(mace_forward_fn.apply)(params, positions)
-    chex.assert_shape(vectors_out, (n_nodes, config.n_vectors_out, dim))
-    chex.assert_shape(h, (n_nodes, config.n_invariant_feat_out))
+    params = mace_forward_fn.init(subkey, positions, features)
+    vectors_out, h = jax.jit(mace_forward_fn.apply)(params, positions, features)
+    chex.assert_shape(vectors_out, (n_nodes, multiplicity, config.n_vectors_out, dim))
+    chex.assert_shape(h, (n_nodes, multiplicity, config.n_invariant_feat_out))
 
-    fig, ax = plot_points_and_vectors(positions)
+    fig, ax = plot_points_and_vectors(positions[:, 0])
     ax.set_title("postions in")
     plt.show()
 
     # Visualise vectors.
-    fig, ax = plot_points_and_vectors(vectors_out / jnp.linalg.norm(vectors_out, axis=-1, keepdims=True))
+    normalised_vectors = vectors_out / jnp.linalg.norm(vectors_out, axis=0, keepdims=True)
+    fig, ax = plot_points_and_vectors(normalised_vectors[:, 0])
     ax.set_title('normalized vectors out')
     plt.show()
 

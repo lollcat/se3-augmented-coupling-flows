@@ -411,7 +411,7 @@ def train(config: TrainConfig):
                     if jnp.isnan(info["grad_norm"]):
                         print("nan grad")
         else:
-            for i in range(batched_data.shape[0]):
+            for i in range(batched_data.positions.shape[0]):
                 x = batched_data[i]
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
