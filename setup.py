@@ -17,13 +17,13 @@ with open(path.join(here, "requirements.txt"), encoding="utf-8") as f:
 # install_requires = [x.strip() for x in all_reqs]
 
 setup(
-    name="augmentedEquivariantFlows",
+    name="AEF",
     version=__version__,
     description="Equivariant normalising flows through augmented variables",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/lollcat/augmented-equivariant-flows",
-    download_url="https://github.com/lollcat/augmented-equivariant-flows/archive/refs/heads/master.zip",
+    # url="https://github.com/lollcat/augmented-equivariant-flows",
+    # download_url="https://github.com/lollcat/augmented-equivariant-flows/archive/refs/heads/master.zip",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
