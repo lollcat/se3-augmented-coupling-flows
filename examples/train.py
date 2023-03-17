@@ -16,7 +16,7 @@ from omegaconf import DictConfig
 import matplotlib as mpl
 from functools import partial
 
-from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step
+from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -24,7 +24,7 @@ from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNN
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.aug_flow_train_and_eval import eval_fn, general_ml_loss_fn
+from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from utils.graph import get_senders_and_receivers_fully_connected
 from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 
@@ -358,10 +358,14 @@ def train(config: TrainConfig):
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
     scan_epoch_fn = create_scan_epoch_fn(training_step_fn, config.last_iter_info_only)
 
+    eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                    flow=flow_dist, K=config.K_marginal_log_lik, test_invariances=True)
+    eval_batch_free_fn = None
+
 
     for i in pbar:
         key, subkey = jax.random.split(key)
-        # TODO: In boiler plate we can move this to happen internall to scan_epoch_fn.
+        # TODO: In boiler plate we can move this to happen internal to scan_epoch_fn.
         batched_data = shuffle_and_batchify_data(subkey)
 
         if config.scan_run:
@@ -390,8 +394,7 @@ def train(config: TrainConfig):
             for i in range(batched_data.positions.shape[0]):
                 x = batched_data[i]
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = training_step_fn(params, x, opt_state, flow_dist, optimizer,
-                                                  subkey)
+                params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
                 config.logger.write(info)
                 info.update(epoch=i)
                 if jnp.isnan(info["grad_norm"]):
@@ -404,11 +407,10 @@ def train(config: TrainConfig):
 
         if i in eval_iter:
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params=params, x=test_data,
-                                flow=flow_dist,
-                                key=subkey,
-                                batch_size=config.batch_size,
-                                K=config.K_marginal_log_lik)
+            eval_info = eval_fn(test_data, subkey, params,
+                                eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                eval_batch_free_fn=eval_batch_free_fn,
+                                batch_size=config.batch_size)
             pbar.write(str(eval_info))
             eval_info.update(epoch=i)
             config.logger.write(eval_info)
