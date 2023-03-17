@@ -33,7 +33,7 @@ flow:
       add_small_identity: false
   compile_n_unroll: 1
   nets:
-    type: e3gnn # mace or egnn or e3transformer or e3gnn
+    type: egnn # mace or egnn or e3transformer or e3gnn
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
