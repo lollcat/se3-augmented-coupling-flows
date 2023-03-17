@@ -14,6 +14,14 @@ ListLogger that can may used if you don't want to use wandb.
 **MUST** be run before running `examples/qm9.py`.
 
 
+## Experiments
+```shell
+python examples.dw4.py
+python examples/lj13.py
+python examples/aldp.py
+python examples/qm9.py
+```
+
 ## Instalation
 
 1. Install packages in requirements.txt
@@ -27,18 +35,17 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Add augmented target to flow definition, and loss. 
-    - Loss can take in whole flow object. 
-    - Add more augmented variables.
-    - Rewrite for e3nn
-        1. Let networks take in positional and feature info.
-        2. Alanine dipeptide
-    - Rewrite with jgraph, generalise to varying number of nodes
+    - Code permutation layer that acts on auxilliary coordinates. 
+    - Update all nets. Make sure they embed h. 
+    - Centralise net config naming to be more consistent. 
+    - Add whether sample has aux to sample info?
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
+    - Make sure non-equivariant flow is working well.
 
 ## Less burning
-    - Generalse FlowWithInfo interface to work for all flows. 
     - Spline flows
+    - Rewrite with jgraph, generalise to varying number of nodes. 
+    - Also have some augmented graph nodes?
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.
     - e3nn outputs are typically shift **invariant** rather than equivariant. 
     The flow transforms should use this, which also allows for simplification. 
