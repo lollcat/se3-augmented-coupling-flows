@@ -4,6 +4,7 @@ import jax
 
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
 from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
+from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 def get_minimal_nets_config(type = 'egnn'):
@@ -15,7 +16,7 @@ def get_minimal_nets_config(type = 'egnn'):
                                  n_invariant_hidden_readout_block=3,
                                  hidden_irreps='4x0e+4x1o'
                              ),
-                             egnn_torso_config=EgnnTorsoConfig(),
+                             egnn_torso_config=EgnnTorsoConfig(mlp_units=(3,), h_embedding_dim=5),
                              e3gnn_torso_config=E3GNNTorsoConfig(
                                  n_blocks=2,
                                  mlp_units=(4,),
@@ -30,13 +31,14 @@ def get_minimal_nets_config(type = 'egnn'):
 def get_pairwise_distances(x):
     return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
 
-def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
+
+def test_fn_is_equivariant(equivariant_fn, key, event_shape):
+    dim = event_shape[-1]
     assert dim in (2, 3)
 
     # Setup
     key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jnp.zeros((n_nodes, dim * 2))
-    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape)
+    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
 
     rtol = 1e-5 if x_and_a.dtype == jnp.float64 else 1e-3
 
@@ -63,17 +65,17 @@ def test_fn_is_equivariant(equivariant_fn, key, dim, n_nodes=20):
     chex.assert_trees_all_close(x_and_a_new_rot, group_action(x_and_a_new), rtol=rtol)
 
 
-def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):
+def test_fn_is_invariant(invariante_fn, key, event_shape):
+    dim = event_shape[-1]
     assert dim in (2, 3)
 
     # Setup
     key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jnp.zeros((n_nodes, dim * 2))
-    x_and_a = x_and_a + jax.random.normal(key1, shape=x_and_a.shape) * 0.1
+    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2 * jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,))
+    translation = jax.random.normal(key3, shape=(dim,)) * 10
     phi = jax.random.uniform(key4) * 2 * jnp.pi
 
     def group_action(x_and_a):
@@ -100,17 +102,16 @@ def test_fn_is_invariant(invariante_fn, key, dim, n_nodes=7):
 
 
 def bijector_test(bijector_forward, bijector_backward,
-                  dim: int, n_nodes: int):
+                  dim: int, n_nodes: int, n_aux: int):
     """Test that the bijector is equivariant, and that it's log determinant is invariant.
     Assumes bijectors are haiku transforms."""
     assert dim in (2, 3)
+    event_shape = (n_nodes, n_aux+1, dim)
 
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
 
-    # Create dummy x and a.
-    x_and_a = jnp.zeros((n_nodes, dim*2))
-    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+    x_and_a = jax.random.normal(subkey, shape=event_shape) * 0.1
 
     if x_and_a.dtype == jnp.float64:
         rtol = 1e-4
@@ -132,21 +133,20 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Test the transformation is equivariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, dim)
+    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, dim)
+    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
 
     # Check the change to the log det is invariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, dim)
+    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, dim)
+    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
 
 
     # Forward reverse test but with a batch.
     batch_size = 11
-    x_and_a = jnp.zeros((batch_size, n_nodes, dim*2))
-    x_and_a = x_and_a + jax.random.normal(subkey, shape=x_and_a.shape)*0.1
+    x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
@@ -165,9 +165,15 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_tree_all_finite(grad)
 
 
-def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
-    batch_size, n_nodes, joint_dim = samples.shape
-    dim = joint_dim // 2
+def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
+                                          flow: AugmentedFlow,
+                                          params: AugmentedFlowParams,
+                                          key: chex.PRNGKey):
+    log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
+
+    # Used in evaluation
+    batch_size, n_nodes, n_var_groups, dim = samples.positions.shape
+    n_aux = n_var_groups - 1
 
     key1, key2, key3 = jax.random.split(key, 3)
 
@@ -179,23 +185,23 @@ def get_max_diff_log_prob_invariance_test(samples, log_prob_fn, key):
     def group_action(x_and_a):
         if dim == 2:
             x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:  #  dim == 3:
+        else:  # dim == 3:
             x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
         return x_and_a_rot
 
 
-    samples_rot = group_action(samples)
+    positions_rot = group_action(samples.positions)
+    samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
 
-    log_prob = log_prob_fn(samples)
-
-    log_prob_alt = log_prob_fn(samples_rot)
+    chex.assert_trees_all_equal_shapes(samples, samples_rot)
+    log_prob = log_prob_samples_only_fn(samples)
+    log_prob_alt = log_prob_samples_only_fn(samples_rot)
 
     max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
     mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
-    mean_diff_x_space = jnp.mean(jnp.abs(samples - samples_rot))
-    return {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
-            "mean_abs_diff_log_prob_after_group_action": mean_abs_diff,
-            "mean_diff_x_space_after_group_action": mean_diff_x_space}
+    info = {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
+            "mean_abs_diff_log_prob_after_group_action": mean_abs_diff}
+    return info
 
 
 

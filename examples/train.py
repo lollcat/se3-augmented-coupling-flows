@@ -1,7 +1,6 @@
 from typing import Callable, Tuple, Optional, List, NamedTuple
 
 import chex
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import optax
@@ -15,33 +14,31 @@ import pathlib
 from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
-from functools import partial
 
-from flow.build_flow import build_flow, FlowDistConfig, BaseConfig
+from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
+from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
 from nets.transformer import TransformerConfig
 from utils.plotting import plot_history
-from utils.train_and_eval import eval_fn, original_dataset_to_joint_dataset, ml_step
-from utils.train_and_eval import ml_step_second_order_opt
-from utils.numerical import get_pairwise_distances
-from utils.loggers import Logger, WandbLogger, ListLogger
-from flow.distrax_with_extra import Extra
+from utils.aug_flow_train_and_eval import eval_fn, ml_step
+from utils.graph import get_senders_and_receivers_fully_connected
+from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 
 
 mpl.rcParams['figure.dpi'] = 150
 TestData = chex.Array
 TrainData = chex.Array
-FlowSampleFn = Callable[[hk.Params, chex.PRNGKey, chex.Shape], chex.Array]
-Plotter = Callable[[hk.Params, FlowSampleFn, TestData, TrainData], List[plt.Figure]]
+PlottingBatchSize = int
+Plotter = Callable[[AugmentedFlowParams, AugmentedFlow, chex.PRNGKey, PlottingBatchSize,
+                    TestData, TrainData], List[plt.Figure]]
 
 
-def plot_orig_aug_centre_mass_diff_hist(samples,
+def plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a,
                                         ax, max_distance=10,
                                         *args, **kwargs):
-    dim = samples.shape[-1] // 2
-    centre_mass_original = jnp.mean(samples[..., :dim], axis=-2)
-    centre_mass_augmented = jnp.mean(samples[..., dim:], axis=-2)
+    centre_mass_original = jnp.mean(positions_x, axis=-2)
+    centre_mass_augmented = jnp.mean(positions_a, axis=-2)
     d = jnp.linalg.norm(centre_mass_original - centre_mass_augmented, axis=-1)
     d = d[jnp.isfinite(d)]
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
@@ -50,79 +47,97 @@ def plot_orig_aug_centre_mass_diff_hist(samples,
 
 def plot_sample_hist(samples,
                      ax,
-                     original_coords,  # or augmented
                      n_vertices: Optional[int] = None,
                      max_distance = 10, *args, **kwargs):
     """n_vertices argument allows us to look at pairwise distances for subset of vertices,
     to prevent plotting taking too long"""
-    dim = samples.shape[-1] // 2
-    dims = jnp.arange(dim) + (0 if original_coords else dim)
     n_vertices = samples.shape[1] if n_vertices is None else n_vertices
     n_vertices = min(samples.shape[1], n_vertices)
-    differences = jax.jit(jax.vmap(get_pairwise_distances))(samples[:, :n_vertices, dims])
-    mask = jnp.ones_like(differences, dtype=bool).at[:, jnp.arange(n_vertices), jnp.arange(n_vertices)].set(False)
-    d = differences.flatten()
-    d = d[mask.flatten()]
+    senders, receivers = get_senders_and_receivers_fully_connected(n_nodes=n_vertices)
+    norms = jnp.linalg.norm(samples[:, senders] - samples[:, receivers], axis=-1)
+    d = norms.flatten()
     d = d[jnp.isfinite(d)]
     d = d.clip(max=max_distance)  # Clip keep plot reasonable.
     ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
-def plot_original_aug_norms_sample_hist(samples, ax, max_distance=10, *args, **kwargs):
-    dim = samples.shape[-1] // 2
-    norms = jnp.linalg.norm(samples[..., :dim] - samples[..., dim:], axis=-1).flatten()
+def plot_original_aug_norms_sample_hist(samples_x, samples_a, ax, max_distance=10, *args, **kwargs):
+    norms = jnp.linalg.norm(samples_x - samples_a, axis=-1).flatten()
     norms = norms.clip(max=max_distance)  # Clip keep plot reasonable.
     ax.hist(norms, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
-
-def default_plotter(params, flow_sample_fn, key, n_samples, train_data, test_data,
+def default_plotter(params: AugmentedFlowParams,
+                    flow: AugmentedFlow,
+                    key: chex.PRNGKey,
+                    n_samples: int,
+                    train_data: FullGraphSample,
+                    test_data: FullGraphSample,
                     plotting_n_nodes: Optional[int] = None):
 
     # Plot interatomic distance histograms.
-    fig1, axs = plt.subplots(2, 3, figsize=(15, 10))
-    samples = flow_sample_fn(params, key, (n_samples,))
+    key1, key2 = jax.random.split(key)
+    joint_samples_flow = jax.jit(flow.sample_apply, static_argnums=3)(params, train_data.features[0], key1,
+                                                                      (n_samples,))
+    features, positions_x, positions_a = jax.jit(flow.joint_to_separate_samples)(joint_samples_flow)
+    positions_a_target = jax.jit(flow.aux_target_sample_n_apply)(params.aux_target, test_data[:n_samples], key2)
 
-    for i, og_coords in enumerate([True, False]):
-        plot_sample_hist(samples, axs[0, i], original_coords=og_coords, label="flow samples",
-                         n_vertices=plotting_n_nodes)
-        plot_sample_hist(samples, axs[1, i], original_coords=og_coords, label="flow samples",
-                         n_vertices=plotting_n_nodes)
-        plot_sample_hist(train_data[:n_samples], axs[0, i], original_coords=og_coords, label="train samples",
-                         n_vertices=plotting_n_nodes)
-        plot_sample_hist(test_data[:n_samples], axs[1, i], original_coords=og_coords, label="test samples",
-                         n_vertices=plotting_n_nodes)
+    # Plot original coords
+    fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
+    plot_sample_hist(positions_x, axs[0], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(positions_x, axs[1], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(train_data.positions[:n_samples], axs[0],  label="train samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(test_data.positions[:n_samples], axs[1],  label="test samples", n_vertices=plotting_n_nodes)
 
-    plot_original_aug_norms_sample_hist(samples, axs[0, 2], label='flow samples')
-    plot_original_aug_norms_sample_hist(train_data, axs[0, 2], label='train samples')
-    plot_original_aug_norms_sample_hist(samples, axs[1, 2], label='flow samples')
-    plot_original_aug_norms_sample_hist(test_data, axs[1, 2], label='test samples')
-
-    axs[0, 0].set_title(f"norms between original coordinates")
-    axs[0, 1].set_title(f"norms between augmented coordinates")
-    axs[0, 2].set_title(f"norms between original-aug pairs")
-    axs[0, 0].legend()
-    axs[1, 0].legend()
+    axs[0].set_title(f"norms between original coordinates train")
+    axs[1].set_title(f"norms between original coordinates test")
+    axs[0].legend()
+    axs[1].legend()
     fig1.tight_layout()
 
-    # Plot histogram for centre of mean
-    fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))
-    plot_orig_aug_centre_mass_diff_hist(samples, ax=axs2[0], label='flow samples')
-    plot_orig_aug_centre_mass_diff_hist(train_data, ax=axs2[0], label='train samples')
-    plot_orig_aug_centre_mass_diff_hist(samples, ax=axs2[1], label='flow samples')
-    plot_orig_aug_centre_mass_diff_hist(test_data, ax=axs2[1], label='test samples')
-    axs2[0].legend()
-    axs2[1].legend()
-    axs2[0].set_title("norms between original - aug centre of mass histogram")
-    axs2[1].set_title("norms between original - aug centre of mass histogram")
+    # Augmented info.
+    fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
+    axs2 = [axs2] if isinstance(axs2, plt.Subplot) else axs2
+    for i in range(flow.n_augmented):
+        positions_a_single = positions_a[:, :, i]  # get single group of augmented coordinates
+        positions_a_target_single = positions_a_target[:, :, i]  # Get first set of aux variables.
+        chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
+        plot_sample_hist(positions_a_single, axs2[i], label="flow samples", n_vertices=plotting_n_nodes)
+        plot_sample_hist(positions_a_target_single, axs2[i], label="test samples", n_vertices=plotting_n_nodes)
+        axs2[i].set_title(f"norms between augmented coordinates (aug group {i})")
+    axs[0].legend()
     fig2.tight_layout()
 
-    return [fig1, fig2]
+    # Plot histogram for centre of mean
+    fig3, axs3 = plt.subplots(1, 2, figsize=(10, 5))
+    positions_a_single = positions_a[:, :, 0]  # get single group of augmented coordinates
+    positions_a_target_single = positions_a_target[:, :, 0]  # Get first set of aux variables.
+
+    plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a_single, ax=axs3[0], label='flow samples')
+    plot_orig_aug_centre_mass_diff_hist(test_data[:n_samples].positions, positions_a_target_single, ax=axs3[0],
+                                        label='test samples')
+    plot_original_aug_norms_sample_hist(positions_x, positions_a_single, axs3[1], label='flow samples')
+    plot_original_aug_norms_sample_hist(test_data[:n_samples].positions, positions_a_target_single, axs3[1],
+                                        label='test samples')
+    axs3[0].legend()
+    axs3[0].set_title("norms orig - aug centre of mass (aug group 1) ")
+    axs3[1].set_title("norms orig - augparticles (aug group 1)")
+    fig3.tight_layout()
+
+    return [fig1, fig2, fig3]
 
 
-def plot_and_maybe_save(plotter, params, sample_fn, key, plot_batch_size, train_data, test_data, epoch_n,
+def plot_and_maybe_save(plotter,
+                        params: AugmentedFlowParams,
+                        flow: AugmentedFlow,
+                        key: chex.PRNGKey,
+                        plot_batch_size: int,
+                        train_data: FullGraphSample,
+                        test_data: FullGraphSample,
+                        epoch_n: int,
                         save: bool,
-                        plots_dir):
-    figures = plotter(params, sample_fn, key, plot_batch_size, train_data, test_data)
+                        plots_dir: str
+                        ):
+    figures = plotter(params, flow, key, plot_batch_size, train_data, test_data)
     for j, figure in enumerate(figures):
         if save:
             figure.savefig(os.path.join(plots_dir, f"{j}_iter_{epoch_n}.png"))
@@ -139,10 +154,6 @@ class OptimizerConfig(NamedTuple):
     peak_lr: Optional[float] = None
     end_lr: Optional[float] = None
     warmup_n_epoch: Optional[int] = None
-    second_order_opt: bool = False
-    damping: float = 1e-5
-    max_second_order_step_size: float = 10.
-    min_second_order_step_size: float = 0.1
 
 
 def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
@@ -167,12 +178,7 @@ def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoc
 
     grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
     optimizer = optax.chain(*grad_transforms)
-    if optimizer_config.second_order_opt:
-        step_fn = partial(ml_step_second_order_opt, step_size_min=optimizer_config.min_second_order_step_size,
-        step_size_max=optimizer_config.max_second_order_step_size, damping=optimizer_config.damping)
-    else:
-        step_fn = ml_step
-    return optimizer, lr, step_fn
+    return optimizer, lr, ml_step
 
 
 class TrainConfig(NamedTuple):
@@ -180,9 +186,7 @@ class TrainConfig(NamedTuple):
     dim: int
     n_nodes: int
     flow_dist_config: FlowDistConfig
-    aug_target_global_centering: bool
-    aug_target_scale: float
-    load_datasets: Callable[[int, int, int], Tuple[chex.Array, chex.Array]]
+    load_datasets: Callable[[int, int, int], Tuple[FullGraphSample, FullGraphSample]]
     optimizer_config: OptimizerConfig
     batch_size: int
     K_marginal_log_lik: int
@@ -195,7 +199,6 @@ class TrainConfig(NamedTuple):
     use_flow_aux_loss: bool = False
     aux_loss_weight: float = 1.0
     plotter: Plotter = default_plotter
-    reload_aug_per_epoch: bool = True
     train_set_size: Optional[int] = None
     test_set_size: Optional[int] = None
     save: bool = True
@@ -213,6 +216,9 @@ def setup_logger(cfg: DictConfig) -> Logger:
         logger = WandbLogger(**cfg.logger.wandb, config=dict(cfg))
     elif hasattr(cfg.logger, "list_logger"):
         logger = ListLogger()
+    elif hasattr(cfg.logger, 'pandas_logger'):
+        logger = PandasLogger(save_path=cfg.training.save_dir, save_period=cfg.logger.pandas_logger.save_period,
+                              save=cfg.training.save)
     else:
         raise Exception("No logger specified, try adding the wandb or "
                         "pandas logger to the config file.")
@@ -239,17 +245,20 @@ def create_nets_config(nets_config: DictConfig):
                              mlp_head_config=mlp_head_config)
     return nets_config
 
-def create_flow_config(flow_cfg: DictConfig):
+def create_flow_config(cfg: DictConfig):
     """Create config for building the flow."""
+    flow_cfg = cfg.flow
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
     nets_config = create_nets_config(flow_cfg.pop("nets"))
-    base_config = dict(flow_cfg.pop("base"))
-    base_config = BaseConfig(**base_config)
+    base_aux_config = dict(flow_cfg.pop("base").aux)
+    base_aux_config = ConditionalAuxDistConfig(**base_aux_config)
+    target_aux_config = ConditionalAuxDistConfig(**dict(cfg.target.aux))
     flow_dist_config = FlowDistConfig(
         **flow_cfg,
         nets_config=nets_config,
-        base_config=base_config,
+        base_aux_config=base_aux_config,
+        target_aux_config=target_aux_config
     )
     return flow_dist_config
 
@@ -267,7 +276,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         save_path = ''
 
 
-    flow_config = create_flow_config(cfg.flow)
+    flow_config = create_flow_config(cfg)
 
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
 
@@ -280,8 +289,6 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> TrainCon
         **training_config,
         logger=logger,
         save_dir=save_path,
-        aug_target_global_centering=cfg.target.aug_global_centering,
-        aug_target_scale=cfg.target.aug_scale
     )
     return experiment_config
 
@@ -295,6 +302,7 @@ def train(config: TrainConfig):
     assert config.flow_dist_config.nodes == config.n_nodes
 
     if config.save:
+        pathlib.Path(config.save_dir).mkdir(exist_ok=True)
         plots_dir = os.path.join(config.save_dir, f"plots")
         pathlib.Path(plots_dir).mkdir(exist_ok=False)
         checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
@@ -307,41 +315,29 @@ def train(config: TrainConfig):
     eval_iter = list(np.linspace(0, config.n_epoch - 1, config.n_eval, dtype="int"))
     plot_iter = list(np.linspace(0, config.n_epoch - 1, config.n_plots, dtype="int"))
 
+    train_data, test_data = config.load_datasets(config.batch_size, config.train_set_size,
+                                                                   config.test_set_size)
 
+    # Define flow, and initialise params.
     flow_dist = build_flow(config.flow_dist_config)
-
-
-    sample_fn = jax.jit(chex.assert_max_traces(flow_dist.sample_apply, 2), static_argnums=2)
-
 
     key = jax.random.PRNGKey(config.seed)
     key, subkey = jax.random.split(key)
-    params = flow_dist.init(subkey, jnp.zeros((1, config.n_nodes, config.dim*2)))
-    params_test = flow_dist.init(subkey, jnp.zeros((config.n_nodes, config.dim*2)))
+    params = flow_dist.init(subkey, train_data[0:2])
+    params_test = flow_dist.init(subkey, train_data[0])
     chex.assert_trees_all_equal_shapes(params, params_test)
 
 
-    train_data_original, test_data_original = config.load_datasets(config.batch_size, config.train_set_size,
-                                                                   config.test_set_size)
 
-    print(f"training data shape of {train_data_original.shape}")
-    chex.assert_tree_shape_suffix(train_data_original, (config.n_nodes, config.dim))
+    print(f"training data position shape of {train_data.positions.shape}, "
+          f"feature shape of {train_data.features.shape}")
+    chex.assert_tree_shape_suffix(train_data.positions, (config.n_nodes, config.dim))
 
-    # Load augmented coordinates.
-    key, subkey = jax.random.split(key)
-    train_data = original_dataset_to_joint_dataset(train_data_original, subkey,
-                                                   global_centering=config.aug_target_global_centering,
-                                                   aug_scale=config.aug_target_scale)
-    test_data = original_dataset_to_joint_dataset(test_data_original, subkey,
-                                                  global_centering=config.aug_target_global_centering,
-                                                  aug_scale=config.aug_target_scale)
-
-
-    plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data, 0,
+    plot_and_maybe_save(config.plotter, params, flow_dist, key, config.plot_batch_size, train_data, test_data, 0,
                         config.save, plots_dir)
 
     optimizer, lr, step_fn = get_optimizer_and_step_fn(config.optimizer_config,
-                                              n_iter_per_epoch=train_data.shape[0] // config.batch_size,
+                                              n_iter_per_epoch=train_data.positions.shape[0] // config.batch_size,
                                               total_n_epoch=config.n_epoch)
     opt_state = optimizer.init(params)
 
@@ -351,7 +347,7 @@ def train(config: TrainConfig):
             params, opt_state, key = carry
             key, subkey = jax.random.split(key)
             x = xs
-            params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+            params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
                                               subkey,
                                               config.use_flow_aux_loss, config.aux_loss_weight)
             if config.last_iter_info_only:
@@ -370,26 +366,22 @@ def train(config: TrainConfig):
             if config.last_iter_info_only:
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = step_fn(params, final_batch, opt_state,
-                                                  flow_dist.log_prob_with_extra_apply,
+                                                  flow_dist,
                                                   optimizer,
                                                   subkey,
-                                                  config.use_flow_aux_loss, config.aux_loss_weight)
+                                                  config.use_flow_aux_loss,
+                                                  config.aux_loss_weight)
             return params, opt_state, key, info
 
 
     pbar = tqdm(range(config.n_epoch))
 
-    @jax.jit
+    jax.jit
     # @chex.assert_max_traces(n=2)
-    def shuffle_and_batchify_data(key, train_data=train_data, config=config):
-        key, subkey = jax.random.split(key)
-        train_data = jax.random.permutation(subkey, train_data, axis=0)
-        if config.reload_aug_per_epoch:
-            key, subkey = jax.random.split(key)
-            train_data = original_dataset_to_joint_dataset(train_data[..., :config.dim], subkey,
-                                                           global_centering=config.aug_target_global_centering,
-                                                           aug_scale=config.aug_target_scale)
-        batched_data = jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:]))
+    def shuffle_and_batchify_data(key, train_data: FullGraphSample = train_data, config: TrainConfig = config):
+        indices = jax.random.permutation(key, jnp.arange(train_data.positions.shape[0]))
+        train_data = train_data[indices]
+        batched_data = jax.tree_map(lambda x: jnp.reshape(x, (-1, config.batch_size, *x.shape[1:])), train_data)
         return batched_data
 
     for i in pbar:
@@ -419,9 +411,10 @@ def train(config: TrainConfig):
                     if jnp.isnan(info["grad_norm"]):
                         print("nan grad")
         else:
-            for x in jnp.reshape(train_data, (-1, config.batch_size, *train_data.shape[1:])):
+            for i in range(batched_data.positions.shape[0]):
+                x = batched_data[i]
                 key, subkey = jax.random.split(key)
-                params, opt_state, info = step_fn(params, x, opt_state, flow_dist.log_prob_with_extra_apply, optimizer,
+                params, opt_state, info = step_fn(params, x, opt_state, flow_dist, optimizer,
                                                   subkey,
                                                   config.use_flow_aux_loss, config.aux_loss_weight
                                                   )
@@ -431,16 +424,14 @@ def train(config: TrainConfig):
                     print("nan grad")
 
         if i in plot_iter:
-            plot_and_maybe_save(config.plotter, params, sample_fn, key, config.plot_batch_size, train_data, test_data,
+            plot_and_maybe_save(config.plotter, params, flow_dist, key, config.plot_batch_size, train_data, test_data,
                                 i + 1, config.save,
                                 plots_dir)
 
         if i in eval_iter:
             key, subkey = jax.random.split(key)
-            eval_info = eval_fn(params=params, x=test_data, flow_log_prob_apply_fn=flow_dist.log_prob_apply,
-                                flow_sample_and_log_prob_apply_fn=flow_dist.sample_and_log_prob_apply,
-                                global_centering=config.aug_target_global_centering,
-                                aug_scale=config.aug_target_scale,
+            eval_info = eval_fn(params=params, x=test_data,
+                                flow=flow_dist,
                                 key=subkey,
                                 batch_size=config.batch_size,
                                 K=config.K_marginal_log_lik)
@@ -458,4 +449,5 @@ def train(config: TrainConfig):
         plot_history(config.logger.history)
         plt.show()
 
+    config.logger.close()
     return config.logger, params, flow_dist
