@@ -26,7 +26,7 @@ def general_ml_loss_fn(params: AugmentedFlowParams,
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
     mean_log_prob_q = jnp.mean(log_q)
     mean_log_p_a = jnp.mean(log_pi_a_given_x)
-    # Train log_pi_a_given_x via maximisation of the ELBO.
+    # Train on lower bound of the marginal log likelihood. (Allows for log_pi_a_given_x to be parameterized)
     loss = mean_log_p_a - mean_log_prob_q
     info = {"mean_log_prob_q_joint": mean_log_prob_q,
             "mean_log_p_a": mean_log_p_a
