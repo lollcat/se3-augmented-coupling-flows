@@ -7,7 +7,7 @@ import chex
 
 from flow.test_utils import bijector_test
 from utils.numerical import rotate_translate_permute_2d, rotate_translate_permute_3d
-from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
+from flow.bijectors.proj_real_nvp import make_se_equivariant_split_coupling_with_projection, \
     affine_transform_in_new_space, inverse_affine_transform_in_new_space
 from flow.test_utils import get_minimal_nets_config
 
@@ -95,7 +95,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
-                n_aux=n_aux,
+                n_aug=n_aux,
                 swap=swap,
                 identity_init=False,
                 nets_config=nets_config)

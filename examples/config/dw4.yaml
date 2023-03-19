@@ -33,7 +33,7 @@ flow:
       condition_on_x_proj: true
       gram_schmidt: false
       add_small_identity: true
-  act_norm: false
+  act_norm: true
   compile_n_unroll: 1
   nets:
     type: egnn

@@ -35,8 +35,7 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Code permutation layer that acts on auxilliary coordinates. 
-    - Update all nets. Make sure they embed h. 
+    - Code permutation layer that acts on auxilliary coordinates.
     - Centralise net config naming to be more consistent. 
     - Add whether sample has aux to sample info?
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 

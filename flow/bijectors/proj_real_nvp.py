@@ -52,26 +52,6 @@ class ProjectedScalarAffine(BijectorWithExtra):
             self._inv_scale = 1. / self._scale
             self._log_scale = jnp.log(jnp.abs(self._scale))
 
-    @property
-    def shift(self) -> chex.Array:
-        return self._shift
-
-    @property
-    def log_scale(self) -> chex.Array:
-        return self._log_scale
-
-    @property
-    def scale(self) -> chex.Array:
-        return self._scale
-
-    @property
-    def change_of_basis_matrix(self) -> chex.Array:
-        return self._change_of_basis_matrix
-
-    @property
-    def origin(self) -> chex.Array:
-        return self._origin
-
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
         if len(x.shape) == 3:
@@ -310,7 +290,6 @@ def make_conditioner(
         return change_of_basis_matrix, origin, log_scale, shift, info
 
 
-
     def conditioner(x):
         if len(x.shape) == 3:
             return _conditioner(x, graph_features)
@@ -325,7 +304,7 @@ def make_se_equivariant_split_coupling_with_projection(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
-        n_aux: int,
+        n_aug: int,
         swap: bool,
         nets_config: NetsConfig,
         identity_init: bool = True,
@@ -335,7 +314,7 @@ def make_se_equivariant_split_coupling_with_projection(
         condition_on_x_proj: bool = True,
         add_small_identity: bool = False
         ) -> BijectorWithExtra:
-    assert n_aux % 2 == 1
+    assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     def bijector_fn(params):
@@ -345,7 +324,7 @@ def make_se_equivariant_split_coupling_with_projection(
     n_heads = dim
     n_invariant_params = dim*2
 
-    n_coupling_variable_groups = n_aux + 1
+    n_coupling_variable_groups = n_aug + 1
     if nets_config.type == "mace":
         n_invariant_feat_out = int(nets_config.mace_torso_config.n_invariant_feat_residual
                                        / (n_coupling_variable_groups / 2))
@@ -395,8 +374,8 @@ def make_se_equivariant_split_coupling_with_projection(
     )
 
     return SplitCouplingWithExtra(
-        split_index=(n_aux + 1)//2,
-        event_ndims=3,  # [n_var_groups, nodes, dim]
+        split_index=(n_aug + 1) // 2,
+        event_ndims=3,  # [nodes, n_aug+1, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
         swap=swap,

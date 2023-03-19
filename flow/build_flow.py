@@ -7,8 +7,9 @@ import distrax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
-from flow.bijectors.bijector_proj_real_nvp import make_se_equivariant_split_coupling_with_projection
-from flow.bijectors.bijector_nice import make_se_equivariant_nice
+from flow.bijectors.proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.bijectors.nice import make_se_equivariant_nice
+from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -41,7 +42,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 
 
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
-    if config.type not in ['proj', 'nice'] or config.act_norm:
+    if config.type not in ['proj', 'nice']:
         raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
 
     flow_type = [config.type] if isinstance(config.type, str) else config.type
@@ -65,7 +66,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         for swap in (True, False):  # For swap False we condition augmented on original.
             if "proj" in flow_type:
                 bijector = make_se_equivariant_split_coupling_with_projection(
-                    graph_features=graph_features, n_aux=config.n_aug,
+                    graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim, swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
@@ -77,11 +78,22 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     layer_number=layer_number,
                     graph_features=graph_features,
                     dim=config.dim,
-                    n_aux=config.n_aug,
+                    n_aug=config.n_aug,
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
                 bijectors.append(bijector)
+
+            if config.act_norm:
+                bijector = make_shrink_aug_layer(
+                    layer_number=layer_number,
+                    graph_features=graph_features,
+                    dim=config.dim,
+                    n_aug=config.n_aug,
+                    swap=swap,
+                    identity_init=config.identity_init)
+                bijectors.append(bijector)
+
         return ChainWithExtra(bijectors)
 
     make_aug_target = build_aux_dist(
