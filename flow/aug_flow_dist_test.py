@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from flow.test_utils import test_fn_is_invariant, rotate_translate_x_and_a_3d, rotate_translate_x_and_a_2d
 from flow.test_utils import get_minimal_nets_config
-from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig
+from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
@@ -29,8 +29,8 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    base_aux_config = ConditionalAuxDistConfig(global_centering=False, trainable_augmented_scale=True)
-    target_aux_config = base_aux_config
+    base_aux_config = BaseConfig()
+    target_aux_config = ConditionalAuxDistConfig(trainable_augmented_scale=False)
 
 
     config = FlowDistConfig(
@@ -40,7 +40,7 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
         type=_FLOW_TYPE,
         compile_n_unroll=2,
         nets_config=get_minimal_nets_config('egnn'),
-        base_aux_config=base_aux_config,
+        base=base_aux_config,
         target_aux_config=target_aux_config,
         n_aug=n_aug
     )
@@ -56,6 +56,8 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     params = flow.init(subkey, dummy_samples)
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
+
+    info = flow.get_base_and_target_info(params)
 
     # Test aux-target distribution.
     key, subkey = jax.random.split(key)

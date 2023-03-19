@@ -18,7 +18,7 @@ from functools import partial
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 
-from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig
+from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
     MACETorsoConfig
@@ -235,13 +235,15 @@ def create_flow_config(cfg: DictConfig):
     print(f"creating flow of type {flow_cfg.type}")
     flow_cfg = dict(flow_cfg)
     nets_config = create_nets_config(flow_cfg.pop("nets"))
-    base_aux_config = dict(flow_cfg.pop("base").aux)
+    base_config = dict(flow_cfg.pop("base"))
+    base_aux_config = base_config.pop("aux")
     base_aux_config = ConditionalAuxDistConfig(**base_aux_config)
+    base_config = BaseConfig(**base_config, aug=base_aux_config)
     target_aux_config = ConditionalAuxDistConfig(**dict(cfg.target.aux))
     flow_dist_config = FlowDistConfig(
         **flow_cfg,
         nets_config=nets_config,
-        base_aux_config=base_aux_config,
+        base=base_config,
         target_aux_config=target_aux_config
     )
     return flow_dist_config

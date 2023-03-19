@@ -10,7 +10,7 @@ from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowPara
 def get_minimal_nets_config(type = 'egnn'):
     nets_config = NetsConfig(type=type,
                              mace_torso_config=MACETorsoConfig(
-                                 n_vectors_residual=3,
+                                 n_vec_residual_per_vec_in=1,
                                  n_invariant_feat_residual=3,
                                  n_vectors_hidden_readout_block=3,
                                  n_invariant_hidden_readout_block=3,
@@ -20,7 +20,7 @@ def get_minimal_nets_config(type = 'egnn'):
                              e3gnn_torso_config=E3GNNTorsoConfig(
                                  n_blocks=2,
                                  mlp_units=(4,),
-                                 n_vectors_hidden=3,
+                                 n_vec_hidden_per_vec_in=1,
                                  n_invariant_feat_hidden=3),
                              mlp_head_config=MLPHeadConfig((4,)),
                              transformer_config=TransformerConfig()

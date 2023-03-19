@@ -19,6 +19,11 @@ class ConditionalAuxDistConfig(NamedTuple):
     trainable_augmented_scale: bool = True
     scale_init: float = 1.0
 
+class BaseConfig(NamedTuple):
+    train_x_scale: bool = True
+    x_scale_init: float = 1.0
+    aug: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
+
 
 class FlowDistConfig(NamedTuple):
     dim: int
@@ -31,7 +36,7 @@ class FlowDistConfig(NamedTuple):
     compile_n_unroll: int = 2
     act_norm: bool = False
     kwargs: dict = {}
-    base_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
+    base: BaseConfig = BaseConfig()
     target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
 
 
@@ -53,12 +58,17 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
-            dim=config.dim, n_nodes=config.nodes, global_centering=config.base_aux_config.global_centering,
-            trainable_augmented_scale=config.base_aux_config.trainable_augmented_scale,
-            augmented_scale_init=config.base_aux_config.scale_init,
+            dim=config.dim,
+            n_nodes=config.nodes,
+            global_centering=config.base.aug.global_centering,
+            trainable_x_scale=config.base.train_x_scale,
+            x_scale_init=config.base.x_scale_init,
+            trainable_augmented_scale=config.base.aug.trainable_augmented_scale,
+            augmented_scale_init=config.base.aug.scale_init,
             n_aux=config.n_aug
         )
         return base
+
     def make_bijector(graph_features: chex.Array):
         bijectors = []
         layer_number = 0

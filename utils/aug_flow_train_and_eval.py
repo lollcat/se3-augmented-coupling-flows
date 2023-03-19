@@ -34,6 +34,7 @@ def general_ml_loss_fn(
             "mean_log_p_a": mean_log_p_a
             }
     aux_loss = jnp.mean(extra.aux_loss)
+    info.update(flow.get_base_and_target_info(params))
     if use_flow_aux_loss:
         loss = loss + aux_loss * aux_loss_weight
     if verbose_info:

@@ -16,6 +16,8 @@ target:
 
 flow:
   base:
+    train_x_scale: true
+    x_scale_init: 1.0
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
