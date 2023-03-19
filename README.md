@@ -35,14 +35,14 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Code permutation layer that acts on auxilliary coordinates.
+    - Spline flows
     - Centralise net config naming to be more consistent. 
     - Add whether sample has aux to sample info?
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 
     - Make sure non-equivariant flow is working well.
 
 ## Less burning
-    - Spline flows
+
     - Rewrite with jgraph, generalise to varying number of nodes. 
     - Also have some augmented graph nodes?
     - Think of initialisation for Egnn that encourages random vectors of reasonable magnitude and as non-collinear as possible.

@@ -10,6 +10,7 @@ from flow.conditional_dist import build_aux_dist
 from flow.bijectors.proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijectors.nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
+from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -83,6 +84,9 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 swap=False,
                 identity_init=config.identity_init)
             bijectors.append(bijector)
+
+        if config.n_aug > 1:
+            bijectors.append(AugPermuteBijector())
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
