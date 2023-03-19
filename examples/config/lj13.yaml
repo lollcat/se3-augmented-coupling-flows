@@ -8,7 +8,7 @@ hydra:
 target:
   aux:
     global_centering: false
-    scale_init: 1.0
+    scale_init: 0.1
     trainable_augmented_scale: false
 
 flow:
@@ -33,7 +33,7 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: mace # mace or egnn or e3transformer or e3gnn
+    type: egnn # mace or egnn or e3transformer or e3gnn
     mace:
       n_vec_residual_per_vec_in: 1
       n_invariant_feat_residual: 64
@@ -67,10 +67,14 @@ flow:
       raw_distance_in_radial_embedding: true
       node_feat_as_edge_feat: true
     egnn:
-      mlp_units: [32,32]
+      mlp_units: [64,64]
       n_layers: 3
+      normalize_by_norms: true
+      variance_scaling_init: 0.001
+      agg: mean
+      normalization_constant: 1.0
       h_linear_softmax: true
-      h_embedding_dim: 16
+      h_embedding_dim: 64
     transformer: # for proj_v2 flow.
       mlp_units: [32,32]
       num_heads: 3
@@ -82,17 +86,17 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-5
+    init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 1e-3 # can be null
-    end_lr: 0 # can be null
+    peak_lr: 6e-4
+    end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 0.5
+    max_global_norm: 1.0
   use_64_bit: false
-  n_epoch: 200
-  batch_size: 100
-  plot_batch_size: 256
+  n_epoch: 64
+  batch_size: 32
+  plot_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
