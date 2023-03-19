@@ -70,10 +70,22 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         return base
 
     def make_bijector(graph_features: chex.Array):
+        # Note that bijector.inverse moves through this forwards, and bijector.fowards reverses the bijector order
         bijectors = []
         layer_number = 0
 
-        for swap in (True, False):  # For swap False we condition augmented on original.
+        if config.act_norm:
+            bijector = make_shrink_aug_layer(
+                layer_number=layer_number,
+                graph_features=graph_features,
+                dim=config.dim,
+                n_aug=config.n_aug,
+                swap=False,
+                identity_init=config.identity_init)
+            bijectors.append(bijector)
+
+
+        for swap in (False, True):  # For swap False we condition augmented on original.
             if "proj" in flow_type:
                 bijector = make_se_equivariant_split_coupling_with_projection(
                     graph_features=graph_features, n_aug=config.n_aug,
@@ -92,16 +104,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
-                bijectors.append(bijector)
-
-            if config.act_norm:
-                bijector = make_shrink_aug_layer(
-                    layer_number=layer_number,
-                    graph_features=graph_features,
-                    dim=config.dim,
-                    n_aug=config.n_aug,
-                    swap=swap,
-                    identity_init=config.identity_init)
                 bijectors.append(bijector)
 
         return ChainWithExtra(bijectors)
