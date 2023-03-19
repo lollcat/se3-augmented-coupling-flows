@@ -20,7 +20,7 @@ flow:
   dim: 3
   n_aug: 3
   nodes: 13
-  n_layers: 4
+  n_layers: 8
   identity_init: true
   type: proj  # vector_scale_shift  vector_scale nice proj
   kwargs:
