@@ -219,6 +219,24 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
                                               total_n_epoch=config.n_epoch)
     flow = build_flow(config.flow_dist_config)
 
+    # Setup training functions.
+    loss_fn = partial(general_ml_loss_fn,
+                      flow=flow,
+                      use_flow_aux_loss=config.use_flow_aux_loss,
+                      aux_loss_weight=config.aux_loss_weight)
+    training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
+
+    scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
+                                         data=train_data,
+                                         last_iter_info_only=config.last_iter_info_only,
+                                         batch_size=config.batch_size)
+
+    # Setup eval functions
+    eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                    flow=flow, K=config.K_marginal_log_lik, test_invariances=True)
+    eval_batch_free_fn = None
+
+
     def init_fn(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)
         params = flow.init(key1, train_data[0])
@@ -226,16 +244,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
         return TrainingState(params, opt_state, key2)
 
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
-        loss_fn = partial(general_ml_loss_fn,
-                          flow=flow,
-                          use_flow_aux_loss=config.use_flow_aux_loss,
-                          aux_loss_weight=config.aux_loss_weight)
-        training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
         if not config.debug:
-            scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
-                                                 data=train_data,
-                                                 last_iter_info_only=config.last_iter_info_only,
-                                                 batch_size=config.batch_size)
             params, opt_state, key, info = scan_epoch_fn(state.params, state.opt_state, state.key)
         else:  # If we want to debug.
             batchify_data = get_shuffle_and_batchify_data_fn(train_data, config.batch_size)
@@ -248,15 +257,14 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
         return TrainingState(params, opt_state, key), info
+
     def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
-        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=config.K_marginal_log_lik, test_invariances=True)
-        eval_batch_free_fn = None
         eval_info = eval_fn(test_data, key, state.params,
                 eval_on_test_batch_fn=eval_on_test_batch_fn,
                 eval_batch_free_fn=eval_batch_free_fn,
                 batch_size=config.batch_size)
         return eval_info
+
     def plotter_fn(state: TrainingState, key: chex.PRNGKey) -> List[plt.Figure]:
         return config.plotter(state.params, flow, key, config.plot_batch_size, train_data,
                                    test_data)

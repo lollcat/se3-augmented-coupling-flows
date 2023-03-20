@@ -2,13 +2,12 @@ import hydra
 from omegaconf import DictConfig
 
 from molboil.targets.data import load_qm9
-from examples.create_train_config import train, create_train_config
+from molboil.train.train import train
+from examples.create_train_config import create_train_config
 
-
-
-def load_dataset(train_set_size):
-    train_data, test_data, valid_data = load_qm9(train_set_size=train_set_size)
-    return train_data, valid_data
+def load_dataset(train_set_size, valid_set_size):
+    train_data, valid_data, test_data = load_qm9(train_set_size=train_set_size)
+    return train_data, valid_data[:valid_set_size]
 
 
 def to_local_config(cfg: DictConfig) -> DictConfig:

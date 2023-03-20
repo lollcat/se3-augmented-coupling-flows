@@ -9,6 +9,10 @@ from examples.create_train_config import create_train_config
 from target.double_well import make_dataset
 from utils.data import positional_dataset_only_to_full_graph
 
+def load_dataset_original(train_set_size: int, valid_set_size: int):
+    train, valid, test = load_dw4(train_set_size)
+    return train, valid[:valid_set_size]
+
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):
     dataset = make_dataset(seed=seed, n_vertices=4, dim=2, n_samples=test_set_size+train_set_size,
@@ -71,7 +75,7 @@ def run(cfg: DictConfig):
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
-        load_dataset = lambda train_size, valid_size: load_dw4(train_size, valid_size)[:2]
+        load_dataset = load_dataset_original
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset)
     train(experiment_config)
 

@@ -48,10 +48,9 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 
 
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
-    if config.type not in ['proj', 'nice']:
-        raise NotImplementedError("WithInfo flow changes so far only applied to proj flow.")
-
     flow_type = [config.type] if isinstance(config.type, str) else config.type
+    if 'nice' not in flow_type and 'proj' not in flow_type:
+        raise Exception
     if not "proj" in config.kwargs.keys():
         if not config.kwargs == {}:
             raise NotImplementedError
