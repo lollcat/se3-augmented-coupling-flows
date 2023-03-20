@@ -4,10 +4,13 @@ import hydra
 from omegaconf import DictConfig
 from examples.train import train, create_train_config, plot_original_aug_norms_sample_hist, plot_sample_hist, plot_orig_aug_centre_mass_diff_hist
 import jax.numpy as jnp
+import numpy as np
 import chex
 import mdtraj
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import jax
+from openmmtools.testsystems import AlanineDipeptideVacuum
 
 from target.alanine_dipeptide import get_atom_encoding
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -92,7 +95,44 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     axs3[1].set_title("norms orig - augparticles (aug group 1)")
     fig3.tight_layout()
 
-    return [fig1, fig2, fig3]
+    # Compute Ramachandran plot angles
+    aldp = AlanineDipeptideVacuum(constraints=None)
+    topology = mdtraj.Topology.from_openmm(aldp.topology)
+    test_traj = mdtraj.Trajectory(np.array(test_data).positions.reshape(-1, 22, 3), topology)
+    sampled_traj = mdtraj.Trajectory(np.array(positions_x).reshape(-1, 22, 3), topology)
+    psi_d = mdtraj.compute_psi(test_traj)[1].reshape(-1)
+    phi_d = mdtraj.compute_phi(test_traj)[1].reshape(-1)
+    psi = mdtraj.compute_psi(sampled_traj)[1].reshape(-1)
+    phi = mdtraj.compute_phi(sampled_traj)[1].reshape(-1)
+
+    # Compute histograms
+    nbins = 10
+    htest_phi, _ = np.histogram(phi_d, nbins, range=[-np.pi, np.pi], density=True);
+    hgen_phi, _ = np.histogram(phi, nbins, range=[-np.pi, np.pi], density=True);
+    htest_psi, _ = np.histogram(psi_d, nbins, range=[-np.pi, np.pi], density=True);
+    hgen_psi, _ = np.histogram(psi, nbins, range=[-np.pi, np.pi], density=True);
+
+    # Plot phi and psi
+    fig4, ax = plt.subplots(1, 2, figsize=(20, 10))
+    x = np.linspace(-np.pi, np.pi, nbins)
+    ax[0].plot(x, htest_phi, linewidth=3)
+    ax[0].plot(x, hgen_phi, linewidth=3)
+    ax[0].tick_params(axis='both', labelsize=20)
+    ax[0].set_xlabel('$\phi$', fontsize=24)
+    ax[1].plot(x, htest_psi, linewidth=3)
+    ax[1].plot(x, hgen_psi, linewidth=3)
+    ax[1].tick_params(axis='both', labelsize=20)
+    ax[1].set_xlabel('$\psi$', fontsize=24)
+
+    # Ramachandran plot
+    fig5, ax = plt.subplots(1, 1, figsize=(10, 10))
+    ax.hist2d(phi, psi, bins=64, norm=mpl.colors.LogNorm(),
+              range=[[-np.pi, np.pi], [-np.pi, np.pi]])
+    ax.tick_params(axis='both', labelsize=20)
+    ax.set_xlabel('$\phi$', fontsize=24)
+    ax.set_ylabel('$\psi$', fontsize=24)
+
+    return [fig1, fig2, fig3, fig4, fig5]
 
 
 
