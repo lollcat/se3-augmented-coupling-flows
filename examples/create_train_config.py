@@ -2,13 +2,9 @@ from typing import Callable, Tuple, Optional, List, NamedTuple
 
 import chex
 import jax
-import jax.numpy as jnp
 import optax
-import numpy as np
 import wandb
-from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
-import pickle
 import os
 import pathlib
 from datetime import datetime
