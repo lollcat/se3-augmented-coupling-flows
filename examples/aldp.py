@@ -98,7 +98,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     # Compute Ramachandran plot angles
     aldp = AlanineDipeptideVacuum(constraints=None)
     topology = mdtraj.Topology.from_openmm(aldp.topology)
-    test_traj = mdtraj.Trajectory(np.array(test_data).positions.reshape(-1, 22, 3), topology)
+    test_traj = mdtraj.Trajectory(np.array(test_data.positions).reshape(-1, 22, 3), topology)
     sampled_traj = mdtraj.Trajectory(np.array(positions_x).reshape(-1, 22, 3), topology)
     psi_d = mdtraj.compute_psi(test_traj)[1].reshape(-1)
     phi_d = mdtraj.compute_phi(test_traj)[1].reshape(-1)
