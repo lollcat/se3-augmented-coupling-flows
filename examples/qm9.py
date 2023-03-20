@@ -1,34 +1,15 @@
 import hydra
 from omegaconf import DictConfig
-import jax
-import numpy as np
 
-from examples.train import train, create_train_config
-from utils.data import positional_dataset_only_to_full_graph
+from molboil.targets.data import load_qm9
+from examples.create_train_config import train, create_train_config
 
 
 
-def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
-    # First need to run `qm9_download_data.download_data`
-    key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
+def load_dataset(train_set_size):
+    train_data, test_data, valid_data = load_qm9(train_set_size=train_set_size)
+    return train_data, valid_data
 
-    try:
-        data_dir = "target/data/qm9_"
-        train_data = np.load(data_dir + "train.npy")
-        test_data = np.load(data_dir + "test.npy")
-        valid_data = np.load(data_dir + "valid.npy")
-    except:
-        print("Data directory not found. Try running `dataset.py` in the `qm9_download_data` dir, otherwise speak to Laurence :)")
-        raise Exception
-
-    if train_data_n_points is not None:
-        train_data = train_data[:train_data_n_points]
-    if test_data_n_points is not None:
-        test_data = test_data[:test_data_n_points]
-
-    train_data = train_data[:train_data.shape[0] - (train_data.shape[0] % batch_size)]
-
-    return positional_dataset_only_to_full_graph(train_data), positional_dataset_only_to_full_graph(test_data)
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""

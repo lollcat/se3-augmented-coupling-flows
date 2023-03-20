@@ -3,7 +3,7 @@ from omegaconf import DictConfig
 import jax.numpy as jnp
 import numpy as np
 
-from examples.train import train, create_train_config
+from examples.create_train_config import train, create_train_config
 from utils.data import positional_dataset_only_to_full_graph
 
 

@@ -2,27 +2,12 @@ import hydra
 from omegaconf import DictConfig
 from functools import partial
 
-import jax.numpy as jnp
-import numpy as np
 
-from examples.train import train, create_train_config
+from molboil.train.train import train
+from molboil.targets.data import load_dw4
+from examples.create_train_config import create_train_config
 from target.double_well import make_dataset
 from utils.data import positional_dataset_only_to_full_graph
-
-
-def load_dataset_standard(batch_size, train_set_size: int = 1000, test_set_size:int = 1000):
-    # dataset from https://github.com/vgsatorras/en_flows
-    # Loading following https://github.com/vgsatorras/en_flows/blob/main/dw4_experiment/dataset.py.
-
-    data_path = 'target/data/dw4-dataidx.npy'  # 'target/data/dw_data_vertices4_dim2.npy'
-    dataset = jnp.asarray(np.load(data_path, allow_pickle=True)[0])
-    dataset = jnp.reshape(dataset, (-1, 4, 2))
-
-    train_set = dataset[:train_set_size]
-    train_set = train_set[:train_set_size - (train_set.shape[0] % batch_size)]
-
-    test_set = dataset[-test_set_size:]
-    return positional_dataset_only_to_full_graph(train_set), positional_dataset_only_to_full_graph(test_set)
 
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):
@@ -69,7 +54,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     debug = False
     if debug:
         cfg_train = dict(cfg['training'])
-        cfg_train['scan_run'] = False
+        cfg_train['debug'] = True
         cfg.training = DictConfig(cfg_train)
     return cfg
 
@@ -86,12 +71,10 @@ def run(cfg: DictConfig):
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
-        load_dataset = load_dataset_standard
-    experiment_config = create_train_config(cfg, dim=2, n_nodes=4,
-                                            load_dataset=load_dataset)
+        load_dataset = lambda train_size, valid_size: load_dw4(train_size, valid_size)[:2]
+    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset)
     train(experiment_config)
 
 
-#
-# if __name__ == '__main__':
-#     run()
+if __name__ == '__main__':
+    run()

@@ -2,7 +2,7 @@ from typing import Tuple, Optional, List
 
 import hydra
 from omegaconf import DictConfig
-from examples.train import train, create_train_config, plot_original_aug_norms_sample_hist, plot_sample_hist, plot_orig_aug_centre_mass_diff_hist
+from examples.create_train_config import train, create_train_config, plot_original_aug_norms_sample_hist, plot_sample_hist, plot_orig_aug_centre_mass_diff_hist
 import jax.numpy as jnp
 import chex
 import mdtraj
