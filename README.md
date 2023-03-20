@@ -19,7 +19,7 @@ ListLogger that can may used if you don't want to use wandb.
 python examples.dw4.py
 python examples/lj13.py
 python examples/aldp.py
-python examples/qm9.py
+python examples/qm9_download_data.py
 ```
 
 ## Instalation

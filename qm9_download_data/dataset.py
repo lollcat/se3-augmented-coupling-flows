@@ -4,11 +4,11 @@ import numpy as np
 
 
 def retrieve_dataloaders(remove_h = True,
-                         dataset='qm9',
+                         dataset='qm9_download_data',
                          datadir='./'):
     # Initialize dataloader
     filter_n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
-    args = init_argparse('qm9')
+    args = init_argparse('qm9_download_data')
     # data_dir = cfg.data_root_dir
     args, datasets, num_species, charge_scale = initialize_datasets(args, datadir, dataset,
                                                                     subtract_thermo=args.subtract_thermo,
@@ -40,7 +40,7 @@ def filter_atoms(datasets, n_nodes):
     return datasets
 
 
-if __name__ == '__main__':
+def download_and_save_data(base_path, remove_h = False):
     for remove_h in (True, False):
         n_atoms = 9 if remove_h else 19  # max 9 heavy atoms
 
@@ -52,12 +52,16 @@ if __name__ == '__main__':
         valid = datasets['valid'].data['positions'][:, :n_atoms]
 
         if remove_h:
-            np.save('../target/data/qm9_train_no_h.npy', train)
-            np.save('../target/data/qm9_test_no_h.npy', test)
-            np.save('../target/data/qm9_valid_no_h.npy', valid)
+            np.save(f'{base_path}/qm9_train_no_h.npy', train)
+            np.save(f'{base_path}/qm9_test_no_h.npy', test)
+            np.save(f'{base_path}/qm9_valid_no_h.npy', valid)
         else:
-            np.save('../target/data/qm9_train.npy', train)
-            np.save('../target/data/qm9_test.npy', test)
-            np.save('../target/data/qm9_valid.npy', valid)
+            np.save(f'{base_path}/qm9_train.npy', train)
+            np.save(f'{base_path}/qm9_test.npy', test)
+            np.save(f'{base_path}/qm9_valid.npy', valid)
 
         print("data saved to target/data")
+
+
+if __name__ == '__main__':
+    download_and_save_data("../target/data")

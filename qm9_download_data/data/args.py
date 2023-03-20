@@ -6,7 +6,7 @@ from math import inf
 
 def setup_shared_args(parser):
     """
-    Sets up the argparse object for the qm9 dataset
+    Sets up the argparse object for the qm9_download_data dataset
     
     Parameters 
     ----------
@@ -104,7 +104,7 @@ def setup_shared_args(parser):
     parser.add_argument('--predictdir', type=str, default='predict/',
                         help='Directory to place log and savefiles. (default: predict/)')
     # Directory to read and save data from
-    parser.add_argument('--datadir', type=str, default='qm9/temp',
+    parser.add_argument('--datadir', type=str, default='qm9_download_data/temp',
                         help='Directory to look up data from. (default: data/)')
 
     # Dataset options
@@ -182,7 +182,7 @@ def setup_shared_args(parser):
     parser.add_argument('--edge-cat', action='store_true',
                         help='Concatenate the scalars from different \ell in the dot-product-matrix part of the edge network.')
     parser.add_argument('--target', type=str, default='',
-                        help='Learning target for a dataset (such as qm9) with multiple options.')
+                        help='Learning target for a dataset (such as qm9_download_data) with multiple options.')
 
     return parser
 
@@ -205,7 +205,7 @@ def setup_argparse(dataset):
     if dataset == "md17":
         parser.add_argument('--subset', '--molecule', type=str, default='',
                             help='Subset/molecule on data with subsets (such as md17).')
-    elif dataset == "qm9":
+    elif dataset == "qm9_download_data":
         parser.add_argument('--subtract-thermo', action=BoolArg, default=True,
                             help='Subtract thermochemical energy from relvant learning targets in QM9 dataset.')
     else:
@@ -278,7 +278,7 @@ def init_argparse(dataset):
     Parameters
     ----------
     dataset : :class:`str`
-        Dataset being used.  Currently 'md17' and 'qm9' are supported.
+        Dataset being used.  Currently 'md17' and 'qm9_download_data' are supported.
 
     Returns
     -------

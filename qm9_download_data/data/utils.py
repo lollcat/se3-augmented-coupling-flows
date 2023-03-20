@@ -5,8 +5,8 @@ import logging
 import os
 
 from torch.utils.data import DataLoader
-from qm9.data.dataset_class import ProcessedDataset
-from qm9.data.prepare import prepare_dataset
+from qm9_download_data.data.dataset_class import ProcessedDataset
+from qm9_download_data.data.prepare import prepare_dataset
 
 
 def initialize_datasets(args, datadir, dataset, subset=None, splits=None,
@@ -22,7 +22,7 @@ def initialize_datasets(args, datadir, dataset, subset=None, splits=None,
     datadir : str
         Path to the directory where the data and calculations and is, or will be, stored.
     dataset : str
-        String specification of the dataset.  If it is not already downloaded, must currently by "qm9" or "md17".
+        String specification of the dataset.  If it is not already downloaded, must currently by "qm9_download_data" or "md17".
     subset : str, optional
         Which subset of a dataset to use.  Action is dependent on the dataset given.
         Must be specified if the dataset has subsets (i.e. MD17).  Otherwise ignored (i.e. GDB9).
@@ -57,7 +57,7 @@ def initialize_datasets(args, datadir, dataset, subset=None, splits=None,
 
     # Download and process dataset. Returns datafiles.
     datafiles = prepare_dataset(
-        datadir, 'qm9', subset, splits, force_download=force_download)
+        datadir, 'qm9_download_data', subset, splits, force_download=force_download)
 
     # Load downloaded/processed datasets
     datasets = {}
@@ -66,7 +66,7 @@ def initialize_datasets(args, datadir, dataset, subset=None, splits=None,
             datasets[split] = {key: torch.from_numpy(
                 val) for key, val in f.items()}
 
-    if dataset != 'qm9':
+    if dataset != 'qm9_download_data':
         np.random.seed(42)
         fixed_perm = np.random.permutation(len(datasets['train']['num_atoms']))
         if dataset == 'qm9_second_half':

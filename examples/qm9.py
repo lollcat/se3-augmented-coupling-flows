@@ -9,7 +9,7 @@ from utils.data import positional_dataset_only_to_full_graph
 
 
 def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None, seed=0):
-    # First need to run `qm9.download_data`
+    # First need to run `qm9_download_data.download_data`
     key1, key2 = jax.random.split(jax.random.PRNGKey(seed))
 
     try:
@@ -18,7 +18,7 @@ def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = No
         test_data = np.load(data_dir + "test.npy")
         valid_data = np.load(data_dir + "valid.npy")
     except:
-        print("Data directory not found. Try running `dataset.py` in the `qm9` dir, otherwise speak to Laurence :)")
+        print("Data directory not found. Try running `dataset.py` in the `qm9_download_data` dir, otherwise speak to Laurence :)")
         raise Exception
 
     if train_data_n_points is not None:
@@ -61,7 +61,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 
 
-@hydra.main(config_path="./config", config_name="qm9.yaml")
+@hydra.main(config_path="./config", config_name="qm9_download_data.yaml")
 def run(cfg: DictConfig):
     local_config = False
     if local_config:

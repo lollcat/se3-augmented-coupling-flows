@@ -1,8 +1,7 @@
 import logging
 import os
 
-from qm9.data.prepare.md17 import download_dataset_md17
-from qm9.data.prepare.qm9 import download_dataset_qm9
+from qm9_download_data.data.prepare.qm9 import download_dataset_qm9
 
 
 def prepare_dataset(datadir, dataset, subset=None, splits=None, cleanup=True, force_download=False):
@@ -14,7 +13,7 @@ def prepare_dataset(datadir, dataset, subset=None, splits=None, cleanup=True, fo
     datadir : str
         Path to the directory where the data and calculations and is, or will be, stored.
     dataset : str
-        String specification of the dataset.  If it is not already downloaded, must currently by "qm9" or "md17".
+        String specification of the dataset.  If it is not already downloaded, must currently by "qm9_download_data" or "md17".
     subset : str, optional
         Which subset of a dataset to use.  Action is dependent on the dataset given.
         Must be specified if the dataset has subsets (i.e. MD17).  Otherwise ignored (i.e. GDB9).
@@ -68,13 +67,10 @@ def prepare_dataset(datadir, dataset, subset=None, splits=None, cleanup=True, fo
     # If need to download dataset, pass to appropriate downloader
     if new_download or force_download:
         logging.info('Dataset does not exist. Downloading!')
-        if dataset.lower().startswith('qm9'):
+        if dataset.lower().startswith('qm9_download_data'):
             download_dataset_qm9(datadir, dataset, splits, cleanup=cleanup)
-        elif dataset.lower().startswith('md17'):
-            download_dataset_md17(datadir, dataset, subset,
-                                  splits, cleanup=cleanup)
         else:
             raise ValueError(
-                'Incorrect choice of dataset! Must chose qm9/md17!')
+                'Incorrect choice of dataset! Must chose qm9_download_data/md17!')
 
     return datafiles

@@ -92,6 +92,6 @@ def run(cfg: DictConfig):
     train(experiment_config)
 
 
-
-if __name__ == '__main__':
-    run()
+#
+# if __name__ == '__main__':
+#     run()
