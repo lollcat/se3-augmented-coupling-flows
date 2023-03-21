@@ -448,7 +448,8 @@ def train(config: TrainConfig):
 
     if isinstance(config.logger, ListLogger):
         plot_history(config.logger.history)
-        plt.show()
+        plt.savefig(os.path.join(plots_dir, "history.png"))
+        plt.close()
 
     config.logger.close()
     return config.logger, params, flow_dist
