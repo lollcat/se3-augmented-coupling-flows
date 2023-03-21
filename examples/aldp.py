@@ -163,7 +163,7 @@ def run(cfg: DictConfig):
     if local_config:
         cfg = to_local_config(cfg)
 
-    custom_aldp_plotter_ = partial(custom_aldp_plotter, n_batches=cfg.training.plot_n_batches)
+    custom_aldp_plotter_ = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
                                             plotter=custom_aldp_plotter_)
