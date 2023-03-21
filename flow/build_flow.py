@@ -1,6 +1,6 @@
 import chex
 
-from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow, FullGraphSample
+from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
 
 from typing import NamedTuple, Sequence, Union
 import distrax
@@ -52,11 +52,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     if 'nice' not in flow_type and 'proj_rnvp' not in flow_type and 'proj_spline' not in flow_type:
         raise Exception
-    if not "proj" in config.kwargs.keys():
-        if not config.kwargs == {}:
-            raise NotImplementedError
-    # TODO: Spline kwargs.
-    kwargs_proj = config.kwargs['proj'] if "proj" in config.kwargs.keys() else {}
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
@@ -97,7 +92,8 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     layer_number=layer_number, dim=config.dim,
                     swap=swap,
                     identity_init=config.identity_init,
-                    nets_config=config.nets_config)
+                    nets_config=config.nets_config,
+                )
                 bijectors.append(bijector)
 
             if "nice" in flow_type:
@@ -112,7 +108,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 bijectors.append(bijector)
 
             elif 'proj_spline' in flow_type:
-                # TODO spline kwargs
+                kwargs_proj_spline = config.kwargs["proj_spline" ] if "proj_spline" in config.kwargs.keys() else {}
                 bijector = make_proj_spline(
                     layer_number=layer_number,
                     graph_features=graph_features,
@@ -121,6 +117,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
+                    **kwargs_proj_spline
                 )
                 bijectors.append(bijector)
 
