@@ -8,6 +8,7 @@ import distrax
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
 from flow.bijectors.proj_real_nvp import make_proj_realnvp
+from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
@@ -49,11 +50,12 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
-    if 'nice' not in flow_type and 'proj' not in flow_type:
+    if 'nice' not in flow_type and 'proj_rnvp' not in flow_type and 'proj_spline' not in flow_type:
         raise Exception
     if not "proj" in config.kwargs.keys():
         if not config.kwargs == {}:
             raise NotImplementedError
+    # TODO: Spline kwargs.
     kwargs_proj = config.kwargs['proj'] if "proj" in config.kwargs.keys() else {}
 
     def make_base() -> distrax.Distribution:
@@ -89,7 +91,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
-            if "proj" in flow_type:
+            if "proj_rnvp" in flow_type:
                 bijector = make_proj_realnvp(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
@@ -107,6 +109,19 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
+                bijectors.append(bijector)
+
+            elif 'proj_spline' in flow_type:
+                # TODO spline kwargs
+                bijector = make_proj_spline(
+                    layer_number=layer_number,
+                    graph_features=graph_features,
+                    dim=config.dim,
+                    n_aug=config.n_aug,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                )
                 bijectors.append(bijector)
 
         return ChainWithExtra(bijectors)

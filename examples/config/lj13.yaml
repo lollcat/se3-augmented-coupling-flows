@@ -24,7 +24,7 @@ flow:
   nodes: 13
   n_layers: 8
   identity_init: true
-  type: proj  # vector_scale_shift  vector_scale nice proj
+  type: proj_spline #  nice proj_rnvp  proj_spline
   kwargs:
     proj:
       global_frame: false

@@ -236,9 +236,11 @@ class ProjSplitCoupling(BijectorWithExtra):
         elif len(x.shape) == 4:
             if self._graph_features.shape[0] != x.shape[0]:
                 print("graph features has no batch size")
-                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single, in_axes=(0, None))(x, self._graph_features)
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single, in_axes=(0, None))(
+                    x, self._graph_features)
             else:
-                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single)(x, self._graph_features)
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single)(
+                    x, self._graph_features)
             extra = extra._replace(aux_info=extra.aggregate_info(), aux_loss=jnp.mean(extra.aux_loss))
         else:
             raise NotImplementedError
