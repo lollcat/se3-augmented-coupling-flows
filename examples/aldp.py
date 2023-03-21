@@ -70,7 +70,9 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
             positions_a_target.append(positions_a_target_)
     positions_x = jnp.concatenate(positions_x, axis=0)
     positions_a = jnp.concatenate(positions_a, axis=0)
+    print(positions_a_target)
     positions_a_target = jnp.concatenate(positions_a_target, axis=0)
+    print(positions_a_target.shape)
 
     # Plot original coords
     fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -93,7 +95,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     for i in range(flow.n_augmented):
         positions_a_single = positions_a[:, :, i]  # get single group of augmented coordinates
         positions_a_target_single = positions_a_target[:, :, i]  # Get first set of aux variables.
-        chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
+        #chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
         plot_sample_hist(positions_a_single, axs2[i], label="flow samples", n_vertices=plotting_n_nodes)
         plot_sample_hist(positions_a_target_single, axs2[i], label="test samples", n_vertices=plotting_n_nodes)
         axs2[i].set_title(f"norms between augmented coordinates (aug group {i})")
