@@ -35,8 +35,8 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Separate channels MLP for diff aux
     - Spline flows
+    - Clean proj realnvp config args (has unused args that are no longer an option). 
     - Centralise net config naming to be more consistent. 
     - Add whether sample has aux to sample info?
     - Think of directly parameterizing the basis (3 free params) for the proj flow. 

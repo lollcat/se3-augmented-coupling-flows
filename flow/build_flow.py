@@ -7,7 +7,7 @@ import distrax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
-from flow.bijectors.proj_real_nvp_v2 import make_se_equivariant_split_coupling_with_projection
+from flow.bijectors.proj_real_nvp import make_se_equivariant_split_coupling_with_projection
 from flow.bijectors.nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector

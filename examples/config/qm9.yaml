@@ -9,7 +9,7 @@ target:
   aux:
     global_centering: false
     scale_init: 0.1
-    trainable_augmented_scale: false
+    trainable_augmented_scale: true
 
 flow:
   n_aug: 1
