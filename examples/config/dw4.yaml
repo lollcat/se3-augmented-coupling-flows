@@ -20,14 +20,14 @@ flow:
     x_scale_init: 1.0
     aux:
       global_centering: false
-      scale_init: ${target.aux.scale_init}
+      scale_init: 0.1
       trainable_augmented_scale: true
   dim: 2
   nodes: 4
   n_aug: 5
   n_layers: 4
   identity_init: true
-  type: proj_spline #  nice proj_rnvp  proj_spline
+  type: proj_rnvp #  nice proj_rnvp  proj_spline
   kwargs:
     proj_spline:
       num_bins: 8
