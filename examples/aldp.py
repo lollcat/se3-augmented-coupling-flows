@@ -1,5 +1,6 @@
 from typing import Tuple, Optional, List
 
+from functools import partial
 import hydra
 from omegaconf import DictConfig
 from examples.train import train, create_train_config, plot_original_aug_norms_sample_hist, plot_sample_hist, plot_orig_aug_centre_mass_diff_hist
@@ -42,23 +43,43 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
                     flow: AugmentedFlow,
                     key: chex.PRNGKey,
                     n_samples: int,
+                    n_batches: int,
                     train_data: FullGraphSample,
                     test_data: FullGraphSample,
                     plotting_n_nodes: Optional[int] = None) -> List[plt.Subplot]:
 
-    # Plot interatomic distance histograms.
-    key1, key2 = jax.random.split(key)
-    joint_samples_flow = jax.jit(flow.sample_apply, static_argnums=3)(params, train_data.features[0], key1,
-                                                                      (n_samples,))
-    features, positions_x, positions_a = jax.jit(flow.joint_to_separate_samples)(joint_samples_flow)
-    positions_a_target = jax.jit(flow.aux_target_sample_n_apply)(params.aux_target, test_data[:n_samples], key2)
+    # Generate samples
+    sample_fn = jax.jit(flow.sample_apply, static_argnums=3)
+    separate_samples_fn = jax.jit(flow.joint_to_separate_samples)
+    aux_target_sample_n_apply_fn = jax.jit(flow.aux_target_sample_n_apply)
+    positions_x = []
+    positions_a = []
+    positions_a_target = []
+    for i in range(n_batches):
+        key, key_ = jax.random.split(key)
+        joint_samples_flow = sample_fn(params, train_data.features[0], key_,
+                                                                          (n_samples,))
+        _, positions_x_, positions_a_ = separate_samples_fn(joint_samples_flow)
+        positions_x.append(positions_x_)
+        positions_a.append(positions_a_)
+        if len(test_data) > i * n_samples:
+            key, key_ = jax.random.split(key)
+            end = min((i + 1) * n_samples, len(test_data))
+            positions_a_target_ = aux_target_sample_n_apply_fn(params.aux_target,
+                                                               test_data[(i * n_samples):end], key_)
+            positions_a_target.append(positions_a_target_)
+    positions_x = jnp.concatenate(positions_x, axis=0)
+    positions_a = jnp.concatenate(positions_a, axis=0)
+    positions_a_target = jnp.concatenate(positions_a_target, axis=0)
 
     # Plot original coords
     fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
     plot_sample_hist(positions_x, axs[0], label="flow samples", n_vertices=plotting_n_nodes)
     plot_sample_hist(positions_x, axs[1], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(train_data.positions[:n_samples], axs[0],  label="train samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(test_data.positions[:n_samples], axs[1],  label="test samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(train_data.positions[:min(n_samples * n_batches, len(train_data))],
+                     axs[0], label="train samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(test_data.positions[:min(n_samples * n_batches, len(train_data))],
+                     axs[1], label="test samples", n_vertices=plotting_n_nodes)
 
     axs[0].set_title(f"norms between original coordinates train")
     axs[1].set_title(f"norms between original coordinates test")
@@ -106,7 +127,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     phi = mdtraj.compute_phi(sampled_traj)[1].reshape(-1)
 
     # Compute histograms
-    nbins = 10
+    nbins = 200
     htest_phi, _ = np.histogram(phi_d, nbins, range=[-np.pi, np.pi], density=True);
     hgen_phi, _ = np.histogram(phi, nbins, range=[-np.pi, np.pi], density=True);
     htest_psi, _ = np.histogram(psi_d, nbins, range=[-np.pi, np.pi], density=True);
@@ -142,9 +163,10 @@ def run(cfg: DictConfig):
     if local_config:
         cfg = to_local_config(cfg)
 
+    custom_aldp_plotter_ = partial(custom_aldp_plotter, n_batches=cfg.plot_n_batches)
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
-                                            plotter=custom_aldp_plotter)
+                                            plotter=custom_aldp_plotter_)
     #experiment_config.plotter = custom_aldp_plotter
     train(experiment_config)
 
