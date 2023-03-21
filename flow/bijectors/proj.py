@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from utils.numerical import rotate_2d, vector_rejection, safe_norm
-from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra
+from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
 BijectorParams = chex.Array
 
@@ -59,7 +59,7 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, add_small_
 
 
 class ProjSplitCoupling(BijectorWithExtra):
-  def __init__(self,
+    def __init__(self,
                split_index: int,
                event_ndims: int,
                graph_features: chex.Array,
@@ -67,40 +67,40 @@ class ProjSplitCoupling(BijectorWithExtra):
                bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                swap: bool = False,
                split_axis: int = -1):
-    super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
-    if split_index < 0:
-      raise ValueError(
-          f'The split index must be non-negative; got {split_index}.')
-    if split_axis >= 0:
-      raise ValueError(f'The split axis must be negative; got {split_axis}.')
-    if event_ndims < 0:
-      raise ValueError(
-          f'`event_ndims` must be non-negative; got {event_ndims}.')
-    if split_axis < -event_ndims:
-      raise ValueError(
-          f'The split axis points to an axis outside the event. With '
-          f'`event_ndims == {event_ndims}`, the split axis must be between -1 '
-          f'and {-event_ndims}. Got `split_axis == {split_axis}`.')
-    self._split_index = split_index
-    self._bijector = bijector
-    self._swap = swap
-    self._split_axis = split_axis
-    self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
-    self._graph_features = graph_features
-    super().__init__(event_ndims_in=event_ndims)
+        super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
+        if split_index < 0:
+          raise ValueError(
+              f'The split index must be non-negative; got {split_index}.')
+        if split_axis >= 0:
+          raise ValueError(f'The split axis must be negative; got {split_axis}.')
+        if event_ndims < 0:
+          raise ValueError(
+              f'`event_ndims` must be non-negative; got {event_ndims}.')
+        if split_axis < -event_ndims:
+          raise ValueError(
+              f'The split axis points to an axis outside the event. With '
+              f'`event_ndims == {event_ndims}`, the split axis must be between -1 '
+              f'and {-event_ndims}. Got `split_axis == {split_axis}`.')
+        self._split_index = split_index
+        self._bijector = bijector
+        self._swap = swap
+        self._split_axis = split_axis
+        self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
+        self._graph_features = graph_features
+        super().__init__(event_ndims_in=event_ndims)
 
-  def _split(self, x: Array) -> Tuple[Array, Array]:
-    x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
-    if self._swap:
-      x1, x2 = x2, x1
-    return x1, x2
+    def _split(self, x: Array) -> Tuple[Array, Array]:
+        x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
+        if self._swap:
+          x1, x2 = x2, x1
+        return x1, x2
 
-  def _recombine(self, x1: Array, x2: Array) -> Array:
-    if self._swap:
-      x1, x2 = x2, x1
-    return jnp.concatenate([x1, x2], self._split_axis)
+    def _recombine(self, x1: Array, x2: Array) -> Array:
+        if self._swap:
+          x1, x2 = x2, x1
+        return jnp.concatenate([x1, x2], self._split_axis)
 
-  def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
       bijector = self._bijector(params)
       if bijector.event_ndims_in != bijector.event_ndims_out:
@@ -121,62 +121,142 @@ class ProjSplitCoupling(BijectorWithExtra):
               bijector = distrax.Block(bijector, extra_ndims)
       return bijector
 
-  def get_basis_and_h(self, x, graph_features: chex.Array):
-      chex.assert_rank(x, 3)
-      n_nodes, multiplicity, dim = x.shape
+    def get_basis_and_h(self, x, graph_features: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array, Extra]:
+        chex.assert_rank(x, 3)
+        n_nodes, multiplicity, dim = x.shape
 
-      # Calculate new basis for the affine transform
-      various_x_points, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
-      # Vmap over multiplicity.
-      origin, change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(x, various_x_points)
+        # Calculate new basis for the affine transform
+        various_x_points, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
+        # Vmap over multiplicity.
+        origin, change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(x, various_x_points)
 
-      # Stack h, and x projected into the space.
-      x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
-      bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
-      return origin, change_of_basis_matrix, bijector_feat_in
+        # Stack h, and x projected into the space.
+        x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
+        bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
+        extra = self.get_extra(various_x_points)
+        return origin, change_of_basis_matrix, bijector_feat_in, extra
 
-  def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
-    """Computes y = f(x) and log|det J(f)(x)|."""
-    self._check_forward_input_shape(x)
-    x1, x2 = self._split(x)
-    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(x1, graph_features)
-    x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
-    y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
-    y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-    return self._recombine(x1, y2), logdet
+    def get_vector_info_single(self, various_x_points: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        basis_vectors = various_x_points[:, 1:]
+        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
+        vec1 = basis_vectors[:, 0]
+        vec2 = basis_vectors[:, 1]
+        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jax.vmap(jnp.arccos)(arccos_in)
+        log_barrier_in = 1 - jnp.abs(arccos_in) + 1e-6
+        aux_loss = - jnp.log(log_barrier_in)
+        return theta, aux_loss, log_barrier_in
 
-  def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
-    """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
-    self._check_inverse_input_shape(y)
-    y1, y2 = self._split(y)
-    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(y1, graph_features)
-    y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
-    x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
-    x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-    return self._recombine(y1, x2), logdet
+    def get_extra(self, various_x_points: chex.Array) -> Extra:
+        theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
+        info = {}
+        info_aggregator = {}
+        info_aggregator.update(
+            mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
+            min_log_barrier_in=jnp.min
+        )
+        info.update(
+            mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
+            min_log_barrier_in=jnp.min(log_barrier_in)
+        )
+        aux_loss = jnp.mean(aux_loss)
+        extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
+        return extra
 
-  def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
-    """Computes y = f(x) and log|det J(f)(x)|."""
-    if len(x.shape) == 3:
-        return self.forward_and_log_det_single(x, self._graph_features)
-    elif len(x.shape) == 4:
-        if self._graph_features.shape[0] != x.shape[0]:
-            print("graph features has no batch size")
-            return jax.vmap(self.forward_and_log_det_single, in_axes=(0, None))(x, self._graph_features)
+    def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        self._check_forward_input_shape(x)
+        x1, x2 = self._split(x)
+        origin, change_of_basis_matrix, bijector_feat_in, _ = self.get_basis_and_h(x1, graph_features)
+        x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
+        y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
+        y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
+        return self._recombine(x1, y2), logdet
+
+    def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        self._check_inverse_input_shape(y)
+        y1, y2 = self._split(y)
+        origin, change_of_basis_matrix, bijector_feat_in, _ = self.get_basis_and_h(y1, graph_features)
+        y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
+        x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
+        x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
+        return self._recombine(y1, x2), logdet
+
+    def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        if len(x.shape) == 3:
+            return self.forward_and_log_det_single(x, self._graph_features)
+        elif len(x.shape) == 4:
+            if self._graph_features.shape[0] != x.shape[0]:
+                print("graph features has no batch size")
+                return jax.vmap(self.forward_and_log_det_single, in_axes=(0, None))(x, self._graph_features)
+            else:
+                return jax.vmap(self.forward_and_log_det_single)(x, self._graph_features)
         else:
-            return jax.vmap(self.forward_and_log_det_single)(x, self._graph_features)
-    else:
-        raise NotImplementedError
+            raise NotImplementedError
 
-  def inverse_and_log_det(self, y: Array) -> Tuple[Array, Array]:
-    """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
-    if len(y.shape) == 3:
-        return self.inverse_and_log_det_single(y, self._graph_features)
-    elif len(y.shape) == 4:
-        if self._graph_features.shape[0] != y.shape[0]:
-            print("graph features has no batch size")
-            return jax.vmap(self.inverse_and_log_det_single, in_axes=(0, None))(y, self._graph_features)
+    def inverse_and_log_det(self, y: Array) -> Tuple[Array, Array]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        if len(y.shape) == 3:
+            return self.inverse_and_log_det_single(y, self._graph_features)
+        elif len(y.shape) == 4:
+            if self._graph_features.shape[0] != y.shape[0]:
+                print("graph features has no batch size")
+                return jax.vmap(self.inverse_and_log_det_single, in_axes=(0, None))(y, self._graph_features)
+            else:
+                return jax.vmap(self.inverse_and_log_det_single)(y, self._graph_features)
         else:
-            return jax.vmap(self.inverse_and_log_det_single)(y, self._graph_features)
-    else:
-        raise NotImplementedError
+            raise NotImplementedError
+
+    def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        self._check_forward_input_shape(x)
+        x1, x2 = self._split(x)
+        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
+        x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
+        y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
+        y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
+        return self._recombine(x1, y2), logdet, extra
+
+    def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        self._check_inverse_input_shape(y)
+        y1, y2 = self._split(y)
+        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
+        y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
+        x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
+        x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
+        return self._recombine(y1, x2), logdet, extra
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        if len(x.shape) == 3:
+            h, logdet, extra = self.forward_and_log_det_with_extra_single(x, self._graph_features)
+        elif len(x.shape) == 4:
+            if self._graph_features.shape[0] != x.shape[0]:
+                print("graph features has no batch size")
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single, in_axes=(0, None))(x, self._graph_features)
+            else:
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_with_extra_single)(x, self._graph_features)
+            extra = extra._replace(aux_info=extra.aggregate_info(), aux_loss=jnp.mean(extra.aux_loss))
+        else:
+            raise NotImplementedError
+        return h, logdet, extra
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        if len(y.shape) == 3:
+            x, logdet, extra = self.inverse_and_log_det_with_extra_single(y, self._graph_features)
+        elif len(y.shape) == 4:
+            if self._graph_features.shape[0] != y.shape[0]:
+                print("graph features has no batch size")
+                x, logdet, extra = jax.vmap(self.inverse_and_log_det_with_extra_single, in_axes=(0, None))(
+                    y, self._graph_features)
+            else:
+                x, logdet, extra = jax.vmap(self.inverse_and_log_det_with_extra_single)(y, self._graph_features)
+            extra = extra._replace(aux_info=extra.aggregate_info(), aux_loss=jnp.mean(extra.aux_loss))
+        else:
+            raise NotImplementedError
+        return x, logdet, extra
+
