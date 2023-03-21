@@ -17,7 +17,7 @@ flow:
     x_scale_init: 1.0
     aux:
       global_centering: false
-      scale_init: ${target.aux.scale_init}
+      scale_init: 1.0
       trainable_augmented_scale: true
   dim: 3
   n_aug: 3

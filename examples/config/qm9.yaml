@@ -8,7 +8,7 @@ hydra:
 target:
   aux:
     global_centering: false
-    scale_init: 1.0
+    scale_init: 0.1
     trainable_augmented_scale: true
 
 flow:
@@ -18,19 +18,19 @@ flow:
     x_scale_init: 1.0
     aux:
       global_centering: false
-      scale_init: 0.1
+      scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: true
   dim: 3
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: proj_rnvp #  nice proj_rnvp  proj_spline
+  type: proj_spline #  nice proj_rnvp  proj_spline
   act_norm: true
   kwargs:
     proj_spline:
       num_bins: 8
-      lower: -10.
-      upper: 10.
+      lower: -2
+      upper: 2.
   compile_n_unroll: 1
   nets:
     type: egnn # mace or egnn or e3transformer or e3gnn
