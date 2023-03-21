@@ -9,9 +9,10 @@ from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
 from flow.bijectors.proj_real_nvp import make_proj_realnvp
 from flow.bijectors.proj_spline import make_proj_spline
-from flow.bijectors.nice import make_se_equivariant_nice
+from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
+from flow.bijectors.equi_spline import make_equi_spline
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -50,8 +51,8 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
-    if 'nice' not in flow_type and 'proj_rnvp' not in flow_type and 'proj_spline' not in flow_type:
-        raise Exception
+    for flow in flow_type:
+        assert flow in ['nice', 'proj_rnvp', 'proj_spline', "equi_spline"]
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
@@ -120,6 +121,20 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     **kwargs_proj_spline
                 )
                 bijectors.append(bijector)
+            elif 'equi_spline' in flow_type:
+                kwargs_equi_spline = config.kwargs["equi_spline"] if "equi_spline" in config.kwargs.keys() else {}
+                bijector = make_equi_spline(
+                    layer_number=layer_number,
+                    graph_features=graph_features,
+                    dim=config.dim,
+                    n_aug=config.n_aug,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_equi_spline
+                )
+                bijectors.append(bijector)
+
 
         return ChainWithExtra(bijectors)
 

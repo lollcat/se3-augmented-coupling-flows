@@ -24,7 +24,7 @@ flow:
   nodes: 13
   n_layers: 8
   identity_init: true
-  type: proj_spline #  nice proj_rnvp  proj_spline
+  type: equi_spline #  nice proj_rnvp  proj_spline equi_spline
   kwargs:
     proj_spline:
       num_bins: 8

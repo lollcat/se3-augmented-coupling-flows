@@ -33,7 +33,7 @@ flow:
       upper: 2.
   compile_n_unroll: 1
   nets:
-    type: egnn # mace or egnn or e3transformer or e3gnn
+    type: equi_spline # mace or egnn or e3transformer or e3gnn
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
@@ -104,7 +104,7 @@ training:
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
-  save_dir: qm9pos_results
+  save_dir: qm9pos_results${training.lr}
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true

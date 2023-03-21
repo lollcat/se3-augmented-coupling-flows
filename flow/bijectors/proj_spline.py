@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import haiku as hk
 
 from nets.base import NetsConfig, build_egnn_fn
-from flow.bijectors.proj import ProjSplitCoupling
+from flow.bijectors.proj_coupling import ProjSplitCoupling
 
 def make_proj_spline(
         graph_features: chex.Array,

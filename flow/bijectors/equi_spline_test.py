@@ -1,14 +1,16 @@
-import haiku as hk
 import distrax
+import haiku as hk
+import jax
+import jax.numpy as jnp
+import chex
+
 
 from flow.test_utils import bijector_test
-from flow.bijectors.nice import make_se_equivariant_nice
+from flow.bijectors.equi_spline import make_equi_spline
 from flow.test_utils import get_minimal_nets_config
-import jax.numpy as jnp
 
-
-def test_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn',
-                            n_nodes: int = 4, n_aux=3):
+def test_bijector_with_proj(dim: int = 3, n_layers: int = 1, type='egnn',
+                            n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
@@ -17,7 +19,7 @@ def test_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_se_equivariant_nice(
+            bijector = make_equi_spline(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
@@ -50,7 +52,9 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_bijector_nice(dim=3)
+    test_bijector_with_proj(dim=3)
     print('passed test in 3D')
-    test_bijector_nice(dim=2)
+    test_bijector_with_proj(dim=2)
     print('passed test in 2D')
+
+
