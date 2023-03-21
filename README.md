@@ -35,6 +35,7 @@ pip install -e .
 # TODO:
 
 ## Burning
+    - Separate channels MLP for diff aux
     - Spline flows
     - Centralise net config naming to be more consistent. 
     - Add whether sample has aux to sample info?
