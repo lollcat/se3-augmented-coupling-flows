@@ -25,7 +25,7 @@ flow:
   n_layers: 8
   identity_init: true
   type: proj_spline #  nice proj_rnvp  proj_spline
-  act_norm: true
+  act_norm: false
   kwargs:
     proj_spline:
       num_bins: 8
@@ -33,7 +33,7 @@ flow:
       upper: 2.
   compile_n_unroll: 1
   nets:
-    type: equi_spline # mace or egnn or e3transformer or e3gnn
+    type: egnn # mace or egnn or e3transformer or e3gnn
     e3gnn:
       n_blocks: 3
       mlp_units: [ 64, 64 ]
@@ -65,14 +65,14 @@ flow:
       residual_mlp_width: 64
       residual_mlp_depth: 1
     egnn:
-      mlp_units: [64,64]
+      mlp_units: [128,128]
       n_layers: 3
       normalize_by_norms: true
       variance_scaling_init: 0.001
       agg: mean
       normalization_constant: 1.0
       h_linear_softmax: true
-      h_embedding_dim: 64
+      h_embedding_dim: 128
     transformer: # for proj flow
       mlp_units: [64,64]
       num_heads: 6
@@ -80,7 +80,7 @@ flow:
       w_init_scale: 0.1
       n_layers: 3
     mlp_head_config:
-      mlp_units: [ 64, 64 ]
+      mlp_units: [ 128, 128 ]
 
 
 training:
@@ -88,7 +88,7 @@ training:
     init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 4e-4
+    peak_lr: 6e-4
     end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
@@ -106,7 +106,7 @@ training:
   save: true
   save_dir: qm9pos_results${training.lr}
   use_flow_aux_loss: true
-  aux_loss_weight: 1.0
+  aux_loss_weight: 10.0
   last_iter_info_only: true
 
 logger:
@@ -114,7 +114,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size}_naug${flow.n_aug}_trainabletarg${target.aux.trainable_augmented_scale}_actnorm${flow.act_norm} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size}_naug${flow.n_aug}_trainabletarg${target.aux.trainable_augmented_scale}_actnorm${flow.act_norm}_fatter # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

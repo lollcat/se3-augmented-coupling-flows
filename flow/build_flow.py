@@ -12,7 +12,6 @@ from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
-from flow.bijectors.equi_spline import make_equi_spline
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -52,7 +51,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj_rnvp', 'proj_spline', "equi_spline"]
+        assert flow in ['nice', 'proj_rnvp', 'proj_spline']
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
@@ -109,7 +108,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 bijectors.append(bijector)
 
             elif 'proj_spline' in flow_type:
-                kwargs_proj_spline = config.kwargs["proj_spline" ] if "proj_spline" in config.kwargs.keys() else {}
+                kwargs_proj_spline = config.kwargs["proj_spline"] if "proj_spline" in config.kwargs.keys() else {}
                 bijector = make_proj_spline(
                     layer_number=layer_number,
                     graph_features=graph_features,
@@ -119,19 +118,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
                     **kwargs_proj_spline
-                )
-                bijectors.append(bijector)
-            elif 'equi_spline' in flow_type:
-                kwargs_equi_spline = config.kwargs["equi_spline"] if "equi_spline" in config.kwargs.keys() else {}
-                bijector = make_equi_spline(
-                    layer_number=layer_number,
-                    graph_features=graph_features,
-                    dim=config.dim,
-                    n_aug=config.n_aug,
-                    swap=swap,
-                    identity_init=config.identity_init,
-                    nets_config=config.nets_config,
-                    **kwargs_equi_spline
                 )
                 bijectors.append(bijector)
 
