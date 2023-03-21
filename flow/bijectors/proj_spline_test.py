@@ -6,7 +6,7 @@ import chex
 
 
 from flow.test_utils import bijector_test
-from flow.bijectors.proj_real_nvp import make_proj_realnvp
+from flow.bijectors.proj_spline import make_proj_spline
 from flow.test_utils import get_minimal_nets_config
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
@@ -19,7 +19,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_realnvp(
+            bijector = make_proj_spline(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,

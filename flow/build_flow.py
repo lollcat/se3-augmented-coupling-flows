@@ -7,7 +7,7 @@ import distrax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
-from flow.bijectors.proj_real_nvp import make_se_equivariant_split_coupling_with_projection
+from flow.bijectors.proj_real_nvp import make_proj_realnvp
 from flow.bijectors.nice import make_se_equivariant_nice
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
@@ -90,7 +90,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
         for swap in (False, True):  # For swap False we condition augmented on original.
             if "proj" in flow_type:
-                bijector = make_se_equivariant_split_coupling_with_projection(
+                bijector = make_proj_realnvp(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
                     swap=swap,

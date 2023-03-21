@@ -9,7 +9,7 @@ import haiku as hk
 from nets.base import NetsConfig, build_egnn_fn
 from flow.bijectors.proj import ProjSplitCoupling
 
-def make_proj_realnvp(
+def make_proj_spline(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -17,12 +17,17 @@ def make_proj_realnvp(
         swap: bool,
         nets_config: NetsConfig,
         identity_init: bool = True,
+        num_bins: int = 10,
+        lower: float = -10.,
+        upper: float = 10.,
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
     n_heads = dim
-    n_invariant_params = dim * 2 * ((n_aug + 1) // 2)
+    params_per_dim_per_var_group = (3 * num_bins + 1)
+    n_variable_groups = ((n_aug + 1) // 2)
+    n_invariant_params = dim * n_variable_groups * params_per_dim_per_var_group
 
     mlp_function = hk.Sequential(
         name=f"layer_{layer_number}_swap{swap}_cond_mlp",
@@ -35,15 +40,20 @@ def make_proj_realnvp(
                       w_init=hk.initializers.VarianceScaling(0.01))
         ])
 
-    def bijector_fn(params: chex.Array) -> distrax.ScalarAffine:
+    def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim*2))
-        log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-        return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim, params_per_dim_per_var_group))
+        bijector = distrax.RationalQuadraticSpline(
+            params,
+            range_min=lower,
+            range_max=upper,
+            boundary_slopes='unconstrained',
+            min_bin_size=(upper - lower) * 1e-4)
+        return bijector
 
 
 
