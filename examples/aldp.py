@@ -43,9 +43,9 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
                     flow: AugmentedFlow,
                     key: chex.PRNGKey,
                     n_samples: int,
-                    n_batches: int,
                     train_data: FullGraphSample,
                     test_data: FullGraphSample,
+                    n_batches: int = 1,
                     plotting_n_nodes: Optional[int] = None) -> List[plt.Subplot]:
 
     # Generate samples
