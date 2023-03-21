@@ -9,7 +9,7 @@ target:
   aux:
     global_centering: false
     scale_init: 1.0
-    trainable_augmented_scale: false
+    trainable_augmented_scale: train
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 

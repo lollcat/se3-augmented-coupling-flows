@@ -68,13 +68,12 @@ def make_se_equivariant_split_coupling_with_projection(
                                    n_equivariant_vectors_out=n_heads,
                                    n_invariant_feat_out=n_invariant_feat_out,
                                    zero_init_invariant_feat=False)
-    def get_basis_vectors_and_invariant_vals(x: chex.Array):
-        return equivariant_fn(x, graph_features)
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
         event_ndims=3,  # [nodes, n_aug+1, dim]
-        get_basis_vectors_and_invariant_vals=get_basis_vectors_and_invariant_vals,
+        get_basis_vectors_and_invariant_vals=equivariant_fn,
+        graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2

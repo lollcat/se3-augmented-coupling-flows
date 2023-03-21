@@ -62,6 +62,7 @@ class ProjSplitCoupling(BijectorWithExtra):
   def __init__(self,
                split_index: int,
                event_ndims: int,
+               graph_features: chex.Array,
                get_basis_vectors_and_invariant_vals: Callable,
                bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                swap: bool = False,
@@ -85,6 +86,7 @@ class ProjSplitCoupling(BijectorWithExtra):
     self._swap = swap
     self._split_axis = split_axis
     self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
+    self._graph_features = graph_features
     super().__init__(event_ndims_in=event_ndims)
 
   def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -119,12 +121,12 @@ class ProjSplitCoupling(BijectorWithExtra):
               bijector = distrax.Block(bijector, extra_ndims)
       return bijector
 
-  def get_basis_and_h(self, x):
+  def get_basis_and_h(self, x, graph_features: chex.Array):
       chex.assert_rank(x, 3)
       n_nodes, multiplicity, dim = x.shape
 
       # Calculate new basis for the affine transform
-      various_x_points, h = self._get_basis_vectors_and_invariant_vals(x)
+      various_x_points, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
       # Vmap over multiplicity.
       origin, change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(x, various_x_points)
 
@@ -133,21 +135,21 @@ class ProjSplitCoupling(BijectorWithExtra):
       bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
       return origin, change_of_basis_matrix, bijector_feat_in
 
-  def forward_and_log_det_single(self, x: Array) -> Tuple[Array, Array]:
+  def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
     """Computes y = f(x) and log|det J(f)(x)|."""
     self._check_forward_input_shape(x)
     x1, x2 = self._split(x)
-    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(x1)
+    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(x1, graph_features)
     x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
     y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
     y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
     return self._recombine(x1, y2), logdet
 
-  def inverse_and_log_det_single(self, y: Array) -> Tuple[Array, Array]:
+  def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
     """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
     self._check_inverse_input_shape(y)
     y1, y2 = self._split(y)
-    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(y1)
+    origin, change_of_basis_matrix, bijector_feat_in = self.get_basis_and_h(y1, graph_features)
     y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
     x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
     x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
@@ -156,17 +158,25 @@ class ProjSplitCoupling(BijectorWithExtra):
   def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
     """Computes y = f(x) and log|det J(f)(x)|."""
     if len(x.shape) == 3:
-        return self.forward_and_log_det_single(x)
+        return self.forward_and_log_det_single(x, self._graph_features)
     elif len(x.shape) == 4:
-        return jax.vmap(self.forward_and_log_det_single)(x)
+        if self._graph_features.shape[0] != x.shape[0]:
+            print("graph features has no batch size")
+            return jax.vmap(self.forward_and_log_det_single, in_axes=(0, None))(x, self._graph_features)
+        else:
+            return jax.vmap(self.forward_and_log_det_single)(x, self._graph_features)
     else:
         raise NotImplementedError
 
   def inverse_and_log_det(self, y: Array) -> Tuple[Array, Array]:
     """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
     if len(y.shape) == 3:
-        return self.inverse_and_log_det_single(y)
+        return self.inverse_and_log_det_single(y, self._graph_features)
     elif len(y.shape) == 4:
-        return jax.vmap(self.inverse_and_log_det_single)(y)
+        if self._graph_features.shape[0] != y.shape[0]:
+            print("graph features has no batch size")
+            return jax.vmap(self.inverse_and_log_det_single, in_axes=(0, None))(y, self._graph_features)
+        else:
+            return jax.vmap(self.inverse_and_log_det_single)(y, self._graph_features)
     else:
         raise NotImplementedError
