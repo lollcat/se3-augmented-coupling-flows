@@ -74,11 +74,11 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
 
     # Plot original coords
     fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
-    plot_sample_hist(positions_x, axs[0], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(positions_x, axs[1], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(train_data.positions[:min(n_samples * n_batches, len(train_data.positions))],
+    plot_sample_hist(positions_x[:n_samples], axs[0], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(positions_x[:n_samples], axs[1], label="flow samples", n_vertices=plotting_n_nodes)
+    plot_sample_hist(train_data.positions[:n_samples],
                      axs[0], label="train samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(test_data.positions[:min(n_samples * n_batches, len(train_data.positions))],
+    plot_sample_hist(test_data.positions[:n_samples],
                      axs[1], label="test samples", n_vertices=plotting_n_nodes)
 
     axs[0].set_title(f"norms between original coordinates train")
@@ -91,8 +91,8 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
     axs2 = [axs2] if isinstance(axs2, plt.Subplot) else axs2
     for i in range(flow.n_augmented):
-        positions_a_single = positions_a[:, :, i]  # get single group of augmented coordinates
-        positions_a_target_single = positions_a_target[:, :, i]  # Get first set of aux variables.
+        positions_a_single = positions_a[:n_samples, :, i]  # get single group of augmented coordinates
+        positions_a_target_single = positions_a_target[:n_samples, :, i]  # Get first set of aux variables.
         #chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
         plot_sample_hist(positions_a_single, axs2[i], label="flow samples", n_vertices=plotting_n_nodes)
         plot_sample_hist(positions_a_target_single, axs2[i], label="test samples", n_vertices=plotting_n_nodes)
@@ -102,14 +102,14 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
 
     # Plot histogram for centre of mean
     fig3, axs3 = plt.subplots(1, 2, figsize=(10, 5))
-    positions_a_single = positions_a[:, :, 0]  # get single group of augmented coordinates
-    positions_a_target_single = positions_a_target[:, :, 0]  # Get first set of aux variables.
+    positions_a_single = positions_a[:n_samples, :, 0]  # get single group of augmented coordinates
+    positions_a_target_single = positions_a_target[:n_samples, :, 0]  # Get first set of aux variables.
 
-    plot_orig_aug_centre_mass_diff_hist(positions_x, positions_a_single, ax=axs3[0], label='flow samples')
-    plot_orig_aug_centre_mass_diff_hist(test_data[:min(n_samples * n_batches, len(test_data.positions))].positions,
+    plot_orig_aug_centre_mass_diff_hist(positions_x[:n_samples], positions_a_single, ax=axs3[0], label='flow samples')
+    plot_orig_aug_centre_mass_diff_hist(test_data[:n_samples].positions,
                                         positions_a_target_single, ax=axs3[0], label='test samples')
-    plot_original_aug_norms_sample_hist(positions_x, positions_a_single, axs3[1], label='flow samples')
-    plot_original_aug_norms_sample_hist(test_data[:min(n_samples * n_batches, len(test_data.positions))].positions,
+    plot_original_aug_norms_sample_hist(positions_x[:n_samples], positions_a_single, axs3[1], label='flow samples')
+    plot_original_aug_norms_sample_hist(test_data[:n_samples].positions,
                                         positions_a_target_single, axs3[1], label='test samples')
     axs3[0].legend()
     axs3[0].set_title("norms orig - aug centre of mass (aug group 1) ")
