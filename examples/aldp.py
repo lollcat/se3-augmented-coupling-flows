@@ -198,12 +198,32 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     ax[1].set_xlabel('$\psi$', fontsize=24)
 
     # Ramachandran plot
+    # Compute KLDs
+    nbins_ram = 64
+    eps_ram = 1e-10
+    hist_ram_train = np.histogram2d(phi_train, psi_train, nbins_ram,
+                                    range=[[-np.pi, np.pi], [-np.pi, np.pi]],
+                                    density=True)[0]
+    hist_ram_test = np.histogram2d(phi_test, psi_test, nbins_ram,
+                                   range=[[-np.pi, np.pi], [-np.pi, np.pi]],
+                                   density=True)[0]
+    hist_ram_gen = np.histogram2d(phi, psi, nbins_ram,
+                                  range=[[-np.pi, np.pi], [-np.pi, np.pi]],
+                                  density=True)[0]
+    kld_train = np.sum(hist_ram_train * np.log((hist_ram_train + eps_ram)
+                                             / (hist_ram_gen + eps_ram))) \
+                * (2 * np.pi / nbins_ram) ** 2
+    kld_test = np.sum(hist_ram_test * np.log((hist_ram_test + eps_ram)
+                                             / (hist_ram_gen + eps_ram))) \
+               * (2 * np.pi / nbins_ram) ** 2
     fig5, ax = plt.subplots(1, 1, figsize=(10, 10))
-    ax.hist2d(phi, psi, bins=64, norm=mpl.colors.LogNorm(),
+    ax.hist2d(phi, psi, bins=nbins_ram, norm=mpl.colors.LogNorm(),
               range=[[-np.pi, np.pi], [-np.pi, np.pi]])
     ax.tick_params(axis='both', labelsize=20)
     ax.set_xlabel('$\phi$', fontsize=24)
     ax.set_ylabel('$\psi$', fontsize=24)
+    ax.set_title('KLD train: {:.2f}, KLD test: {:.2f}'.format(kld_train, kld_test),
+                 fontsize=24)
 
     # Internal coordinates
     ndim = internal_gen.shape[1]
