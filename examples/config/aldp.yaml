@@ -6,6 +6,9 @@ hydra:
     chdir: false
 
 target:
+  data:
+    train: target/data/aldp_500K_train_mini.h5
+    test: target/data/aldp_500K_test_mini.h5
   aux:
     global_centering: false
     scale_init: 0.1

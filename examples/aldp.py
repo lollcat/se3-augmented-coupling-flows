@@ -20,10 +20,12 @@ from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowPara
 from examples.lj13 import to_local_config
 
 
-def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None) -> \
+def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None,
+                 path_train='target/data/aldp_500K_train_mini.h5',
+                 path_test='target/data/aldp_500K_test_mini.h5') -> \
         Tuple[FullGraphSample, FullGraphSample]:
-    train_traj = mdtraj.load('target/data/aldp_500K_train_mini.h5')
-    test_traj = mdtraj.load('target/data/aldp_500K_test_mini.h5')
+    train_traj = mdtraj.load(path_train)
+    test_traj = mdtraj.load(path_test)
     features = get_atom_encoding(train_traj)
 
     positions_train = train_traj.xyz
@@ -302,8 +304,10 @@ def run(cfg: DictConfig):
         cfg = to_local_config(cfg)
 
     custom_aldp_plotter_ = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
+    load_dataset_ = partial(load_dataset, path_train=cfg.target.data.train,
+                            path_test=cfg.target.data.test)
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
-                                            load_dataset=load_dataset,
+                                            load_dataset=load_dataset_,
                                             plotter=custom_aldp_plotter_)
     #experiment_config.plotter = custom_aldp_plotter
     train(experiment_config)
