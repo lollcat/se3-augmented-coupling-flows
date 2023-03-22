@@ -306,9 +306,9 @@ def train(config: TrainConfig):
     if config.save:
         pathlib.Path(config.save_dir).mkdir(exist_ok=True)
         plots_dir = os.path.join(config.save_dir, f"plots")
-        pathlib.Path(plots_dir).mkdir(exist_ok=False)
+        pathlib.Path(plots_dir).mkdir(exist_ok=True)
         checkpoints_dir = os.path.join(config.save_dir, f"model_checkpoints")
-        pathlib.Path(checkpoints_dir).mkdir(exist_ok=False)
+        pathlib.Path(checkpoints_dir).mkdir(exist_ok=True)
     else:
         plots_dir = None
         checkpoints_dir = None
@@ -443,7 +443,7 @@ def train(config: TrainConfig):
 
         if i in checkpoint_iter and config.save:
             checkpoint_path = os.path.join(checkpoints_dir, f"iter_{i}/")
-            pathlib.Path(checkpoint_path).mkdir(exist_ok=False)
+            pathlib.Path(checkpoint_path).mkdir(exist_ok=True)
             with open(os.path.join(checkpoint_path, "state.pkl"), "wb") as f:
                 pickle.dump(params, f)
 
