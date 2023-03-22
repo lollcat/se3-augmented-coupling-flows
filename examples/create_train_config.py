@@ -169,7 +169,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
     flow = build_flow(config.flow_dist_config)
 
     if plotter is None:
-        plotter = make_default_plotter(train_data, test_data,
+        plotter = make_default_plotter(train_data,
+                                       test_data,
                                        flow=flow,
                                        n_samples_from_flow=config.plot_batch_size,
                                        max_n_samples=1000,
