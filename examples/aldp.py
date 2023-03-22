@@ -96,7 +96,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
         _, positions_x_, positions_a_ = separate_samples_fn(joint_samples_flow)
         positions_x_torch = torch.tensor(np.array(positions_x_).reshape(-1, ndim),
                                          dtype=torch.float64)
-        internal_gen_ = transform.inverse(positions_x_torch).detach().numpy()
+        internal_gen_, _ = transform.inverse(positions_x_torch).detach().numpy()
         positions_x.append(positions_x_)
         positions_a.append(positions_a_)
         internal_gen.append(internal_gen_)
@@ -107,7 +107,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
                                                                test_data[(i * n_samples):end], key_)
             positions_x_torch = torch.tensor(np.array(test_data[(i * n_samples):end].positions).reshape(-1, ndim),
                                              dtype=torch.float64)
-            internal_test_ = transform.inverse(positions_x_torch).detach().numpy()
+            internal_test_, _ = transform.inverse(positions_x_torch).detach().numpy()
             positions_a_target.append(positions_a_target_)
             internal_test.append(internal_test_)
     positions_x = jnp.concatenate(positions_x, axis=0)
