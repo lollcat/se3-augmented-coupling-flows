@@ -12,8 +12,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import jax
 from openmmtools.testsystems import AlanineDipeptideVacuum
-# from boltzgen.flows import CoordinateTransform
-# import torch
+from boltzgen.flows import CoordinateTransform
+import torch
 
 from target.alanine_dipeptide import get_atom_encoding
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -52,8 +52,8 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
 
     # Set up coordinate transform
     ndim = 66
-    # transform_data = torch.tensor(np.array(train_data.positions).reshape(-1, ndim),
-    #                               dtype=torch.float64)
+    transform_data = torch.tensor(np.array(train_data.positions).reshape(-1, ndim),
+                                  dtype=torch.float64)
     z_matrix = [
         (0, [1, 4, 6]),
         (1, [4, 6, 8]),
@@ -77,8 +77,8 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     ]
     cart_indices = [8, 6, 14]
     ind_circ_dih = [0, 1, 2, 3, 4, 5, 8, 9, 10, 13, 15, 16]
-    # transform = CoordinateTransform(transform_data, ndim, z_matrix, cart_indices,
-    #                                 mode="internal", ind_circ_dih=ind_circ_dih)
+    transform = CoordinateTransform(transform_data, ndim, z_matrix, cart_indices,
+                                    mode="internal", ind_circ_dih=ind_circ_dih)
 
     # Generate samples
     sample_fn = jax.jit(flow.sample_apply, static_argnums=3)
@@ -94,22 +94,22 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
         joint_samples_flow = sample_fn(params, train_data.features[0], key_,
                                                                           (n_samples,))
         _, positions_x_, positions_a_ = separate_samples_fn(joint_samples_flow)
-        # positions_x_torch = torch.tensor(np.array(positions_x_).reshape(-1, ndim),
-        #                                  dtype=torch.float64)
-        # internal_gen_ = transform.inverse(positions_x_torch).detach().numpy()
+        positions_x_torch = torch.tensor(np.array(positions_x_).reshape(-1, ndim),
+                                         dtype=torch.float64)
+        internal_gen_ = transform.inverse(positions_x_torch).detach().numpy()
         positions_x.append(positions_x_)
         positions_a.append(positions_a_)
-        # internal_gen.append(internal_gen_)
+        internal_gen.append(internal_gen_)
         if len(test_data.positions) > i * n_samples:
             key, key_ = jax.random.split(key)
             end = min((i + 1) * n_samples, len(test_data.positions))
             positions_a_target_ = aux_target_sample_n_apply_fn(params.aux_target,
                                                                test_data[(i * n_samples):end], key_)
-            # positions_x_torch = torch.tensor(np.array(test_data[(i * n_samples):end].positions).reshape(-1, ndim),
-            #                                  dtype=torch.float64)
-            # internal_test_ = transform.inverse(positions_x_torch).detach().numpy()
+            positions_x_torch = torch.tensor(np.array(test_data[(i * n_samples):end].positions).reshape(-1, ndim),
+                                             dtype=torch.float64)
+            internal_test_ = transform.inverse(positions_x_torch).detach().numpy()
             positions_a_target.append(positions_a_target_)
-            # internal_test.append(internal_test_)
+            internal_test.append(internal_test_)
     positions_x = jnp.concatenate(positions_x, axis=0)
     positions_a = jnp.concatenate(positions_a, axis=0)
     positions_a_target = jnp.concatenate(positions_a_target, axis=0)
@@ -217,59 +217,59 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
         hists_gen[:, i] = hgen
 
     # Histograms of the groups
-    # ncarts = transform.transform.len_cart_inds
-    # permute_inv = transform.transform.permute_inv.cpu().data.numpy()
-    # bond_ind = transform.transform.ic_transform.bond_indices.cpu().data.numpy()
-    # angle_ind = transform.transform.ic_transform.angle_indices.cpu().data.numpy()
-    # dih_ind = transform.transform.ic_transform.dih_indices.cpu().data.numpy()
-    # hists_test_cart = hists_test[:, :(3 * ncarts - 6)]
-    # hists_test_ = np.concatenate([hists_test[:, :(3 * ncarts - 6)],
-    #                               np.zeros((nbins, 6)),
-    #                               hists_test[:, (3 * ncarts - 6):]], axis=1)
-    # hists_test_ = hists_test_[:, permute_inv]
-    # hists_test_bond = hists_test_[:, bond_ind]
-    # hists_test_angle = hists_test_[:, angle_ind]
-    # hists_test_dih = hists_test_[:, dih_ind]
-    #
-    # hists_gen_cart = hists_gen[:, :(3 * ncarts - 6)]
-    # hists_gen_ = np.concatenate([hists_gen[:, :(3 * ncarts - 6)],
-    #                              np.zeros((nbins, 6)),
-    #                              hists_gen[:, (3 * ncarts - 6):]], axis=1)
-    # hists_gen_ = hists_gen_[:, permute_inv]
-    # hists_gen_bond = hists_gen_[:, bond_ind]
-    # hists_gen_angle = hists_gen_[:, angle_ind]
-    # hists_gen_dih = hists_gen_[:, dih_ind]
-    # hists_test_bond = np.concatenate((hists_test_cart[:, :2],
-    #                                   hists_test_bond), 1)
-    # hists_gen_bond = np.concatenate((hists_gen_cart[:, :2],
-    #                                  hists_gen_bond), 1)
-    # hists_test_angle = np.concatenate((hists_test_cart[:, 2:],
-    #                                    hists_test_angle), 1)
-    # hists_gen_angle = np.concatenate((hists_gen_cart[:, 2:],
-    #                                   hists_gen_angle), 1)
-    #
-    # label = ['bond', 'angle', 'dih']
-    # hists_test_list = [hists_test_bond, hists_test_angle,
-    #                    hists_test_dih]
-    # hists_gen_list = [hists_gen_bond, hists_gen_angle,
-    #                   hists_gen_dih]
-    # x = np.linspace(*hist_range, nbins)
-    # figs_internal = []
-    # for i in range(len(label)):
-    #     ncol = 4
-    #     if i == 0:
-    #         fig, ax = plt.subplots(6, 4, figsize=(15, 24))
-    #         for j in range(1, 4):
-    #             ax[5, j].set_axis_off()
-    #     elif i == 2:
-    #         fig, ax = plt.subplots(5, 4, figsize=(15, 20))
-    #         ax[4, 3].set_axis_off()
-    #     else:
-    #         fig, ax = plt.subplots(5, 4, figsize=(15, 20))
-    #     for j in range(hists_test_list[i].shape[1]):
-    #         ax[j // ncol, j % ncol].plot(x, hists_test_list[i][:, j])
-    #         ax[j // ncol, j % ncol].plot(x, hists_gen_list[i][:, j])
-    #     figs_internal.append(fig)
+    ncarts = transform.transform.len_cart_inds
+    permute_inv = transform.transform.permute_inv.cpu().data.numpy()
+    bond_ind = transform.transform.ic_transform.bond_indices.cpu().data.numpy()
+    angle_ind = transform.transform.ic_transform.angle_indices.cpu().data.numpy()
+    dih_ind = transform.transform.ic_transform.dih_indices.cpu().data.numpy()
+    hists_test_cart = hists_test[:, :(3 * ncarts - 6)]
+    hists_test_ = np.concatenate([hists_test[:, :(3 * ncarts - 6)],
+                                  np.zeros((nbins, 6)),
+                                  hists_test[:, (3 * ncarts - 6):]], axis=1)
+    hists_test_ = hists_test_[:, permute_inv]
+    hists_test_bond = hists_test_[:, bond_ind]
+    hists_test_angle = hists_test_[:, angle_ind]
+    hists_test_dih = hists_test_[:, dih_ind]
+
+    hists_gen_cart = hists_gen[:, :(3 * ncarts - 6)]
+    hists_gen_ = np.concatenate([hists_gen[:, :(3 * ncarts - 6)],
+                                 np.zeros((nbins, 6)),
+                                 hists_gen[:, (3 * ncarts - 6):]], axis=1)
+    hists_gen_ = hists_gen_[:, permute_inv]
+    hists_gen_bond = hists_gen_[:, bond_ind]
+    hists_gen_angle = hists_gen_[:, angle_ind]
+    hists_gen_dih = hists_gen_[:, dih_ind]
+    hists_test_bond = np.concatenate((hists_test_cart[:, :2],
+                                      hists_test_bond), 1)
+    hists_gen_bond = np.concatenate((hists_gen_cart[:, :2],
+                                     hists_gen_bond), 1)
+    hists_test_angle = np.concatenate((hists_test_cart[:, 2:],
+                                       hists_test_angle), 1)
+    hists_gen_angle = np.concatenate((hists_gen_cart[:, 2:],
+                                      hists_gen_angle), 1)
+
+    label = ['bond', 'angle', 'dih']
+    hists_test_list = [hists_test_bond, hists_test_angle,
+                       hists_test_dih]
+    hists_gen_list = [hists_gen_bond, hists_gen_angle,
+                      hists_gen_dih]
+    x = np.linspace(*hist_range, nbins)
+    figs_internal = []
+    for i in range(len(label)):
+        ncol = 4
+        if i == 0:
+            fig, ax = plt.subplots(6, 4, figsize=(15, 24))
+            for j in range(1, 4):
+                ax[5, j].set_axis_off()
+        elif i == 2:
+            fig, ax = plt.subplots(5, 4, figsize=(15, 20))
+            ax[4, 3].set_axis_off()
+        else:
+            fig, ax = plt.subplots(5, 4, figsize=(15, 20))
+        for j in range(hists_test_list[i].shape[1]):
+            ax[j // ncol, j % ncol].plot(x, hists_test_list[i][:, j])
+            ax[j // ncol, j % ncol].plot(x, hists_gen_list[i][:, j])
+        figs_internal.append(fig)
 
     return [fig1, fig2, fig3, fig4, fig5]#, *figs_internal]
 
