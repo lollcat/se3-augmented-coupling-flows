@@ -24,22 +24,19 @@ def unproject(x, origin, change_of_basis_matrix):
     return change_of_basis_matrix @ x + origin
 
 
-def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, add_small_identity: bool = False):
-    n_nodes, dim = x.shape
+def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = False):
+    n_nodes, n_vectors, dim = various_x_vectors.shape
     # Calculate new basis for the affine transform
-    various_x_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
-
-    origin = x + various_x_vectors[0]
-    basis_vectors = various_x_vectors[1:]
+    basis_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
-        basis_vectors = basis_vectors + jnp.eye(x.shape[-1])[:basis_vectors.shape[0]][:, None, :]*1e-6
-    chex.assert_tree_shape_suffix(various_x_vectors, (dim, n_nodes, dim))
+        basis_vectors = basis_vectors + jnp.eye(dim)[:dim][:, None, :]*1e-6
+
 
     z_basis_vector = basis_vectors[0]
     if dim == 3:
-        chex.assert_tree_shape_suffix(x, (3,))
+        chex.assert_tree_shape_suffix(various_x_vectors, (3,))
         x_basis_vector = basis_vectors[1]
         # Compute reference axes.
         x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
@@ -47,26 +44,26 @@ def get_new_space_basis(x: chex.Array, various_x_vectors: chex.Array, add_small_
         change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
 
     else:
-        chex.assert_tree_shape_suffix(x, (2,))
+        chex.assert_tree_shape_suffix(various_x_vectors, (2,))
         y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
         change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
     change_of_basis_matrix = change_of_basis_matrix / safe_norm(change_of_basis_matrix, axis=-2,
                                                                       keepdims=True)
-    chex.assert_equal_shape((origin, x))
     chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
-    return origin, change_of_basis_matrix
+    return change_of_basis_matrix
 
 
 class ProjSplitCoupling(BijectorWithExtra):
     def __init__(self,
-               split_index: int,
-               event_ndims: int,
-               graph_features: chex.Array,
-               get_basis_vectors_and_invariant_vals: Callable,
-               bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
-               swap: bool = False,
-               split_axis: int = -1):
+                 split_index: int,
+                 event_ndims: int,
+                 graph_features: chex.Array,
+                 get_basis_vectors_and_invariant_vals: Callable,
+                 bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
+                 origin_on_coupled_pair: bool = True,
+                 swap: bool = False,
+                 split_axis: int = -1):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
           raise ValueError(
@@ -81,6 +78,7 @@ class ProjSplitCoupling(BijectorWithExtra):
               f'The split axis points to an axis outside the event. With '
               f'`event_ndims == {event_ndims}`, the split axis must be between -1 '
               f'and {-event_ndims}. Got `split_axis == {split_axis}`.')
+        self._origin_on_aug = origin_on_coupled_pair
         self._split_index = split_index
         self._bijector = bijector
         self._swap = swap
@@ -126,18 +124,22 @@ class ProjSplitCoupling(BijectorWithExtra):
         n_nodes, multiplicity, dim = x.shape
 
         # Calculate new basis for the affine transform
-        various_x_points, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
+        vectors, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
+        if self._origin_on_aug:
+            origin = x
+        else:
+            origin = x + vectors[:, :, 0]
+            vectors = vectors[:, :, 1:]
         # Vmap over multiplicity.
-        origin, change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(x, various_x_points)
+        change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(vectors)
 
         # Stack h, and x projected into the space.
         x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
         bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
-        extra = self.get_extra(various_x_points)
+        extra = self.get_extra(vectors)
         return origin, change_of_basis_matrix, bijector_feat_in, extra
 
-    def get_vector_info_single(self, various_x_points: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        basis_vectors = various_x_points[:, 1:]
+    def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
         basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
         vec1 = basis_vectors[:, 0]
         vec2 = basis_vectors[:, 1]

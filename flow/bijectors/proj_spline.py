@@ -16,6 +16,7 @@ def make_proj_spline(
         n_aug: int,
         swap: bool,
         nets_config: NetsConfig,
+        origin_on_coupled_pair: bool = True,
         identity_init: bool = True,
         num_bins: int = 10,
         lower: float = -10.,
@@ -24,7 +25,7 @@ def make_proj_spline(
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
-    n_heads = dim
+    n_heads = dim - 1 if origin_on_coupled_pair else dim
     params_per_dim_per_var_group = (3 * num_bins + 1)
     n_variable_groups = ((n_aug + 1) // 2)
     n_invariant_params = dim * n_variable_groups * params_per_dim_per_var_group
@@ -86,5 +87,6 @@ def make_proj_spline(
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-2
+        split_axis=-2,
+        origin_on_coupled_pair=origin_on_coupled_pair
     )

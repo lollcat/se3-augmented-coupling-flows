@@ -29,12 +29,11 @@ flow:
   identity_init: true
   type: proj_spline #  nice proj_rnvp  proj_spline
   kwargs:
+    proj_rnvp:
+      origin_on_coupled_pair: true
     proj_spline:
+      origin_on_coupled_pair: true
       num_bins: 8
-      lower: -2.
-      upper: 2.
-    equi_spline:
-      num_bins: 4
       lower: -2.
       upper: 2.
   act_norm: true

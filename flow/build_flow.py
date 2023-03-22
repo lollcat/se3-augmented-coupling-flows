@@ -87,12 +87,14 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
         for swap in (False, True):  # For swap False we condition augmented on original.
             if "proj_rnvp" in flow_type:
+                kwargs_proj_rnvp = config.kwargs["proj_rnvp"] if "proj_rnvp" in config.kwargs.keys() else {}
                 bijector = make_proj_realnvp(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
+                    **kwargs_proj_rnvp
                 )
                 bijectors.append(bijector)
 

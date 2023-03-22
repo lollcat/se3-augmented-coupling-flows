@@ -17,11 +17,12 @@ def make_proj_realnvp(
         swap: bool,
         nets_config: NetsConfig,
         identity_init: bool = True,
+        origin_on_coupled_pair: bool = True,
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
-    n_heads = dim
+    n_heads = dim - 1 if origin_on_coupled_pair else dim
     n_invariant_params = dim * 2 * ((n_aug + 1) // 2)
 
     mlp_function = hk.Sequential(
@@ -72,6 +73,7 @@ def make_proj_realnvp(
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
         event_ndims=3,  # [nodes, n_aug+1, dim]
+        origin_on_coupled_pair=origin_on_coupled_pair,
         get_basis_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
