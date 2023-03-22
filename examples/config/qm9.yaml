@@ -65,14 +65,14 @@ flow:
       residual_mlp_width: 64
       residual_mlp_depth: 1
     egnn:
-      mlp_units: [256,256]
+      mlp_units: [128,128]
       n_layers: 3
       normalize_by_norms: true
       variance_scaling_init: 0.001
       agg: mean
       normalization_constant: 1.0
       h_linear_softmax: true
-      h_embedding_dim: 256
+      h_embedding_dim: 128
     transformer: # for proj flow
       mlp_units: [64,64]
       num_heads: 6
@@ -80,7 +80,7 @@ flow:
       w_init_scale: 0.1
       n_layers: 3
     mlp_head_config:
-      mlp_units: [ 256, 256 ]
+      mlp_units: [ 128, 128 ]
 
 
 training:
