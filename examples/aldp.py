@@ -271,7 +271,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
             ax[j // ncol, j % ncol].plot(x, hists_gen_list[i][:, j])
         figs_internal.append(fig)
 
-    return [fig1, fig2, fig3, fig4, fig5]#, *figs_internal]
+    return [fig1, fig2, fig3, fig4, fig5, *figs_internal]
 
 
 
