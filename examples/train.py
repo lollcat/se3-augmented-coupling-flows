@@ -266,7 +266,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter=def
     logger = setup_logger(cfg)
 
     training_config = dict(cfg.training)
-    save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
+    #save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
+    save_path = training_config.pop("save_dir")
     if cfg.training.save:
         if hasattr(cfg.logger, "wandb"):
             # if using wandb then save to wandb path
