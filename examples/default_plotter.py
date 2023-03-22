@@ -57,7 +57,7 @@ def make_default_plotter(
         max_n_samples: int = 10000,
         plotting_n_nodes: Optional[int] = None,
 ):
-    bins = jnp.linspace(0., 8., 50)
+    bins = jnp.linspace(0., 6., 100)
     pairwise_distances_train_x = get_pairwise_distances_for_plotting(train_data.positions[:max_n_samples])
     pairwise_distances_test_x = get_pairwise_distances_for_plotting(test_data.positions[:max_n_samples])
     counts_target_train_x = get_counts(pairwise_distances_train_x)
@@ -66,7 +66,6 @@ def make_default_plotter(
     n_samples = n_samples_from_flow
 
     @partial(jax.jit)
-    @chex.assert_max_traces(2)
     def get_data_for_plotting(state: TrainingState, key: chex.PRNGKey, train_data=train_data, test_data=test_data):
         params = state.params
         key1, key2 = jax.random.split(key)
