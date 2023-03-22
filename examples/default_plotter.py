@@ -57,11 +57,11 @@ def make_default_plotter(
         max_n_samples: int = 10000,
         plotting_n_nodes: Optional[int] = None,
 ):
-    bins = jnp.linspace(0., 6., 100)
+    bins = jnp.linspace(0., 6., 50)
     pairwise_distances_train_x = get_pairwise_distances_for_plotting(train_data.positions[:max_n_samples])
     pairwise_distances_test_x = get_pairwise_distances_for_plotting(test_data.positions[:max_n_samples])
-    counts_target_train_x = get_counts(pairwise_distances_train_x)
-    counts_target_test_x = get_counts(pairwise_distances_test_x)
+    counts_target_train_x = get_counts(pairwise_distances_train_x, bins)
+    counts_target_test_x = get_counts(pairwise_distances_test_x, bins)
 
     n_samples = n_samples_from_flow
 
