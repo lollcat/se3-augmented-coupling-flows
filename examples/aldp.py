@@ -68,6 +68,9 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
             positions_a_target_ = aux_target_sample_n_apply_fn(params.aux_target,
                                                                test_data[(i * n_samples):end], key_)
             positions_a_target.append(positions_a_target_)
+    out = aux_target_sample_n_apply_fn(params.aux_target, test_data[:n_samples], key_)
+    print(out)
+    print(out.shape)
     positions_x = jnp.concatenate(positions_x, axis=0)
     positions_a = jnp.concatenate(positions_a, axis=0)
     print(positions_a_target)
