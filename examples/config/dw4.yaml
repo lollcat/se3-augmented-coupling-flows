@@ -16,6 +16,8 @@ target:
 
 flow:
   base:
+    train_x_scale: true
+    x_scale_init: 1.0
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
@@ -25,14 +27,15 @@ flow:
   n_aug: 5
   n_layers: 4
   identity_init: true
-  type: proj # vector_scale  vector_scale nice proj   proj_v2 realnvp_non_eq
+  type: proj_rnvp #  nice proj_rnvp  proj_spline
   kwargs:
-    proj:
-      global_frame: false
-      process_flow_params_jointly: false
-      condition_on_x_proj: true
-      gram_schmidt: false
-      add_small_identity: true
+    proj_rnvp:
+      origin_on_coupled_pair: false
+    proj_spline:
+      origin_on_coupled_pair: false
+      num_bins: 8
+      lower: -2.
+      upper: 2.
   act_norm: false
   compile_n_unroll: 1
   nets:
@@ -45,12 +48,6 @@ flow:
       agg: mean
       h_linear_softmax: true
       h_embedding_dim: 16
-    transformer: # for proj and proj_v2 flows.
-      mlp_units: [32,32]
-      num_heads: 3
-      key_size: 4
-      w_init_scale: 0.1
-      n_layers: 3
     mlp_head_config:
       mlp_units: [32, 32]
 
@@ -80,6 +77,8 @@ training:
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   last_iter_info_only: true
+  debug: false
+
 
 logger:
 #  list_logger: null

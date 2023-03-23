@@ -83,7 +83,7 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
             info_aggregator.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in
                                     extra.info_aggregator.items()})
             losses.append(extra.aux_loss)
-        extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
+        extras = Extra(aux_loss=jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
         return y, log_det, extras
 
 
@@ -166,3 +166,15 @@ class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
             x2, logdet = inner_bijector.inverse_and_log_det(y2)
             extra = Extra()
         return self._recombine(y1, x2), logdet, extra
+
+
+class DistributionWithExtra(distrax.Distribution):
+
+    def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
+        sample, log_prob = self._sample_n_and_log_prob(key, n)
+        return sample, log_prob, Extra()
+
+    def log_prob_with_extra(self, value: Array) -> Tuple[Array, Extra]:
+        log_prob = self.log_prob(value)
+        return log_prob, Extra()
+

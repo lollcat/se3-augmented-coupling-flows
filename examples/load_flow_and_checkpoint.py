@@ -7,8 +7,8 @@ import pickle
 import jax.numpy as jnp
 import jax
 
-from train import create_flow_config, AugmentedFlow, AugmentedFlowParams
-from train import plot_sample_hist, build_flow
+from create_train_config import create_flow_config, AugmentedFlow, AugmentedFlowParams
+from create_train_config import plot_sample_hist, build_flow
 from examples.dw4 import to_local_config
 
 def load_flow(cfg: DictConfig, checkpoint_path: str) -> Tuple[AugmentedFlow, AugmentedFlowParams]:

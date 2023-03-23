@@ -1,20 +1,24 @@
 """Following https://github.com/vgsatorras/en_flows/blob/main/flows/utils.py."""
-from typing import Tuple
+from typing import Tuple, Optional
 
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 from chex import PRNGKey, Array
+import distrax
 import haiku as hk
 
-import distrax
-
 from flow.conditional_dist import get_conditional_gaussian_augmented_dist
+from flow.distrax_with_extra import DistributionWithExtra, Extra
 
 
-class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
+class CentreGravitryGaussianAndCondtionalGuassian(DistributionWithExtra):
     """x ~ CentreGravityGaussian, a ~ Normal(x, I)"""
-    def __init__(self, dim, n_nodes: int, n_aux: int, global_centering: bool = False,
+    def __init__(self, dim, n_nodes: int, n_aux: int,
+                 global_centering: bool = False,
+                 x_scale_init: float = 1.0,
+                 trainable_x_scale: bool = False,
                  augmented_scale_init: float = 1.0,
                  trainable_augmented_scale: bool = True):
         self.n_aux = n_aux
@@ -22,21 +26,27 @@ class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
         self.n_nodes = n_nodes
         self.global_centering = global_centering
         if trainable_augmented_scale:
-            self.augmented_scale_logit = hk.get_parameter(name='augmented_scale_logit', shape=(n_aux,),
+            self.augmented_log_scale = hk.get_parameter(name='augmented_log_scale', shape=(n_aux,),
                                                           init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
         else:
-            self.augmented_scale_logit = jnp.log(jnp.ones(n_aux) * augmented_scale_init)
+            self.augmented_log_scale = jnp.zeros((n_aux,))
+        if trainable_x_scale:
+            self.x_log_scale = hk.get_parameter(name='x_log_scale', shape=(),
+                                                          init=hk.initializers.Constant(jnp.log(x_scale_init)))
+        else:
+            self.x_log_scale = jnp.zeros(())
+        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=self.x_log_scale)
 
-    def get_augmented_dist(self, x) -> distrax.Distribution:
-        dist = get_conditional_gaussian_augmented_dist(x, n_aux=self.n_aux, scale=jnp.exp(self.augmented_scale_logit),
-                                                       global_centering=self.global_centering)
+
+    def get_augmented_dist(self, x: chex.Array) -> distrax.Distribution:
+        dist = get_conditional_gaussian_augmented_dist(
+            x, n_aux=self.n_aux, scale=jnp.exp(self.augmented_log_scale), global_centering=self.global_centering)
         return dist
 
 
     def _sample_n(self, key: PRNGKey, n: int) -> Array:
         key1, key2 = jax.random.split(key)
-        shape = (n, self.n_nodes, self.dim)
-        original_coords = sample_center_gravity_zero_gaussian(key1, shape)
+        original_coords = self.x_dist._sample_n(key1, n)
         augmented_coords = self.get_augmented_dist(original_coords).sample(seed=key2)
         joint_coords = jnp.concatenate([jnp.expand_dims(original_coords, axis=-2), augmented_coords], axis=-2)
         return joint_coords
@@ -48,33 +58,62 @@ class CentreGravitryGaussianAndCondtionalGuassian(distrax.Distribution):
         original_coords = jnp.squeeze(original_coords, axis=-2)
 
         log_prob_a_given_x = self.get_augmented_dist(original_coords).log_prob(augmented_coords)
-        log_p_x = center_gravity_zero_gaussian_log_likelihood(remove_mean(original_coords))
+        log_p_x = self.x_dist.log_prob(original_coords)
         chex.assert_equal_shape((log_p_x, log_prob_a_given_x))
         return log_p_x + log_prob_a_given_x
 
+    def get_extra(self) -> Extra:
+        extra = Extra(aux_info={"base_x_scale": jnp.exp(self.x_log_scale)},
+                      info_aggregator={"base_x_scale": jnp.mean})
+        for i in range(self.n_aux):
+            extra.aux_info[f"base_a{i}_scale"] = jnp.exp(self.augmented_log_scale[i])
+            extra.info_aggregator[f"base_a{i}_scale"] = jnp.mean
+        return extra
+
+    def log_prob_with_extra(self, value: Array) -> Tuple[Array, Extra]:
+        extra = self.get_extra()
+        log_prob = self.log_prob(value)
+        return log_prob, extra
+
+    def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
+        x, log_prob = self._sample_n_and_log_prob(key, n)
+        extra = self.get_extra()
+        return x, log_prob, extra
+
     @property
     def event_shape(self) -> Tuple[int, ...]:
-        return (self.n_aux+1, self.n_nodes, self.dim)
+        return (self.n_nodes, self.n_aux+1, self.dim)
 
 
 class CentreGravityGaussian(distrax.Distribution):
     """Guassian distribution over nodes in space, with a zero centre of gravity.
     See https://arxiv.org/pdf/2105.09016.pdf."""
-    def __init__(self, dim, n_nodes):
+    def __init__(self, dim: int, n_nodes: int, log_scale: chex.Array = jnp.zeros(())):
+
         self.dim = dim
         self.n_nodes = n_nodes
+        self.log_scale = log_scale
+
+    @property
+    def scale(self):
+        return jnp.exp(self.log_scale)
 
     def _sample_n(self, key: PRNGKey, n: int) -> Array:
         shape = (n, self.n_nodes, self.dim)
-        return sample_center_gravity_zero_gaussian(key, shape)
+        return sample_center_gravity_zero_gaussian(key, shape)*self.scale
 
     def log_prob(self, value: Array) -> Array:
         value = remove_mean(value)
-        return center_gravity_zero_gaussian_log_likelihood(value)
+        value = value / self.scale
+        inv_log_det = - self.log_scale*np.prod(self.event_shape)
+        base_log_prob = center_gravity_zero_gaussian_log_likelihood(value)
+        return base_log_prob + inv_log_det
 
     @property
     def event_shape(self) -> Tuple[int, ...]:
         return (self.n_nodes, self.dim)
+
+
 
 
 

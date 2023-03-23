@@ -4,7 +4,7 @@ import chex
 import jax.numpy as jnp
 import jax
 import numpy as np
-import blackjax
+import matplotlib.pyplot as plt
 
 from utils.numerical import get_pairwise_distances, set_diagonal_to_zero
 from utils.mcmc import get_samples_simple
@@ -38,7 +38,7 @@ def make_dataset(seed: int = 0, n_vertices=2, dim=2, n_samples: int = 8192):
                                  key=key, n_vertices=n_vertices, dim=dim, n_steps=n_samples // batch_size,
                                  batch_size=batch_size,
                                  n_warmup_steps=20000,
-                                 step_size=0.025)
+                                 step_sizes=(0.025,))
     np.save(f"data/lj_data_vertices{n_vertices}_dim{dim}.npy", np.asarray(samples))
 
 
@@ -58,7 +58,7 @@ if __name__ == '__main__':
 
 
     # Visualise 2D energy fn as a function of distance
-    import matplotlib.pyplot as plt
+    key = jax.random.PRNGKey(0)
 
     dim = 2
     batch_size = 512
@@ -74,14 +74,12 @@ if __name__ == '__main__':
     plt.plot(d, log_probs)
     plt.show()
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots()  # 2D
     ax.plot(d, jnp.exp(log_probs - 1))  # approx normalise
-    # plt.show()
 
-    key = jax.random.PRNGKey(0)
-    samples = get_samples_simple(log_prob_fn, key, n_steps=2, batch_size=1028, n_warmup_steps=20000, step_size=0.025,
+    samples = get_samples_simple(log_prob_fn, key, n_steps=2, batch_size=1028, n_warmup_steps=20000, step_sizes=(0.025,),
                                  init_scale=0.1)
     plot_sample_hist(samples, ax=ax)
     plt.show()
 
-    make_dataset(dim=3, n_vertices=13)
+    # make_dataset(dim=3, n_vertices=13)
