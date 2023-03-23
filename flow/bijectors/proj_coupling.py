@@ -5,6 +5,8 @@ import distrax
 import jax
 import jax.numpy as jnp
 
+from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
+
 from utils.numerical import rotate_2d, vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
@@ -23,11 +25,31 @@ def unproject(x, origin, change_of_basis_matrix):
     chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
     return change_of_basis_matrix @ x + origin
 
+def get_min_k_vectors_by_norm(norms, vectors, receivers, n_vectors, node_index):
+    _, min_k_indices = jax.lax.top_k(-norms[receivers == node_index], n_vectors)
+    min_k_vectors = vectors[receivers == node_index][min_k_indices]
+    return min_k_vectors
+
+
+def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Array:
+    chex.assert_rank(x, 2)  # [n_nodes, dim]
+    n_nodes, dim = x.shape
+    senders, receivers = get_senders_and_receivers_fully_connected(dim)
+    vectors = x[receivers] - x[senders]
+    norms = safe_norm(vectors, axis=-1, keepdims=False)
+    min_k_vectors = jax.vmap(get_min_k_vectors_by_norm, in_axes=(None, None, None, None, 0))(
+        norms, vectors, receivers, n_vectors, jnp.arange(n_nodes))
+    chex.assert_shape(min_k_vectors, (n_nodes, n_vectors, dim))
+    return min_k_vectors
+
+
+
 
 def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = False):
     n_nodes, n_vectors, dim = various_x_vectors.shape
     # Calculate new basis for the affine transform
     basis_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
+
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
@@ -119,17 +141,20 @@ class ProjSplitCoupling(BijectorWithExtra):
               bijector = distrax.Block(bijector, extra_ndims)
       return bijector
 
-    def get_basis_and_h(self, x, graph_features: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array, Extra]:
+    def get_basis_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
+            Tuple[chex.Array, chex.Array, chex.Array, Extra]:
         chex.assert_rank(x, 3)
         n_nodes, multiplicity, dim = x.shape
 
         # Calculate new basis for the affine transform
-        vectors, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
+        vectors_out, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
         if self._origin_on_aug:
             origin = x
+            vectors = vectors_out
         else:
-            origin = x + vectors[:, :, 0]
-            vectors = vectors[:, :, 1:]
+            origin = x + vectors_out[:, :, 0]
+            vectors = vectors_out[:, :, 1:]
+        # jax.vmap(get_directions_for_closest_atoms, in_axes=(1, None), out_axes=1)(x, vectors.shape[2])
         # Vmap over multiplicity.
         change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(vectors)
 
