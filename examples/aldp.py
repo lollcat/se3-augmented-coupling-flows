@@ -73,7 +73,7 @@ def make_custom_plotter_and_eval(cfg: DictConfig, load_dataset, batch_size: int 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
-    local_config = True
+    local_config = False
     if local_config:
         cfg = to_local_config(cfg)
     plotter, evaluation_fn = make_custom_plotter_and_eval(cfg, load_dataset)
