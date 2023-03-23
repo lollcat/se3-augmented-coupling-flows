@@ -30,7 +30,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.mace.correlation = 2
 
 
-    cfg.flow.type = 'proj'
+    cfg.flow.type = 'proj_rnvp'
 
 
     cfg.training.n_epoch = 32

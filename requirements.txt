@@ -13,6 +13,5 @@ hydra-joblib-launcher
 joblib
 e3nn-jax
 git+https://github.com/ACEsuit/mace-jax@main#egg=mace_jax
-git+https://github.com/JavierAntoran/molecule-bolierplate#egg=molboil
 mdtraj
 tables
