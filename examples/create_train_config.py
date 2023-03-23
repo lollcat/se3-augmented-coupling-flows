@@ -23,7 +23,7 @@ from nets.transformer import TransformerConfig
 from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
-from examples.configs import TrainingState, FlowTrainConfig, OptimizerConfig
+from examples.configs import TrainingState, OptimizerConfig
 
 mpl.rcParams['figure.dpi'] = 150
 
@@ -125,9 +125,13 @@ def create_flow_config(cfg: DictConfig):
     )
     return flow_dist_config
 
+def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
+                        plotter: Optional = None,
+                        evaluation_fn: Optional = None) -> TrainConfig:
+    """Creates `mol_boil` style train config"""
+    assert cfg.flow.dim == dim
+    assert cfg.flow.nodes == n_nodes
 
-def create_flow_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> \
-        FlowTrainConfig:
     logger = setup_logger(cfg)
     training_config = dict(cfg.training)
     save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
@@ -138,41 +142,20 @@ def create_flow_train_config(cfg: DictConfig, load_dataset, dim, n_nodes) -> \
         pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
     else:
         save_path = ''
-
-
+    train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
-
+    flow = build_flow(flow_config)
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
+    optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
+                                              n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
+                                              total_n_epoch=cfg.training.n_epoch)
 
-    config = FlowTrainConfig(
-        dim=dim,
-        n_nodes=n_nodes,
-        flow_dist_config=flow_config,
-        load_datasets=load_dataset,
-        optimizer_config=optimizer_config,
-        **training_config,
-        logger=logger,
-        save_dir=save_path,
-    )
-    return config
-
-
-def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Optional = None):
-    config = create_flow_train_config(cfg, load_dataset, dim, n_nodes)
-    assert config.flow_dist_config.dim == config.dim
-    assert config.flow_dist_config.nodes == config.n_nodes
-
-    train_data, test_data = config.load_datasets(config.train_set_size, config.test_set_size)
-    optimizer, lr = get_optimizer_and_step_fn(config.optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // config.batch_size,
-                                              total_n_epoch=config.n_epoch)
-    flow = build_flow(config.flow_dist_config)
 
     if plotter is None:
         plotter = make_default_plotter(train_data,
                                        test_data,
                                        flow=flow,
-                                       n_samples_from_flow=config.plot_batch_size,
+                                       n_samples_from_flow=cfg.training.plot_batch_size,
                                        max_n_samples=1000,
                                        plotting_n_nodes=None
                                        )
@@ -180,20 +163,14 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
     # Setup training functions.
     loss_fn = partial(general_ml_loss_fn,
                       flow=flow,
-                      use_flow_aux_loss=config.use_flow_aux_loss,
-                      aux_loss_weight=config.aux_loss_weight)
+                      use_flow_aux_loss=cfg.training.use_flow_aux_loss,
+                      aux_loss_weight=cfg.training.aux_loss_weight)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
 
     scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
                                          data=train_data,
-                                         last_iter_info_only=config.last_iter_info_only,
-                                         batch_size=config.batch_size)
-
-    # Setup eval functions
-    eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                    flow=flow, K=config.K_marginal_log_lik, test_invariances=True)
-    eval_batch_free_fn = None
-
+                                         last_iter_info_only=cfg.training.last_iter_info_only,
+                                         batch_size=cfg.training.batch_size)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)
@@ -202,10 +179,10 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
         return TrainingState(params, opt_state, key2)
 
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
-        if not config.debug:
+        if not cfg.training.debug:
             params, opt_state, key, info = scan_epoch_fn(state.params, state.opt_state, state.key)
         else:  # If we want to debug.
-            batchify_data = get_shuffle_and_batchify_data_fn(train_data, config.batch_size)
+            batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size)
             params = state.params
             opt_state = state.opt_state
             key, subkey = jax.random.split(state.key)
@@ -216,25 +193,32 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes, plotter: Op
                 params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
         return TrainingState(params, opt_state, key), info
 
-    def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
-        eval_info = eval_fn(test_data, key, state.params,
-                eval_on_test_batch_fn=eval_on_test_batch_fn,
-                eval_batch_free_fn=eval_batch_free_fn,
-                batch_size=config.batch_size)
-        return eval_info
+    if evaluation_fn is None:
+        # Setup eval functions
+        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+        eval_batch_free_fn = None
+
+        def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
+            eval_info = eval_fn(test_data, key, state.params,
+                    eval_on_test_batch_fn=eval_on_test_batch_fn,
+                    eval_batch_free_fn=eval_batch_free_fn,
+                    batch_size=cfg.training.batch_size)
+            return eval_info
+
 
     return TrainConfig(
-        n_iteration=config.n_epoch,
-        logger=config.logger,
-        seed=config.seed,
-        n_checkpoints=config.n_checkpoints,
-        n_eval=config.n_eval,
-        n_plot=config.n_plots,
+        n_iteration=cfg.training.n_epoch,
+        logger=logger,
+        seed=cfg.training.seed,
+        n_checkpoints=cfg.training.n_checkpoints,
+        n_eval=cfg.training.n_eval,
+        n_plot=cfg.training.n_plots,
         plotter=plotter,
         init_state=init_fn,
         update_state=update_fn,
         eval_state=evaluation_fn,
-        save=config.save,
-        save_dir=config.save_dir,
-        use_64_bit=config.use_64_bit
+        save=cfg.training.save,
+        save_dir=save_path,
+        use_64_bit=cfg.training.use_64_bit
                        )

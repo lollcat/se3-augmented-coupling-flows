@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utils.numerical import get_pairwise_distances, set_diagonal_to_zero
-from utils.mcmc import get_samples_simple, get_samples_with_tuning
+from utils.mcmc import get_samples_simple
 
 def energy(x: chex.Array, epsilon: float = 1.0, tau: float = 1.0, r: Union[float, chex.Array] = 1.0,
            harmonic_potential_coef: float = 0.3) -> chex.Array:
@@ -58,15 +58,7 @@ if __name__ == '__main__':
 
 
     # Visualise 2D energy fn as a function of distance
-
     key = jax.random.PRNGKey(0)
-
-    fig, ax = plt.subplots()  # 13 nodes, 3D.
-    samples = get_samples_with_tuning(log_prob_fn, key, n_vertices= 13, dim = 3, n_steps = 64,
-                            batch_size=32, burn_in=1000, algorithm_type = "hmc")
-    plot_sample_hist(samples, ax=ax)
-    plt.show()
-
 
     dim = 2
     batch_size = 512

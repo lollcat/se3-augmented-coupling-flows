@@ -9,7 +9,7 @@ target:
   aux:
     global_centering: false
     scale_init: 1.0
-    trainable_augmented_scale: train
+    trainable_augmented_scale: false
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
@@ -20,14 +20,14 @@ flow:
     x_scale_init: 1.0
     aux:
       global_centering: false
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: true
   dim: 2
   nodes: 4
   n_aug: 5
   n_layers: 4
   identity_init: true
-  type: proj_spline #  nice proj_rnvp  proj_spline
+  type: proj_rnvp #  nice proj_rnvp  proj_spline
   kwargs:
     proj_rnvp:
       origin_on_coupled_pair: false
@@ -36,7 +36,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-  act_norm: true
+  act_norm: false
   compile_n_unroll: 1
   nets:
     type: egnn
@@ -48,12 +48,6 @@ flow:
       agg: mean
       h_linear_softmax: true
       h_embedding_dim: 16
-    transformer: # for proj and proj_v2 flows.
-      mlp_units: [32,32]
-      num_heads: 3
-      key_size: 4
-      w_init_scale: 0.1
-      n_layers: 3
     mlp_head_config:
       mlp_units: [32, 32]
 
@@ -83,6 +77,8 @@ training:
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   last_iter_info_only: true
+  debug: false
+
 
 logger:
 #  list_logger: null

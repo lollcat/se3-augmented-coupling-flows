@@ -73,7 +73,7 @@ def make_default_plotter(
         return counts_flow_x, counts_flow_a, counts_flow_a_minus_x, counts_targ_a, counts_targ_a_minus_x
 
 
-    def default_plotter(state: TrainingState, key: chex.PRNGKey):
+    def default_plotter(state: TrainingState, key: chex.PRNGKey) -> dict:
         # Plot interatomic distance histograms.
         counts_flow_x, counts_flow_a, counts_flow_a_minus_x, counts_targ_a, counts_targ_a_minus_x = \
             get_data_for_plotting(state, key)

@@ -46,8 +46,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 
     # Configure NNs
-    cfg.flow.nets.transformer.mlp_units = (16,)
-    cfg.flow.nets.transformer.n_layers = 2
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
     cfg.flow.nets.egnn.mlp_units = (8,)
 
