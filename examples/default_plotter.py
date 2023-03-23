@@ -7,9 +7,10 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from molboil.utils.plotting import get_counts, get_pairwise_distances_for_plotting
+
 from examples.configs import TrainingState
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from utils.graph import get_senders_and_receivers_fully_connected
 
 
 mpl.rcParams['figure.dpi'] = 150
@@ -19,34 +20,8 @@ TestData = FullGraphSample
 FLowPlotter = Callable[[AugmentedFlowParams, AugmentedFlow, chex.PRNGKey, PlottingBatchSize,
                         TestData, TrainData], List[plt.Figure]]
 
-
-def get_pairwise_distances_for_plotting(samples, n_vertices: Optional[int] = None, max_distance: float = 10.):
-    n_vertices = samples.shape[1] if n_vertices is None else n_vertices
-    n_vertices = min(samples.shape[1], n_vertices)
-    senders, receivers = get_senders_and_receivers_fully_connected(n_nodes=n_vertices)
-    norms = jnp.linalg.norm(samples[:, senders] - samples[:, receivers], axis=-1)
-    d = norms.flatten()
-    d = d.clip(max=max_distance)  # Clip keep plot reasonable.
-    return d
-
-def get_counts(d: chex.Array, bins = jnp.linspace(0., 10., num=50)):
-    count_fn = lambda lower, upper: jnp.sum((d >= lower) & (d < upper))
-    counts = jax.vmap(count_fn)(bins[:-1], bins[1:])
-    counts = counts / jnp.sum(counts)  # normalize.
-    return counts
-
 def plot_histogram(counts, bins, ax: plt.Axes, *args, **kwargs):
     ax.stairs(counts, bins, alpha=0.4, fill=True, *args, **kwargs)
-
-
-def plot_sample_hist(samples,
-                     ax: plt.Axes,
-                     n_vertices: Optional[int] = None,
-                     max_distance: float = 10., *args, **kwargs):
-    """n_vertices argument allows us to look at pairwise distances for subset of vertices,
-    to prevent plotting taking too long"""
-    d = get_pairwise_distances_for_plotting(samples, n_vertices, max_distance)
-    ax.hist(d, bins=50, density=True, alpha=0.4, *args, **kwargs)
 
 
 def make_default_plotter(

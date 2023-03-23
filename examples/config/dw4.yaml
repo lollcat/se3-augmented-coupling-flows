@@ -30,9 +30,9 @@ flow:
   type: proj_spline #  nice proj_rnvp  proj_spline
   kwargs:
     proj_rnvp:
-      origin_on_coupled_pair: true
+      origin_on_coupled_pair: false
     proj_spline:
-      origin_on_coupled_pair: true
+      origin_on_coupled_pair: false
       num_bins: 8
       lower: -2.
       upper: 2.
