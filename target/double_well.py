@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
 
     fig, ax = plt.subplots()
-    samples = make_dataset(n_vertices=4, temperature=0.1)
+    samples = make_dataset(n_vertices=4, temperature=0.1, dim=3)
     plot_sample_hist(samples, ax=ax)
     plt.title("dataset samples")
     plt.show()
