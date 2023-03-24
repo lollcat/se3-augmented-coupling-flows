@@ -45,7 +45,7 @@ def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Arra
 
 
 
-def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = False):
+def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = True):
     n_nodes, n_vectors, dim = various_x_vectors.shape
     # Calculate new basis for the affine transform
     basis_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
