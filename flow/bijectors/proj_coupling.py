@@ -53,7 +53,7 @@ def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool 
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
-        basis_vectors = basis_vectors + jnp.eye(dim)[:dim][:, None, :]*1e-6
+        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors][:, None, :]*1e-6
 
 
     z_basis_vector = basis_vectors[0]
