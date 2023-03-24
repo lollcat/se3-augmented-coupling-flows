@@ -32,7 +32,7 @@ flow:
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:
-      origin_on_coupled_pair: false
+      origin_on_coupled_pair: true
       num_bins: 8
       lower: -2.
       upper: 2.

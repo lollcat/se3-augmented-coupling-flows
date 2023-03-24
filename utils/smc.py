@@ -42,11 +42,51 @@ def prior_log_prob(x: chex.Array, scale: float = 1.):
     return multivariate_normal.logpdf(x, jnp.zeros((d,)), jnp.eye(d)*scale)
 
 
-def run_smc(target_log_prob: Callable,
-            dim: int,
-            n_samples: int,
-            base_scale: float = 1.,
-            hmc_step_size: float = 1e-4):
+def run_smc_molecule(
+        target_log_prob: Callable,
+        key: chex.PRNGKey,
+        dim: int,
+        n_nodes: int,
+        n_samples: int,
+        num_mcmc_steps: int,
+        base_scale: float = 1.,
+        target_ess: float = 0.5,
+        hmc_step_size: float = 1e-4):
+    def flatten(x: chex.Array) -> chex.Array:
+        return jnp.reshape(x, (*x.shape[:-2], dim*n_nodes))
+
+    def unflatten(x: chex.Array) -> chex.Array:
+        return jnp.reshape(x, (*x.shape[:-1], n_nodes, dim))
+
+    def flat_log_prob_fn(x: chex.Array) -> chex.Array:
+        """Takes in flat x."""
+        return target_log_prob(unflatten(x))
+
+    flat_dim = dim * n_nodes
+    smc_samples = run_smc(
+        flat_log_prob_fn,
+        key,
+        flat_dim,
+        n_samples,
+        num_mcmc_steps,
+        target_ess=target_ess,
+        base_scale=base_scale,
+        hmc_step_size=hmc_step_size)
+
+    samples = unflatten(smc_samples.particles)
+    return samples, smc_samples.weights, smc_samples.lmbda
+
+
+def run_smc(
+        target_log_prob: Callable,
+        key: chex.PRNGKey,
+        dim: int,
+        n_samples: int,
+        num_mcmc_steps: int,
+        base_scale: float = 1.,
+        target_ess: float = 0.5,
+        hmc_step_size: float = 1e-4):
+
     inv_mass_matrix = jnp.eye(dim)
 
     hmc_parameters = dict(
@@ -61,8 +101,8 @@ def run_smc(target_log_prob: Callable,
         blackjax.hmc.init,
         hmc_parameters,
         resampling_fn=resampling.systematic,
-        target_ess=0.5,
-        num_mcmc_steps=1,
+        target_ess=target_ess,
+        num_mcmc_steps=num_mcmc_steps,
     )
 
     initial_smc_state = jax.random.multivariate_normal(
@@ -87,7 +127,7 @@ if __name__ == '__main__':
 
     loglikelihood = lambda x: -V(x)
 
-    smc_samples = run_smc(target_log_prob=loglikelihood, dim=1, n_samples=1000)
+    smc_samples = run_smc(target_log_prob=loglikelihood, dim=1, n_samples=1000, key=key, n_nodes=1)
 
     samples = np.array(smc_samples.particles[:, 0])
     _ = plt.hist(samples, bins=100, density=True)

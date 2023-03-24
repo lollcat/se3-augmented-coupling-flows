@@ -109,7 +109,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     nets_config=config.nets_config)
                 bijectors.append(bijector)
 
-            elif 'proj_spline' in flow_type:
+            if 'proj_spline' in flow_type:
                 kwargs_proj_spline = config.kwargs["proj_spline"] if "proj_spline" in config.kwargs.keys() else {}
                 bijector = make_proj_spline(
                     layer_number=layer_number,
