@@ -39,7 +39,7 @@ class FlowDistConfig(NamedTuple):
     act_norm: bool = False
     kwargs: dict = {}
     base: BaseConfig = BaseConfig()
-    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
+    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig(trainable_augmented_scale=False)
 
 
 def build_flow(config: FlowDistConfig) -> AugmentedFlow:
