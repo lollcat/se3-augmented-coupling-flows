@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
 
-from utils.numerical import rotate_2d, vector_rejection, safe_norm
+from utils.numerical import vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
 BijectorParams = chex.Array
@@ -45,7 +45,7 @@ def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Arra
 
 
 
-def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = False):
+def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = True):
     n_nodes, n_vectors, dim = various_x_vectors.shape
     # Calculate new basis for the affine transform
     basis_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
@@ -53,25 +53,28 @@ def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool 
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
-        basis_vectors = basis_vectors + jnp.eye(dim)[:dim][:, None, :]*1e-6
+        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors][:, None, :]*1e-6
 
 
     z_basis_vector = basis_vectors[0]
+    z_basis_vector = z_basis_vector / safe_norm(z_basis_vector, axis=-1, keepdims=True)
     if dim == 3:
         chex.assert_tree_shape_suffix(various_x_vectors, (3,))
         x_basis_vector = basis_vectors[1]
         # Compute reference axes.
+        x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
         x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
+        x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
         y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
+        y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
-
     else:
         chex.assert_tree_shape_suffix(various_x_vectors, (2,))
-        y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
+        y_basis_vector = vector_rejection(jnp.ones_like(z_basis_vector), z_basis_vector)
+        y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
-    change_of_basis_matrix = change_of_basis_matrix / safe_norm(change_of_basis_matrix, axis=-2,
-                                                                      keepdims=True)
+
     chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
     return change_of_basis_matrix
 
