@@ -1,12 +1,18 @@
-from typing import NamedTuple, Optional, Sequence
+from typing import NamedTuple, Optional, Sequence, Tuple
 
+import chex
 import jax.numpy as jnp
+import e3nn_jax as e3nn
+import haiku as hk
+import jax
 
-from nets.e3nn_transformer import EnTransformerTorsoConfig, EnTransformer, EnTransformerConfig
-from nets.mace import MACETorsoConfig, MACEConfig, MaceNet
-from nets.e3_gnn import E3GNNConfig, E3Gnn, E3GNNTorsoConfig
+from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
+from molboil.models.base import EquivariantForwardFunction
+from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
+from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
+
 from nets.en_gnn import en_gnn_net, MultiEgnnConfig, EgnnTorsoConfig
-from nets.transformer import TransformerConfig
+
 
 class MLPHeadConfig(NamedTuple):
     mlp_units: Sequence[int]
@@ -14,12 +20,18 @@ class MLPHeadConfig(NamedTuple):
 
 class NetsConfig(NamedTuple):
     type: str
-    mace_torso_config: Optional[MACETorsoConfig] = None
     egnn_torso_config: Optional[EgnnTorsoConfig] = None
     e3gnn_torso_config: Optional[E3GNNTorsoConfig] = None
-    e3transformer_lay_config: Optional[EnTransformerTorsoConfig] = None
-    transformer_config: Optional[TransformerConfig] = None
     mlp_head_config: Optional[MLPHeadConfig] = None
+
+
+def build_torso(name: str, config: NetsConfig) -> EquivariantForwardFunction:
+    if config.type == 'e3gnn':
+        torso = make_e3nn_torso_forward_fn(torso_config=config.e3gnn_torso_config._replace(
+            name=name + config.e3gnn_torso_config.name))
+    else:
+        raise NotImplementedError
+    return torso
 
 
 def build_egnn_fn(
@@ -33,56 +45,41 @@ def build_egnn_fn(
     h_out = n_invariant_feat_out != 0
     n_invariant_feat_out = max(1, n_invariant_feat_out)
 
-    def egnn_forward(x, h):
-        assert h.shape[-3] == x.shape[-3]  # n_nodes
-        assert h.shape[-2] == 1  # Currently only have single h multiplicity.
-        if (len(x.shape) - 1) == len(h.shape):  # h needs batch size.
-            h = jnp.repeat(h[None], x.shape[0], axis=0)
+    def egnn_forward_single(
+            x: chex.Array,
+            h: chex.Array,
+            senders: chex.Array,
+            receivers: chex.Array):
+        chex.assert_rank(x, 2)
+        chex.assert_rank(h, 2)
+        assert h.shape[0] == x.shape[0]  # n_nodes
+        torso = build_torso(name, nets_config)
+        vectors, h = torso(x, h, senders, receivers)
 
-        assert len(x.shape) == len(h.shape)
+        if vectors.shape[1] != n_equivariant_vectors_out:
+            vectors = e3nn.IrrepsArray("1x1o", vectors)
+            vectors = vectors.axis_to_mul(axis=-2)  # [n_nodes, n_vectors*dim]
 
-        if nets_config.type == "mace":
-            mace_config = MACEConfig(name=name+"_mace",
-                                     torso_config=nets_config.mace_torso_config,
-                                     n_vectors_out=n_equivariant_vectors_out,
-                                     n_invariant_feat_out=n_invariant_feat_out,
-                                     zero_init_invariant_feat=zero_init_invariant_feat)
-            x, h = MaceNet(mace_config)(x, h)
-            if n_equivariant_vectors_out == 1:
-                x = jnp.squeeze(x, axis=-2)
-        elif nets_config.type == "egnn":
-            egnn_config = MultiEgnnConfig(name=name+"multi_x_egnn",
-                                          torso_config=nets_config.egnn_torso_config,
-                                          n_invariant_feat_out=n_invariant_feat_out,
-                                          n_equivariant_vectors_out=n_equivariant_vectors_out,
-                                          invariant_feat_zero_init=zero_init_invariant_feat
-                                          )
-            x, h = en_gnn_net(egnn_config)(x, h)
-        elif nets_config.type == "e3transformer":
-            config = EnTransformerConfig(name=name+"e3transformer",
-                                         n_vectors_readout=n_equivariant_vectors_out,
-                                         n_invariant_feat_readout=n_invariant_feat_out,
-                                         zero_init_invariant_feat=zero_init_invariant_feat,
-                                         torso_config=nets_config.e3transformer_lay_config)
-            x, h = EnTransformer(config)(x, h)
-            if n_equivariant_vectors_out == 1:
-                x = jnp.squeeze(x, axis=-2)
-        elif nets_config.type == "e3gnn":
-            config = E3GNNConfig(name=name+"e3gnn",
-                                         n_vectors_readout=n_equivariant_vectors_out,
-                                         n_invariant_feat_readout=n_invariant_feat_out,
-                                         zero_init_invariant_feat=zero_init_invariant_feat,
-                                         torso_config=nets_config.e3gnn_torso_config)
-            x, h = E3Gnn(config)(x, h)
-            if n_equivariant_vectors_out == 1:
-                x = jnp.squeeze(x, axis=-2)
+            vectors = e3nnLinear(f"{n_equivariant_vectors_out}x1o", biases=True)(vectors)  # [n_nodes, 1*dim]
+            vectors = vectors.array
+
+        h = hk.Linear(n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
+            if zero_init_invariant_feat else hk.Linear(n_invariant_feat_out)(h)
+        return vectors, h
+
+    def egnn_forward(
+            x: chex.Array,
+            h: chex.Array
+    ):
+        n_nodes, multiplicity, dim = x.shape[-3:]
+        if len(x.shape) == 3:
+            vectors, h = egnn_forward_single(x, h, senders, receivers)
         else:
-            raise NotImplementedError
-
+            vectors, h = jax.vmap(egnn_forward_single, in_axes=(0, 0, None, None))(x, h, senders, receivers)
         if h_out:
-            return x, h
+            return vectors, h
         else:
-            return x
+            return vectors
 
 
     return egnn_forward
