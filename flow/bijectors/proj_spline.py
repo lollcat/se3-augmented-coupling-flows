@@ -56,21 +56,10 @@ def make_proj_spline(
             min_bin_size=(upper - lower) * 1e-4)
         return bijector
 
-
-
-    n_coupling_variable_groups = n_aug + 1
-    if nets_config.type == "mace":
-        n_invariant_feat_out = int(nets_config.mace_torso_config.n_invariant_feat_residual
-                                       / (n_coupling_variable_groups / 2))
-    elif nets_config.type == "egnn":
-        n_invariant_feat_out = int(nets_config.egnn_torso_config.h_embedding_dim
-                                       / (n_coupling_variable_groups / 2))
-    elif nets_config.type == 'e3transformer':
-        n_invariant_feat_out = int(nets_config.e3transformer_lay_config.n_invariant_feat_hidden
-                                       / (n_coupling_variable_groups / 2))
+    if nets_config.type == "egnn":
+        n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim
     elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = int(nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-                                       / (n_coupling_variable_groups / 2))
+        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 
