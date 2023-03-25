@@ -48,7 +48,7 @@ def make_proj_realnvp(
 
 
     if nets_config.type == "egnn":
-        n_invariant_feat_out = nets_config.egnn_torso_config.h_embedding_dim
+        n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "e3gnn":
         n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
     else:

@@ -10,8 +10,8 @@ from molboil.models.base import EquivariantForwardFunction
 from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
 from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
 
-from nets.en_gnn import en_gnn_net, MultiEgnnConfig, EgnnTorsoConfig
-from utils.graph import get_pos_feat_send_receive_flattened_over_multiplicity
+from nets.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
+from utils.graph import get_pos_feat_send_receive_flattened_over_multiplicity, unflatten_vectors_scalars
 
 
 class MLPHeadConfig(NamedTuple):
@@ -20,32 +20,24 @@ class MLPHeadConfig(NamedTuple):
 
 class NetsConfig(NamedTuple):
     type: str
-    egnn_torso_config: Optional[EgnnTorsoConfig] = None
+    egnn_torso_config: Optional[EGNNTorsoConfig] = None
     e3gnn_torso_config: Optional[E3GNNTorsoConfig] = None
     mlp_head_config: Optional[MLPHeadConfig] = None
 
 
-def build_torso(name: str, config: NetsConfig) -> EquivariantForwardFunction:
+def build_torso(name: str, config: NetsConfig, n_vectors_out: int) -> EquivariantForwardFunction:
     if config.type == 'e3gnn':
         torso = make_e3nn_torso_forward_fn(torso_config=config.e3gnn_torso_config._replace(
             name=name + config.e3gnn_torso_config.name))
+    elif config.type == 'egnn':
+        torso = make_egnn_torso_forward_fn(config.egnn_torso_config._replace(
+            name=name + config.egnn_torso_config.name,
+            multiplicity=n_vectors_out
+        ),
+        )
     else:
         raise NotImplementedError
     return torso
-
-
-def unflatten_vectors_scalars(vectors: chex.Array, scalars: chex.Array,
-                              n_nodes: int, multiplicity: int, dim: int) -> Tuple[chex.Array, chex.Array]:
-    chex.assert_rank(vectors, 3)
-    chex.assert_rank(scalars, 2)
-    n_nodes_multp, n_vectors, dim_ = vectors.shape
-    n_nodes_multp_, n_scalars = scalars.shape
-    assert n_nodes_multp == (n_nodes*multiplicity) == n_nodes_multp_
-    assert dim == dim_
-
-    vectors_out = jnp.reshape(vectors, (n_nodes, multiplicity, n_vectors, dim))
-    scalars_out = jnp.reshape(scalars, (n_nodes, multiplicity, n_scalars))
-    return vectors_out, scalars_out
 
 
 def build_egnn_fn(
@@ -59,6 +51,7 @@ def build_egnn_fn(
     h_out = n_invariant_feat_out != 0
     n_invariant_feat_out = max(1, n_invariant_feat_out)
 
+
     def egnn_forward_single(
             x: chex.Array,
             h: chex.Array,
@@ -67,10 +60,12 @@ def build_egnn_fn(
         chex.assert_rank(x, 2)
         chex.assert_rank(h, 2)
         assert h.shape[0] == x.shape[0]  # n_nodes
-        torso = build_torso(name, nets_config)
+        torso = build_torso(name, nets_config, n_equivariant_vectors_out)
         vectors, h = torso(x, h, senders, receivers)
 
         if vectors.shape[1] != n_equivariant_vectors_out:
+            if nets_config.type == 'egnn':
+                raise Exception("EGNN not configured for this to be different")
             vectors = e3nn.IrrepsArray("1x1o", vectors)
             vectors = vectors.axis_to_mul(axis=-2)  # [n_nodes, n_vectors*dim]
 

@@ -6,12 +6,12 @@ import chex
 from flow.test_utils import get_minimal_nets_config
 from nets.base import build_egnn_fn
 
-def test_net_does_not_smoke():
-    nets_config = get_minimal_nets_config("e3gnn")
+def test_net_does_not_smoke(type="egnn"):
+    nets_config = get_minimal_nets_config(type=type)
     zero_init_invariant_feat = False
     n_invariant_feat_out = 5
     n_equivariant_vectors_out = 3
-    dim = 3
+    dim = 2 if type == 'egnn' else 3
     n_nodes = 5
     multiplicity = 2
 

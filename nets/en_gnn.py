@@ -1,199 +1,183 @@
-from typing import NamedTuple, Sequence, Callable, Optional
+from typing import NamedTuple, Callable, Sequence
 
-import chex
-import jax
-import jax.numpy as jnp
 import haiku as hk
+import jax.numpy as jnp
+import jax
+import e3nn_jax as e3nn
+from mace_jax.modules.models import safe_norm
+import chex
 import numpy as np
 
-def get_norms_sqrd(x):
-    diff_combos = x - x[:, None]  # [n_nodes, n_nodes, dim]
-    diff_combos = diff_combos.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-    sq_norms = jnp.sum(diff_combos ** 2, axis=-1)
-    return sq_norms
+from molboil.models.base import EquivariantForwardFunction
 
+from utils.graph import get_pos_feat_send_receive_flattened_over_multiplicity, unflatten_vectors_scalars
 
-class EGCL_Multi(hk.Module):
-    def __init__(self, name: str,
-                 mlp_units: Sequence[int],
-                 residual: bool = True,
-                 normalize_by_x_norm: bool = True, activation_fn: Callable = jax.nn.silu,
-                 normalization_constant: float = 1.0,
-                 agg='mean',
-                 stop_gradient_for_norm: bool = False,
-                 variance_scaling_init: float = 0.001):
-        super().__init__(name=name + "equivariant")
+class EGCL(hk.Module):
+    """A version of EGCL coded only with haiku (not e3nn) so works for arbitary dimension of inputs."""
+
+    def __init__(
+        self,
+        name: str,
+        mlp_units: Sequence[int],
+        n_invariant_feat_hidden: int,
+        activation_fn: Callable,
+        residual_h: bool,
+        residual_x: bool,
+        normalization_constant: float,
+        variance_scaling_init: float,
+    ):
+        """_summary_
+
+        Args:
+            name (str)
+            mlp_units (Sequence[int]): sizes of hidden layers for all MLPs
+            residual_h (bool): whether to use a residual connectio probability density for scalars
+            residual_x (bool): whether to use a residual connectio probability density for vectors.
+            get_shifts_via_tensor_product (bool): Whether to use tensor product for message construction
+            variance_scaling_init (float): Value to scale the output variance of MLP multiplying message vectors
+        """
+        super().__init__(name=name)
         self.variance_scaling_init = variance_scaling_init
+        self.mlp_units = mlp_units
+        self.n_invariant_feat_hidden = n_invariant_feat_hidden
+        self.activation_fn = activation_fn
+        self.residual_h = residual_h
+        self.residual_x = residual_x
+        self.normalization_constant = normalization_constant
+
+        self.n_invariant_feat_hidden = n_invariant_feat_hidden
+
+
         self.phi_e = hk.nets.MLP(mlp_units, activation=activation_fn, activate_final=True)
         self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
 
-        self.phi_x = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
+        self.phi_x = hk.Sequential([
+            hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn),
+            hk.Linear(1, w_init=hk.initializers.VarianceScaling(variance_scaling_init, "fan_avg", "uniform"))])
 
-        self.phi_h_mlp = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
-        self.residual_h = residual
-        self.normalize_by_x_norm = normalize_by_x_norm
-        self.normalization_constant = normalization_constant
-        self.agg = agg
-        self.stop_gradient_for_norm = stop_gradient_for_norm
+        self.phi_h = hk.nets.MLP((*mlp_units, self.n_invariant_feat_hidden), activate_final=False,
+                                 activation=activation_fn)
 
-    def __call__(self, x, h):
-        if len(x.shape) == 3:
-            return self.forward_single(x, h)
-        else:
-            chex.assert_rank(x, 4)
-            return hk.vmap(self.forward_single, split_rng=False)(x, h)
+    def __call__(self, node_positions, node_features, senders, receivers):
+        """E(N)GNN layer implemented with E3NN package
 
-    def forward_single(self, x, h):
-        """Forward pass for a single graph (no batch dimension)."""
-        chex.assert_rank(x, 3)
-        chex.assert_rank(h, 2)
-        n_nodes, n_heads = x.shape[0:2]
+        Args:
+            node_positions [n_nodes, self.n_vectors_hidden, 3]-ndarray: augmented set of euclidean coodinates for each node
+            node_features [n_nodes, self.n_invariant_feat_hidden]-ndarray: scalar features at each node
+
+        Returns:
+            vectors_out [n_nodes, self.n_vectors_hidden, 3]-ndarray: augmented set of euclidean coodinates for each node
+            features_out [n_nodes, self.n_invariant_feat_hidden]-ndarray: scalar features at each node
+            senders:
+            receivers:
+        """
+        n_nodes, dim = node_positions.shape
         avg_num_neighbours = n_nodes - 1
+        chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
 
-        # Equation 4(a)
-        # Append norms between all heads to h.
-        diff_combos_heads = jax.vmap(lambda x: x - x[:, None], in_axes=0)(x)  # [n_nodes, n_heads, n_heads, dim]
+        # Prepare the edge attributes.
+        vectors = node_positions[receivers] - node_positions[senders]
+        lengths = safe_norm(vectors, axis=-1, keepdims=True)
 
-        diff_combos_heads = diff_combos_heads.at[:, jnp.arange(n_heads), jnp.arange(n_heads)].set(0.0)  # prevents nan grads
-        sq_norms_heads = jnp.sum(diff_combos_heads**2, axis=-1)
-        sq_norms_heads_flat = sq_norms_heads.reshape(sq_norms_heads.shape[0], np.prod(sq_norms_heads.shape[1:]))  # Flatten.
-        h_concat = jnp.concatenate([h, sq_norms_heads_flat], axis=-1)
+        # build messages
+        edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], lengths], axis=-1)
+        m_ij = self.phi_e(edge_feat_in)
 
-        # create h_combos.
-        h_combos = jnp.concatenate([jnp.repeat(h_concat[None, ...], h.shape[0], axis=0),
-                                    jnp.repeat(h_concat[:, None, ...], h.shape[0], axis=1)], axis=-1)
-
-        diff_combos_nodes = jax.vmap(lambda x: x - x[:, None], in_axes=-2, out_axes=-2)(x)  # [n_nodes, n_nodes, n_heads, dim]
-        diff_combos_nodes = diff_combos_nodes.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # prevents nan grads
-        sq_norms_nodes = jnp.sum(diff_combos_nodes**2, axis=-1)
-
-
-        m_ij = self.phi_e(jnp.concatenate([sq_norms_nodes, h_combos], axis=-1))
-        m_ij = m_ij.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
-
-        # Equation 4(b)
-        e = self.phi_inf(m_ij)
-        e = e.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
-        m_i = jnp.einsum('ijd,ij->id', m_ij, jnp.squeeze(e, axis=-1))
-        m_i = m_i / jnp.sqrt(avg_num_neighbours)
-
-        # Get vectors.
-        # Equation 5(a)
+        # Get positional output
         phi_x_out = self.phi_x(m_ij)
-        phi_x_out = hk.Linear(n_heads, w_init=hk.initializers.VarianceScaling(self.variance_scaling_init,
-                                                                               "fan_avg", "uniform"))(phi_x_out)
-        phi_x_out = phi_x_out.at[jnp.arange(x.shape[0]), jnp.arange(x.shape[0])].set(0.0)  # explicitly set diagonal to 0
+        shifts_ij = (
+            phi_x_out
+            * vectors
+            / (self.normalization_constant + lengths)
+        )  # scale vectors by messages and
+        shifts_i = e3nn.scatter_sum(
+            data=shifts_ij, dst=receivers, output_size=n_nodes
+        )
+        vectors_out = shifts_i / avg_num_neighbours
+        chex.assert_equal_shape((vectors_out, node_positions))
 
-        if self.normalize_by_x_norm:
-            # Get norm in safe way that prevents nans.
-            norm = jnp.sqrt(jnp.where(sq_norms_nodes == 0., 1., sq_norms_nodes)) + self.normalization_constant
-            if self.stop_gradient_for_norm:
-                norm = jax.lax.stop_gradient(norm)
-            norm_diff_combo = diff_combos_nodes / norm[..., None]
-            norm_diff_combo = norm_diff_combo.at[jnp.arange(n_nodes), jnp.arange(n_nodes)].set(0.0)
-            equivariant_shift = jnp.einsum('ijhd,ijh->ihd', norm_diff_combo, phi_x_out)
+        # Get feature output
+        e = self.phi_inf(m_ij)
+        m_i = e3nn.scatter_sum(
+            data=m_ij*e, dst=receivers, output_size=n_nodes
+        ) / jnp.sqrt(avg_num_neighbours)
+        phi_h_in = jnp.concatenate([m_i, node_features], axis=-1)
+        features_out = self.phi_h(phi_h_in)
+        chex.assert_equal_shape((features_out, node_features))
 
-        else:
-            equivariant_shift = jnp.einsum('ijhd,ijh->id', diff_combos_nodes, phi_x_out)
+        # Final processing and conversion into plain arrays.
 
-        if self.agg == 'mean':
-            equivariant_shift = equivariant_shift / avg_num_neighbours
-        else:
-            assert self.agg == 'sum'
-
-        x_new = x + equivariant_shift
-
-        # Get feature updates.
-        # Equation 5(b)
-        phi_h = hk.Sequential([self.phi_h_mlp, hk.Linear(h.shape[-1])])
-        phi_h_in = jnp.concatenate([m_i, h], axis=-1)
-        h_new = phi_h(phi_h_in)
         if self.residual_h:
-            h_new = h + h_new
-
-        return x_new, h_new
-
-
-class EgnnTorsoConfig(NamedTuple):
-    mlp_units: Sequence[int]
-    h_embedding_dim: int  # Dimension of h embedding in the EGCL.
-    zero_init_h: int = False
-    h_linear_softmax: bool = True    # Linear layer followed by softmax for improving stability.
-    h_residual: bool = True
-    n_layers: int = 3  # Number of EGCL layers.
-    normalize_by_norms: bool = True
-    activation_fn: Callable = jax.nn.silu
-    agg: str = 'mean'
-    stop_gradient_for_norm: bool = False
-    variance_scaling_init: float = 0.001
-    normalization_constant: float = 1.0
+            features_out = features_out + node_features
+        if self.residual_x:
+            vectors_out = node_positions + vectors_out
+        return vectors_out, features_out
 
 
-class MultiEgnnConfig(NamedTuple):
-    """Config of the EGNN."""
+class EGNNTorsoConfig(NamedTuple):
     name: str
-    n_invariant_feat_out: int
-    n_equivariant_vectors_out: int
-    torso_config: EgnnTorsoConfig
-    invariant_feat_zero_init: bool = True
+    n_blocks: int  # number of layers
+    mlp_units: Sequence[int]
+    n_invariant_feat_hidden: int
+    activation_fn: Callable = jax.nn.silu
+    residual_h: bool = True
+    residual_x: bool = True
+    normalization_constant: float = 1.0
+    variance_scaling_init: float = 0.001
+    multiplicity: int = 1
+
+    def get_EGCL_kwargs(self):
+        kwargs = self._asdict()
+        del kwargs["n_blocks"]
+        del kwargs["name"]
+        del kwargs["multiplicity"]
+        return kwargs
 
 
-class en_gnn_net(hk.Module):
-    def __init__(self, config: MultiEgnnConfig):
-        super().__init__(name=config.name + "_multi_x_egnn")
-        self.egnn_layers = [EGCL_Multi(config.name + str(i),
-                                             mlp_units=config.torso_config.mlp_units,
-                                             normalize_by_x_norm=config.torso_config.normalize_by_norms,
-                                             residual=config.torso_config.h_residual,
-                                             activation_fn=config.torso_config.activation_fn,
-                                             agg=config.torso_config.agg,
-                                             stop_gradient_for_norm=config.torso_config.stop_gradient_for_norm,
-                                             variance_scaling_init=config.torso_config.variance_scaling_init,
-                                             normalization_constant=config.torso_config.normalization_constant
-                           ) for i in range(config.torso_config.n_layers)]
-        self.egnn_config = config.torso_config
-        self.n_heads = config.n_equivariant_vectors_out
-        self.config = config
+def make_egnn_torso_forward_fn(
+    torso_config: EGNNTorsoConfig,
+) -> EquivariantForwardFunction:
+    def forward_fn(
+        positions: chex.Array,
+        node_features: chex.Array,
+        senders: chex.Array,
+        receivers: chex.Array,
+    ):
+        chex.assert_rank(positions, 2)
+        chex.assert_rank(node_features, 2)
+        chex.assert_rank(senders, 1)
+        chex.assert_rank(receivers, 1)
 
+        n_nodes, dim = positions.shape
 
-    def __call__(self, x: chex.Array, h: chex.Array):
-        if len(x.shape) == 3:
-            return self.forward_single(x, h)
-        else:
-            chex.assert_rank(x, 4)
-            return hk.vmap(self.forward_single, split_rng=False)(x, h)
+        vectors = positions - positions.mean(axis=0, keepdims=True)
+        vectors = vectors[:, None]
+        initial_vectors = vectors
 
+        # Create n-multiplicity copies of h and vectors.
+        vectors = jnp.repeat(vectors, torso_config.multiplicity, axis=1)
+        multiplicity_encoding = hk.get_parameter(
+            f'multiplicity_encoding_torso', shape=(torso_config.multiplicity,),
+            init=hk.initializers.TruncatedNormal(stddev=1. / np.sqrt(torso_config.multiplicity)))
+        h = jnp.concatenate([jnp.concatenate([node_features[:, None], jnp.ones((n_nodes, 1, 1)) * multiplicity_encoding[i]], axis=-1)
+                                    for i in range(torso_config.multiplicity)], axis=1)
+        h = hk.Linear(torso_config.n_invariant_feat_hidden)(h)
 
-    def forward_single(self, x: chex.Array, h: chex.Array):
-        """Compute forward pass of EGNN for a single x (no batch dimension)."""
-        assert x.shape[0] == h.shape[0]
-        n_nodes, multiplicity_in = x.shape[:2]
+        # Perform flattening so we can pass this all into the EGCL layer.
+        vectors, h, senders, receivers = get_pos_feat_send_receive_flattened_over_multiplicity(
+            vectors, h, senders, receivers)
 
-        assert self.config.torso_config.h_embedding_dim >= (multiplicity_in * self.config.n_invariant_feat_out)
+        for i in range(torso_config.n_blocks):
+            vectors, h = EGCL(
+                torso_config.name + str(i), **torso_config.get_EGCL_kwargs()
+            )(vectors, h, senders, receivers)
 
-        # Perform forward pass of EGNN.
-        # Centre mass.
-        x = x - jnp.mean(x, axis=0, keepdims=True)
+        vectors = jnp.reshape(vectors, (n_nodes, torso_config.multiplicity, dim))
+        h = jnp.reshape(h, (n_nodes, torso_config.multiplicity, torso_config.n_invariant_feat_hidden))
+        vectors = vectors - initial_vectors
 
-        # Project to number of heads
-        x = jnp.repeat(x, repeats=self.n_heads, axis=1)
-        x_original = x
-        h = h.reshape(h.shape[0], np.prod(h.shape[1:]))  # flatten along last 2 axes.
-        h = hk.Linear(self.config.torso_config.h_embedding_dim)(h)
+        h = jnp.mean(h, axis=1)  # Collapse h over multiplicity for output.
 
-        x_out, h_egnn = x, h
-        for layer in self.egnn_layers:
-            x_out, h_egnn = layer(x_out, h_egnn)
+        return vectors, h
 
-        # Use h_egnn output from the EGNN as a feature for h-out.
-        if self.egnn_config.h_linear_softmax:
-            h_egnn = jax.nn.softmax(h_egnn, axis=-1)
-
-
-        h_out = hk.Linear(self.config.n_invariant_feat_out*multiplicity_in, w_init=jnp.zeros, b_init=jnp.zeros) \
-            if self.config.invariant_feat_zero_init else \
-            hk.Linear(self.config.n_invariant_feat_out*multiplicity_in)(h_egnn)
-        x_out = x_out - x_original
-        x_out = x_out.reshape((n_nodes, multiplicity_in, self.n_heads, x_out.shape[-1]))
-        h_out = h_out.reshape((n_nodes, multiplicity_in, self.config.n_invariant_feat_out))
-        return x_out, h_out
+    return forward_fn
