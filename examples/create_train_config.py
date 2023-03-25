@@ -17,9 +17,7 @@ from molboil.train.train import TrainConfig
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from nets.base import NetsConfig, MLPHeadConfig, EnTransformerTorsoConfig, E3GNNTorsoConfig, EgnnTorsoConfig, \
-    MACETorsoConfig
-from nets.transformer import TransformerConfig
+from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EgnnTorsoConfig
 from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
@@ -90,19 +88,12 @@ def create_nets_config(nets_config: DictConfig):
     nets_config = dict(nets_config)
     egnn_cfg = EgnnTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
     e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
-    mace_config = MACETorsoConfig(**dict(nets_config.pop("mace"))) if "mace" in nets_config.keys() else None
-    e3transformer_cfg = EnTransformerTorsoConfig(**dict(nets_config.pop("e3transformer"))) if "e3transformer" in nets_config.keys() else None
-    transformer_cfg = dict(nets_config.pop("transformer")) if "transformer" in nets_config.keys() else None
-    transformer_config = TransformerConfig(**dict(transformer_cfg)) if transformer_cfg else None
     mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
                                                                              nets_config.keys() else None
     type = nets_config['type']
     nets_config = NetsConfig(type=type,
                              egnn_torso_config=egnn_cfg,
                              e3gnn_torso_config=e3gnn_config,
-                             mace_torso_config=mace_config,
-                             e3transformer_lay_config=e3transformer_cfg,
-                             transformer_config=transformer_config,
                              mlp_head_config=mlp_head_config)
     return nets_config
 

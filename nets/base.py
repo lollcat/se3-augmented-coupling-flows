@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import e3nn_jax as e3nn
 import haiku as hk
 import jax
+import numpy as np
 
 from molboil.models.base import EquivariantForwardFunction
 from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
@@ -86,12 +87,27 @@ def build_egnn_fn(
             features: chex.Array
     ):
         n_nodes, multiplicity, dim = positions.shape[-3:]
+        if features.shape[-2] != multiplicity:
+            # Add multiplicity axis, and feature encoding.
+            chex.assert_axis_dimension(features, 1, 1)
+            multiplicity_encoding = hk.get_parameter(
+                f'multiplicity_encoding', shape=(multiplicity,),
+                init=hk.initializers.TruncatedNormal(stddev=1. / np.sqrt(multiplicity)))
+            features = jnp.concatenate([jnp.concatenate([features,
+                                                         jnp.ones((n_nodes, 1, 1))*multiplicity_encoding[i]], axis=-1)
+                        for i in range(multiplicity)], axis=1)
+
         if len(positions.shape) == 3:
             positions_flat, features_flat, senders, receivers = \
                 get_pos_feat_send_receive_flattened_over_multiplicity(positions, features)
             vectors, scalars = egnn_forward_single(positions_flat, features_flat, senders, receivers)
             vectors, scalars = unflatten_vectors_scalars(vectors, scalars, n_nodes, multiplicity, dim)
         else:
+            batch_size = positions.shape[0]
+            if features.shape[0] != batch_size:
+                chex.assert_rank(features, 3)
+                features = jnp.repeat(features[None, ...], batch_size)
+
             positions_flat, features_flat, senders, receivers = \
                 jax.vmap(get_pos_feat_send_receive_flattened_over_multiplicity)(positions, features)
             vectors, scalars = jax.vmap(egnn_forward_single)(positions_flat, features_flat, senders, receivers)
