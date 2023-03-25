@@ -1,17 +1,16 @@
 from typing import NamedTuple, Optional, Sequence, Tuple
-
 import chex
 import jax.numpy as jnp
 import e3nn_jax as e3nn
 import haiku as hk
 import jax
 
-from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
 from molboil.models.base import EquivariantForwardFunction
 from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
 from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
 
 from nets.en_gnn import en_gnn_net, MultiEgnnConfig, EgnnTorsoConfig
+from utils.graph import get_pos_feat_send_receive_flattened_over_multiplicity
 
 
 class MLPHeadConfig(NamedTuple):
@@ -32,6 +31,20 @@ def build_torso(name: str, config: NetsConfig) -> EquivariantForwardFunction:
     else:
         raise NotImplementedError
     return torso
+
+
+def unflatten_vectors_scalars(vectors: chex.Array, scalars: chex.Array,
+                              n_nodes: int, multiplicity: int, dim: int) -> Tuple[chex.Array, chex.Array]:
+    chex.assert_rank(vectors, 3)
+    chex.assert_rank(scalars, 3)
+    n_nodes_multp, n_vectors, dim_ = vectors.shape
+    n_nodes_multp_, n_scalars = vectors.shape
+    assert n_nodes_multp == (n_nodes*multiplicity) == n_nodes_multp_
+    assert dim == dim_
+
+    vectors_out = jnp.reshape(vectors, (n_nodes, multiplicity, n_vectors, dim))
+    scalars_out = jnp.reshape(scalars, (n_nodes, multiplicity, n_scalars))
+    return vectors_out, scalars_out
 
 
 def build_egnn_fn(
@@ -68,16 +81,31 @@ def build_egnn_fn(
         return vectors, h
 
     def egnn_forward(
-            x: chex.Array,
-            h: chex.Array
+            positions: chex.Array,
+            features: chex.Array
     ):
-        n_nodes, multiplicity, dim = x.shape[-3:]
-        if len(x.shape) == 3:
-            vectors, h = egnn_forward_single(x, h, senders, receivers)
+        n_nodes, multiplicity, dim = positions.shape[-3:]
+        if len(positions.shape) == 3:
+            positions_flat, features_flat, senders, receivers  = \
+                get_pos_feat_send_receive_flattened_over_multiplicity(positions, features)
+            vectors, scalars = egnn_forward_single(positions_flat, features_flat, senders, receivers)
+            vectors, scalars = unflatten_vectors_scalars(vectors, scalars, n_nodes, multiplicity, dim)
         else:
-            vectors, h = jax.vmap(egnn_forward_single, in_axes=(0, 0, None, None))(x, h, senders, receivers)
+            positions_flat, features_flat, senders, receivers = \
+                jax.vmap(get_pos_feat_send_receive_flattened_over_multiplicity)(positions, features)
+            vectors, scalars = jax.vmap(egnn_forward_single)(positions_flat, features_flat, senders, receivers)
+            vectors, scalars = jax.vmap(unflatten_vectors_scalars, in_axes=(0, 0, None, None, None))(
+                vectors, scalars, n_nodes, multiplicity, dim)
+
+        # Final processing of vectors and scalars to output shapes.
+        if not vectors.shape[-2] == n_equivariant_vectors_out:
+            vectors = vectors
+
+        scalars = jax.nn.softmax(scalars, axis=-1)
+
+
         if h_out:
-            return vectors, h
+            return vectors, scalars
         else:
             return vectors
 

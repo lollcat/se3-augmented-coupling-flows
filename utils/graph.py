@@ -18,10 +18,19 @@ def e3nn_apply_activation(x: e3nn.IrrepsArray, activation_fn: Callable):
     return e3nn.IrrepsArray(irreps=x.irreps, array=activation_fn(x.array))
 
 
-def get_x_flattened_over_multiplicity_and_senders_recievers(x: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-    n_nodes, multiplicity, dim = x.shape
+def get_pos_feat_send_receive_flattened_over_multiplicity(positions: chex.Array,
+                                                          features: chex.Array
+                                                          ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
+    n_nodes, multiplicity, dim = positions.shape
+    chex.assert_tree_shape_prefix(features, (n_nodes, multiplicity))
+    n_features = features.shape[-1]
+
+    # Get flat positions and features.
+    positions = jnp.reshape(positions, (n_nodes * multiplicity, dim))
+    features = jnp.reshape(features, (n_nodes * multiplicity, n_features))
+
+    # Get senders and receivers, with connection across multiplicities.
     senders, receivers = get_senders_and_receivers_fully_connected(n_nodes)
-    x = jnp.reshape(x, (n_nodes * multiplicity, dim))
     senders_list = []
     receivers_list = []
     for i in range(multiplicity):
@@ -35,4 +44,4 @@ def get_x_flattened_over_multiplicity_and_senders_recievers(x: chex.Array) -> Tu
             senders_list.append(jnp.arange(dim) + ((j + i + 1) % multiplicity) * dim)
     senders = jnp.concatenate(senders_list)
     receivers = jnp.concatenate(receivers_list)
-    return x, senders, receivers
+    return positions, features, senders, receivers

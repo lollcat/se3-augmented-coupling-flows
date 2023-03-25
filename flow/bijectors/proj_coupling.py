@@ -25,55 +25,40 @@ def unproject(x, origin, change_of_basis_matrix):
     chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
     return change_of_basis_matrix @ x + origin
 
-def get_min_k_vectors_by_norm(norms, vectors, receivers, n_vectors, node_index):
-    _, min_k_indices = jax.lax.top_k(-norms[receivers == node_index], n_vectors)
-    min_k_vectors = vectors[receivers == node_index][min_k_indices]
-    return min_k_vectors
-
-
-def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Array:
-    chex.assert_rank(x, 2)  # [n_nodes, dim]
-    n_nodes, dim = x.shape
-    senders, receivers = get_senders_and_receivers_fully_connected(dim)
-    vectors = x[receivers] - x[senders]
-    norms = safe_norm(vectors, axis=-1, keepdims=False)
-    min_k_vectors = jax.vmap(get_min_k_vectors_by_norm, in_axes=(None, None, None, None, 0))(
-        norms, vectors, receivers, n_vectors, jnp.arange(n_nodes))
-    chex.assert_shape(min_k_vectors, (n_nodes, n_vectors, dim))
-    return min_k_vectors
 
 
 
+def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True) -> chex.Array:
+    """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
+    vectors as it's columns."""
 
-def get_new_space_basis(various_x_vectors: chex.Array, add_small_identity: bool = True):
-    n_nodes, n_vectors, dim = various_x_vectors.shape
-    # Calculate new basis for the affine transform
-    basis_vectors = jnp.swapaxes(various_x_vectors, 0, 1)
+    n_nodes, n_vectors, dim = vectors.shape
 
+    # Set n_vectors to leading axis to make slicing simpler.
+    basis_vectors = jnp.swapaxes(vectors, 0, 1)
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
         basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors][:, None, :]*1e-6
 
-
     z_basis_vector = basis_vectors[0]
     z_basis_vector = z_basis_vector / safe_norm(z_basis_vector, axis=-1, keepdims=True)
     if dim == 3:
-        chex.assert_tree_shape_suffix(various_x_vectors, (3,))
+        # Vector rejection to get second axis orthogonal to z axis.
         x_basis_vector = basis_vectors[1]
-        # Compute reference axes.
         x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
         x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
         x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
+
+        # Cross product of z and x vector to get final vector.
         y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
         y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
     else:
-        chex.assert_tree_shape_suffix(various_x_vectors, (2,))
+        # Vector rejection with arbitrary vector and z-basis vector to get the other axis.
         y_basis_vector = vector_rejection(jnp.ones_like(z_basis_vector), z_basis_vector)
         y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
-
 
     chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
     return change_of_basis_matrix
@@ -159,7 +144,7 @@ class ProjSplitCoupling(BijectorWithExtra):
             vectors = vectors_out[:, :, 1:]
         # jax.vmap(get_directions_for_closest_atoms, in_axes=(1, None), out_axes=1)(x, vectors.shape[2])
         # Vmap over multiplicity.
-        change_of_basis_matrix = jax.vmap(get_new_space_basis, in_axes=1, out_axes=1)(vectors)
+        change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=1, out_axes=1)(vectors)
 
         # Stack h, and x projected into the space.
         x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
@@ -292,3 +277,22 @@ class ProjSplitCoupling(BijectorWithExtra):
             raise NotImplementedError
         return x, logdet, extra
 
+
+#
+#
+# def get_min_k_vectors_by_norm(norms, vectors, receivers, n_vectors, node_index):
+#     _, min_k_indices = jax.lax.top_k(-norms[receivers == node_index], n_vectors)
+#     min_k_vectors = vectors[receivers == node_index][min_k_indices]
+#     return min_k_vectors
+#
+#
+# def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Array:
+#     chex.assert_rank(x, 2)  # [n_nodes, dim]
+#     n_nodes, dim = x.shape
+#     senders, receivers = get_senders_and_receivers_fully_connected(dim)
+#     vectors = x[receivers] - x[senders]
+#     norms = safe_norm(vectors, axis=-1, keepdims=False)
+#     min_k_vectors = jax.vmap(get_min_k_vectors_by_norm, in_axes=(None, None, None, None, 0))(
+#         norms, vectors, receivers, n_vectors, jnp.arange(n_nodes))
+#     chex.assert_shape(min_k_vectors, (n_nodes, n_vectors, dim))
+#     return min_k_vectors
