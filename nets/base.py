@@ -36,9 +36,9 @@ def build_torso(name: str, config: NetsConfig) -> EquivariantForwardFunction:
 def unflatten_vectors_scalars(vectors: chex.Array, scalars: chex.Array,
                               n_nodes: int, multiplicity: int, dim: int) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(vectors, 3)
-    chex.assert_rank(scalars, 3)
+    chex.assert_rank(scalars, 2)
     n_nodes_multp, n_vectors, dim_ = vectors.shape
-    n_nodes_multp_, n_scalars = vectors.shape
+    n_nodes_multp_, n_scalars = scalars.shape
     assert n_nodes_multp == (n_nodes*multiplicity) == n_nodes_multp_
     assert dim == dim_
 
@@ -73,8 +73,9 @@ def build_egnn_fn(
             vectors = e3nn.IrrepsArray("1x1o", vectors)
             vectors = vectors.axis_to_mul(axis=-2)  # [n_nodes, n_vectors*dim]
 
-            vectors = e3nnLinear(f"{n_equivariant_vectors_out}x1o", biases=True)(vectors)  # [n_nodes, 1*dim]
-            vectors = vectors.array
+            vectors = e3nnLinear(e3nn.Irreps(f"{n_equivariant_vectors_out}x1o"),
+                                 biases=True)(vectors)  # [n_nodes, n_equivariant_vectors_out*dim]
+            vectors = vectors.mul_to_axis().array
 
         h = hk.Linear(n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
             if zero_init_invariant_feat else hk.Linear(n_invariant_feat_out)(h)
@@ -86,7 +87,7 @@ def build_egnn_fn(
     ):
         n_nodes, multiplicity, dim = positions.shape[-3:]
         if len(positions.shape) == 3:
-            positions_flat, features_flat, senders, receivers  = \
+            positions_flat, features_flat, senders, receivers = \
                 get_pos_feat_send_receive_flattened_over_multiplicity(positions, features)
             vectors, scalars = egnn_forward_single(positions_flat, features_flat, senders, receivers)
             vectors, scalars = unflatten_vectors_scalars(vectors, scalars, n_nodes, multiplicity, dim)
@@ -96,14 +97,6 @@ def build_egnn_fn(
             vectors, scalars = jax.vmap(egnn_forward_single)(positions_flat, features_flat, senders, receivers)
             vectors, scalars = jax.vmap(unflatten_vectors_scalars, in_axes=(0, 0, None, None, None))(
                 vectors, scalars, n_nodes, multiplicity, dim)
-
-        # Final processing of vectors and scalars to output shapes.
-        if not vectors.shape[-2] == n_equivariant_vectors_out:
-            vectors = vectors
-
-        scalars = jax.nn.softmax(scalars, axis=-1)
-
-
         if h_out:
             return vectors, scalars
         else:
