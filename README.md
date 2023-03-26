@@ -1,6 +1,6 @@
 # Equivariant Augmented Normalizing Flows
 
-
+Equivariance looking broken for multiplicity. 
 
 # Overview of the repo
 - For blackjax we need `pip install blackjax-nightly` (latest version) otherwise we get errors.

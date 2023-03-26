@@ -31,7 +31,7 @@ def get_pairwise_distances(x):
     return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, event_shape):
+def test_fn_is_equivariant(equivariant_fn, key, event_shape, translate: bool = True):
     dim = event_shape[-1]
     assert dim in (2, 3)
 
@@ -43,7 +43,7 @@ def test_fn_is_equivariant(equivariant_fn, key, event_shape):
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2*jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,))
+    translation = jax.random.normal(key3, shape=(dim,)) * (1 if translate else 0)
     phi = jax.random.uniform(key4) * 2 * jnp.pi
 
     def group_action(x_and_a):
