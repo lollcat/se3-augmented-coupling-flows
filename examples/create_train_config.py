@@ -128,10 +128,12 @@ def create_flow_config(cfg: DictConfig):
 
 def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
-                        evaluation_fn: Optional = None) -> TrainConfig:
+                        evaluation_fn: Optional = None,
+                        eval_and_plot_fn = None) -> TrainConfig:
     """Creates `mol_boil` style train config"""
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
+    assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
     logger = setup_logger(cfg)
     training_config = dict(cfg.training)
@@ -207,7 +209,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                     batch_size=cfg.training.batch_size)
             return eval_info
 
-    plot_and_eval_fn = get_eval_and_plot_fn(evaluation_fn, plotter)
+    if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):
+        plot_and_eval_fn = get_eval_and_plot_fn(evaluation_fn, plotter)
 
 
     return TrainConfig(
@@ -221,5 +224,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
         plot_and_eval_fn=plot_and_eval_fn,
         save=cfg.training.save,
         save_dir=save_path,
-        use_64_bit=cfg.training.use_64_bit
+        resume=cfg.training.resume,
+        use_64_bit=cfg.training.use_64_bit,
+        runtime_limit=cfg.training.runtime_limit
                        )
