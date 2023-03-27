@@ -131,7 +131,7 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_shape(log_det_fwd, ())
     chex.assert_trees_all_close((x_and_a - x_and_a_old)/magnitude_of_bijector,
                                 jnp.zeros_like(x_and_a),
-                                rtol=rtol)
+                                atol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
 
     # Test the transformation is equivariant.

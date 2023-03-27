@@ -52,11 +52,16 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
+
     test_bijector_with_proj(dim=2)
     print('passed test in 2D')
 
     test_bijector_with_proj(dim=3)
     print('passed test in 3D')
+
+
+
+
 
 
 
