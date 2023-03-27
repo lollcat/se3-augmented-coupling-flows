@@ -5,8 +5,6 @@ import distrax
 import jax
 import jax.numpy as jnp
 
-from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
-
 from utils.numerical import vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
@@ -28,7 +26,7 @@ def unproject(x, origin, change_of_basis_matrix):
 
 
 
-def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True) -> chex.Array:
+def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = False) -> chex.Array:
     """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
     vectors as it's columns."""
 

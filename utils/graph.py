@@ -54,13 +54,13 @@ def get_pos_feat_send_receive_flattened_over_multiplicity(
     receivers_list = []
     for i in range(multiplicity):
         # Pairwise within each multiplicity group.
-        senders_list.append(senders + i * dim)
-        receivers_list.append(receivers + i * dim)
+        senders_list.append(senders + i * n_nodes)
+        receivers_list.append(receivers + i * n_nodes)
 
         # Pairwise across multiplicity groups.
         for j in range(multiplicity - 1):
-            receivers_list.append(jnp.arange(dim) + i * dim)
-            senders_list.append(jnp.arange(dim) + ((j + i + 1) % multiplicity) * dim)
+            receivers_list.append(jnp.arange(n_nodes) + i * n_nodes)
+            senders_list.append(jnp.arange(n_nodes) + ((j + i + 1) % multiplicity) * n_nodes)
     senders = jnp.concatenate(senders_list)
     receivers = jnp.concatenate(receivers_list)
     return positions, features, senders, receivers

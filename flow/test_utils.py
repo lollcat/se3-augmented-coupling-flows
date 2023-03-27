@@ -2,7 +2,7 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d, param_count
 from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
@@ -119,15 +119,19 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Initialise bijector parameters.
     params = bijector_forward.init(key, x_and_a)
+    print(f"bijector param count of {param_count(params)}")
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
     # Check inverse gives original `x_and_a`
+    magnitude_of_bijector = jnp.mean(jnp.linalg.norm(x_and_a_new - x_and_a, axis=-1))
     chex.assert_tree_all_finite(log_det_fwd)
     chex.assert_shape(log_det_fwd, ())
-    chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
+    chex.assert_trees_all_close((x_and_a - x_and_a_old)/magnitude_of_bijector,
+                                jnp.zeros_like(x_and_a),
+                                rtol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
 
     # Test the transformation is equivariant.

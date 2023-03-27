@@ -6,7 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 import haiku as hk
 
-from nets.base import NetsConfig, build_egnn_fn
+from nets.base import NetsConfig, EGNN
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
 def make_proj_spline(
@@ -63,11 +63,11 @@ def make_proj_spline(
     else:
         raise NotImplementedError
 
-    equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
-                                   nets_config=nets_config,
-                                   n_equivariant_vectors_out=n_heads,
-                                   n_invariant_feat_out=n_invariant_feat_out,
-                                   zero_init_invariant_feat=False)
+    equivariant_fn = EGNN(name=f"layer_{layer_number}_swap{swap}",
+                          nets_config=nets_config,
+                          n_equivariant_vectors_out=n_heads,
+                          n_invariant_feat_out=n_invariant_feat_out,
+                          zero_init_invariant_feat=False)
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,

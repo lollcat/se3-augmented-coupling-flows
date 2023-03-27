@@ -28,11 +28,11 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
-    cfg.training.optimizer.init_lr = 2e-4
+    cfg.training.optimizer.init_lr = 1e-3
     cfg.training.batch_size = 16
     cfg.training.n_epoch = 200
     cfg.training.save = False
-    cfg.training.n_plots = 3
+    cfg.training.n_plots = 5
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
@@ -44,6 +44,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 2
     cfg.flow.act_norm = False
+
+    cfg.target.aux.trainable_augmented_scale = False
+    cfg.flow.base.aux.trainable_augmented_scale = False
+    cfg.flow.base.train_x_scale = False
 
 
     # Configure NNs

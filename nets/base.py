@@ -40,19 +40,26 @@ def build_torso(name: str, config: NetsConfig, n_vectors_out: int) -> Equivarian
     return torso
 
 
-def build_egnn_fn(
+class EGNN(hk.Module):
+    def __init__(
+        self,
         name: str,
         nets_config: NetsConfig,
         zero_init_invariant_feat: bool,
         n_invariant_feat_out: int,
         n_equivariant_vectors_out: int,
                   ):
-    """Adds a head to the relevant EGNN to output the desired equivariant vectors & invariant scalars."""
-    h_out = n_invariant_feat_out != 0
-    n_invariant_feat_out = max(1, n_invariant_feat_out)
+        super().__init__(name=name)
+        self.name = name
+        self.nets_config = nets_config
+        self.zero_init_invariant_feat = zero_init_invariant_feat
+        self.h_out = n_invariant_feat_out != 0
+        self.n_invariant_feat_out = max(1, n_invariant_feat_out)
+        self.n_equivariant_vectors_out = n_equivariant_vectors_out
 
 
-    def egnn_forward_single(
+    def call_single(
+            self,
             x: chex.Array,
             h: chex.Array,
             senders: chex.Array,
@@ -60,24 +67,25 @@ def build_egnn_fn(
         chex.assert_rank(x, 2)
         chex.assert_rank(h, 2)
         assert h.shape[0] == x.shape[0]  # n_nodes
-        torso = build_torso(name, nets_config, n_equivariant_vectors_out)
+        torso = build_torso(self.name, self.nets_config, self.n_equivariant_vectors_out)
         vectors, h = torso(x, h, senders, receivers)
 
-        if vectors.shape[1] != n_equivariant_vectors_out:
-            if nets_config.type == 'egnn':
+        if vectors.shape[1] != self.n_equivariant_vectors_out:
+            if self.nets_config.type == 'egnn':
                 raise Exception("EGNN not configured for this to be different")
             vectors = e3nn.IrrepsArray("1x1o", vectors)
             vectors = vectors.axis_to_mul(axis=-2)  # [n_nodes, n_vectors*dim]
 
-            vectors = e3nnLinear(e3nn.Irreps(f"{n_equivariant_vectors_out}x1o"),
+            vectors = e3nnLinear(e3nn.Irreps(f"{self.n_equivariant_vectors_out}x1o"),
                                  biases=True)(vectors)  # [n_nodes, n_equivariant_vectors_out*dim]
             vectors = vectors.mul_to_axis().array
 
-        h = hk.Linear(n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
-            if zero_init_invariant_feat else hk.Linear(n_invariant_feat_out)(h)
+        h = hk.Linear(self.n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
+            if self.zero_init_invariant_feat else hk.Linear(self.n_invariant_feat_out)(h)
         return vectors, h
 
-    def egnn_forward(
+    def __call__(
+            self,
             positions: chex.Array,
             features: chex.Array
     ):
@@ -95,24 +103,22 @@ def build_egnn_fn(
         if len(positions.shape) == 3:
             positions_flat, features_flat, senders, receivers = \
                 get_pos_feat_send_receive_flattened_over_multiplicity(positions, features)
-            vectors, scalars = egnn_forward_single(positions_flat, features_flat, senders, receivers)
+            vectors, scalars = self.call_single(positions_flat, features_flat, senders, receivers)
             vectors, scalars = unflatten_vectors_scalars(vectors, scalars, n_nodes, multiplicity, dim)
         else:
             batch_size = positions.shape[0]
             if features.shape[0] != batch_size:
                 chex.assert_rank(features, 3)
-                features = jnp.repeat(features[None, ...], batch_size)
+                features = jnp.repeat(features[None, ...], batch_size, axis=0)
 
             positions_flat, features_flat, senders, receivers = \
                 jax.vmap(get_pos_feat_send_receive_flattened_over_multiplicity)(positions, features)
-            vectors, scalars = jax.vmap(egnn_forward_single)(positions_flat, features_flat, senders, receivers)
+            vectors, scalars = hk.vmap(self.call_single, split_rng=False)(positions_flat, features_flat, senders,
+                                                                          receivers)
             vectors, scalars = jax.vmap(unflatten_vectors_scalars, in_axes=(0, 0, None, None, None))(
                 vectors, scalars, n_nodes, multiplicity, dim)
-        if h_out:
+        if self.h_out:
             return vectors, scalars
         else:
             return vectors
-
-
-    return egnn_forward
 

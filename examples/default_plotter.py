@@ -75,6 +75,7 @@ def make_default_plotter(
 
     def default_plotter(state: TrainingState, key: chex.PRNGKey) -> dict:
         # Plot interatomic distance histograms.
+        key = jax.random.PRNGKey(0)
         counts_flow_x, counts_flow_a, counts_flow_a_minus_x, counts_targ_a, counts_targ_a_minus_x = \
             get_data_for_plotting(state, key)
 

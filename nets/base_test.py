@@ -4,7 +4,7 @@ import haiku as hk
 import chex
 
 from flow.test_utils import get_minimal_nets_config
-from nets.base import build_egnn_fn
+from nets.base import EGNN
 
 def test_net_does_not_smoke(type="egnn"):
     nets_config = get_minimal_nets_config(type=type)
@@ -18,12 +18,12 @@ def test_net_does_not_smoke(type="egnn"):
     @hk.without_apply_rng
     @hk.transform
     def forward(positions, features):
-        vectors, scalars = build_egnn_fn('dogfish',
-                             nets_config=nets_config,
-                             zero_init_invariant_feat=zero_init_invariant_feat,
-                             n_invariant_feat_out = n_invariant_feat_out,
-                             n_equivariant_vectors_out = n_equivariant_vectors_out,
-                             )(positions, features)
+        vectors, scalars = EGNN('dogfish',
+                                nets_config=nets_config,
+                                zero_init_invariant_feat=zero_init_invariant_feat,
+                                n_invariant_feat_out = n_invariant_feat_out,
+                                n_equivariant_vectors_out = n_equivariant_vectors_out,
+                                )(positions, features)
         return vectors, scalars
 
 

@@ -2,7 +2,7 @@ import distrax
 import jax.numpy as jnp
 import haiku as hk
 
-from nets.base import build_egnn_fn, NetsConfig
+from nets.base import EGNN, NetsConfig
 from flow.distrax_with_extra import SplitCouplingWithExtra
 
 
@@ -22,11 +22,11 @@ def make_se_equivariant_nice(graph_features,
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
     assert n_aug % 2 == 1
 
-    equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
-                                   nets_config=nets_config,
-                                   n_equivariant_vectors_out=1,
-                                   n_invariant_feat_out=0,
-                                   zero_init_invariant_feat=False)
+    equivariant_fn = EGNN(name=f"layer_{layer_number}_swap{swap}",
+                          nets_config=nets_config,
+                          n_equivariant_vectors_out=1,
+                          n_invariant_feat_out=0,
+                          zero_init_invariant_feat=False)
 
     # Used to for zero initialisation.
     get_scaling_weight_fn = lambda: hk.get_parameter(
