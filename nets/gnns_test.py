@@ -7,7 +7,7 @@ from flow.test_utils import get_minimal_nets_config
 from nets.base import EGNN
 from flow.test_utils import test_fn_is_invariant, test_fn_is_equivariant
 
-def test_net_does_not_smoke(type="egnn"):
+def test_net_does_not_smoke(type="egnn_v0"):
     nets_config = get_minimal_nets_config(type=type)
     zero_init_invariant_feat = False
     n_invariant_feat_out = 5

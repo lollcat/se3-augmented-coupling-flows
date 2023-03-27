@@ -36,7 +36,12 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: egnn # egnn or e3gnn
+    type: egnn_v0 # egnn_v0 or egnn or e3gnn
+    egnn_v0:
+      name: egnn_v0
+      n_blocks: 3 # number of layers
+      mlp_units: [ 128, 128 ]
+      n_invariant_feat_hidden: 128
     egnn:
       name: egnn
       n_blocks: 3 # number of layers

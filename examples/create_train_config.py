@@ -17,7 +17,7 @@ from molboil.train.train import TrainConfig
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig
+from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig, EGNNTorsoConfig_v0
 from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
@@ -87,12 +87,14 @@ def create_nets_config(nets_config: DictConfig):
     """Configure nets (MACE, EGNN, Transformer, MLP)."""
     nets_config = dict(nets_config)
     egnn_cfg = EGNNTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
+    egnn_v0_cfg = EGNNTorsoConfig_v0(**dict(nets_config.pop("egnn_v0"))) if "egnn_v0" in nets_config.keys() else None
     e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
     mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
                                                                              nets_config.keys() else None
     type = nets_config['type']
     nets_config = NetsConfig(type=type,
                              egnn_torso_config=egnn_cfg,
+                             egnn_v0_torso_config=egnn_v0_cfg,
                              e3gnn_torso_config=e3gnn_config,
                              mlp_head_config=mlp_head_config)
     return nets_config
