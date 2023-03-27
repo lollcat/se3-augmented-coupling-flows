@@ -5,7 +5,7 @@ import distrax
 import jax
 import jax.numpy as jnp
 
-from utils.numerical import vector_rejection, safe_norm
+from utils.numerical import vector_rejection, safe_norm, rotate_2d
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
 BijectorParams = chex.Array
@@ -53,8 +53,8 @@ def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: b
         y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
     else:
-        # Vector rejection with arbitrary vector and z-basis vector to get the other axis.
-        y_basis_vector = vector_rejection(jnp.ones_like(z_basis_vector), z_basis_vector)
+        assert dim == 2
+        y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
         y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
         change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
