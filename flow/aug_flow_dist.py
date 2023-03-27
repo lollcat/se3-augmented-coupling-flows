@@ -58,6 +58,21 @@ def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions,
     features = jnp.squeeze(joint_sample.features, axis=-2)
     return features, positions_x, positions_a
 
+def get_base_and_target_info(params: AugmentedFlowParams) -> dict:
+    info = {}
+    if params.base:
+        if "x_log_scale" in params.base["~"]:
+            info.update(base_x_scale=jnp.exp(params.base["~"]["x_log_scale"]))
+        if 'augmented_log_scale' in params.base["~"]:
+            scale = jnp.exp(params.base["~"]['augmented_log_scale'])
+            for i in range(scale.shape[0]):
+                info.update({f"base_augmented_scale{i}": scale[i]})
+    if params.aux_target:
+        target_scale = jnp.exp(params.aux_target['~']['target_augmented_scale_logit'])
+        for i in range(target_scale.shape[0]):
+            info.update({f"target_augmented_scale{i}": target_scale[i]})
+    return info
+
 
 class AugmentedFlow(NamedTuple):
     init: Callable[[chex.PRNGKey, FullGraphSample], AugmentedFlowParams]
@@ -74,6 +89,7 @@ class AugmentedFlow(NamedTuple):
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
     separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample] = separate_samples_to_full_joint
     joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]] = joint_to_separate_samples
+    get_base_and_target_info: Callable[[AugmentedFlowParams], dict] = get_base_and_target_info
 
 
 
@@ -105,7 +121,6 @@ def create_flow(recipe: AugmentedFlowRecipe):
     @hk.without_apply_rng
     @hk.transform
     def base_log_prob_fn(sample: FullGraphSample) -> LogProb:
-        # TODO: see base_sample_fn.
         return recipe.make_base().log_prob(value=sample.positions)
 
     @hk.without_apply_rng

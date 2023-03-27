@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from flow.test_utils import test_fn_is_invariant, rotate_translate_x_and_a_3d, rotate_translate_x_and_a_2d
 from flow.test_utils import get_minimal_nets_config
-from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig
+from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
@@ -29,8 +29,8 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     n_nodes = _N_NODES
     batch_size = 5
     key = jax.random.PRNGKey(0)
-    base_aux_config = ConditionalAuxDistConfig(global_centering=False, trainable_augmented_scale=True)
-    target_aux_config = base_aux_config
+    base_aux_config = BaseConfig()
+    target_aux_config = ConditionalAuxDistConfig(trainable_augmented_scale=False)
 
 
     config = FlowDistConfig(
@@ -40,7 +40,7 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
         type=_FLOW_TYPE,
         compile_n_unroll=2,
         nets_config=get_minimal_nets_config('egnn'),
-        base_aux_config=base_aux_config,
+        base=base_aux_config,
         target_aux_config=target_aux_config,
         n_aug=n_aug
     )
@@ -56,6 +56,8 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     params = flow.init(subkey, dummy_samples)
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
+
+    info = flow.get_base_and_target_info(params)
 
     # Test aux-target distribution.
     key, subkey = jax.random.split(key)
@@ -122,12 +124,61 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
 
+def test_target_reparam(dim: int = 3, n_aug: int = 3):
+    """Visualise samples from the distribution, and check that it's log prob is invariant to
+    translation and rotation."""
+    if jnp.ones(()).dtype == jnp.float64:
+        rtol = 1e-5
+    else:
+        rtol = 1e-4
+
+    n_nodes = _N_NODES
+    batch_size = 5
+    key = jax.random.PRNGKey(0)
+    base_aux_config = BaseConfig()
+    target_aux_config = ConditionalAuxDistConfig(trainable_augmented_scale=True)
+
+
+    config = FlowDistConfig(
+        dim=dim, n_layers=_N_FLOW_LAYERS,
+        nodes=_N_NODES,
+        identity_init=_IDENTITY_INIT,
+        type=_FLOW_TYPE,
+        compile_n_unroll=2,
+        nets_config=get_minimal_nets_config('egnn'),
+        base=base_aux_config,
+        target_aux_config=target_aux_config,
+        n_aug=n_aug
+    )
+
+    flow = build_flow(config)
+
+
+    # Init params.
+    key, subkey = jax.random.split(key)
+    dummy_samples = FullGraphSample(positions=jax.random.normal(subkey, (batch_size, n_nodes, dim)),
+                                    features=jnp.zeros((batch_size, n_nodes, _FEATURE_DIM)))
+    key, subkey = jax.random.split(key)
+    params = flow.init(subkey, dummy_samples)
+
+    def dummy_loss(params, key):
+        samples = flow.aux_target_sample_n_apply(params, dummy_samples, key, 2)
+        return jnp.sum(samples)
+
+    print(jax.grad(dummy_loss)(params.aux_target, key))
+    pass
+
+
+
+
 
 if __name__ == '__main__':
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
         config.update("jax_enable_x64", True)
+
+    test_target_reparam(dim=3)
 
 
     test_distribution(dim=3)

@@ -11,10 +11,11 @@ from nets.en_gnn import en_gnn_net, MultiEgnnConfig, EgnnTorsoConfig
 def test_equivariant_fn(dim: int = 2, n_nodes: int = 8, batch_size: int = 3,
                         n_heads: int = 2):
     """Run the EGNN forward pass, and check that it is equivariant."""
-    eggn_config = EgnnTorsoConfig(mlp_units=(16,), identity_init_x=False, n_layers=2,
+    eggn_config = EgnnTorsoConfig(mlp_units=(16,)
+                                  , n_layers=2,
                                   zero_init_h=False,
-                                  h_embedding_dim=3, h_linear_softmax=True,
-                                  hk_layer_stack=False)
+                                  h_embedding_dim=3,
+                                  h_linear_softmax=True)
     multi_x_config = MultiEgnnConfig(
         name="multi_x_egnn",
         n_equivariant_vectors_out=n_heads,

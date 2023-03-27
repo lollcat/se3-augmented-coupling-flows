@@ -13,13 +13,14 @@ def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
         return shift
     return conditioner
 
+
 def make_se_equivariant_nice(graph_features,
                              layer_number,
                              dim: int,
-                             n_aux: int,
+                             n_aug: int,
                              swap, nets_config: NetsConfig, identity_init: bool = True):
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
-    assert n_aux % 2 == 1
+    assert n_aug % 2 == 1
 
     equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
                                    nets_config=nets_config,
@@ -39,8 +40,8 @@ def make_se_equivariant_nice(graph_features,
     conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn,
                                    graph_features=graph_features)
     return SplitCouplingWithExtra(
-        split_index=(n_aux + 1)//2,
-        event_ndims=3,  # [n_var_groups, nodes, dim]
+        split_index=(n_aug + 1) // 2,
+        event_ndims=3,  # [nodes, n_aug+1, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
         swap=swap,

@@ -14,6 +14,8 @@ target:
 flow:
   n_aug: 1
   base:
+    train_x_scale: true
+    x_scale_init: 1.0
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
@@ -22,65 +24,30 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: proj  # vector_scale_shift  vector_scale nice proj
-  act_norm: false
+  type: proj_rnvp #  nice proj_rnvp  proj_spline
   kwargs:
-    proj:
-      global_frame: false
-      process_flow_params_jointly: false
-      condition_on_x_proj: true
-      gram_schmidt: false
-      add_small_identity: false
+    proj_rnvp:
+      origin_on_coupled_pair: false
+    proj_spline:
+      origin_on_coupled_pair: false
+      num_bins: 8
+      lower: -2.
+      upper: 2.
+  act_norm: false
   compile_n_unroll: 1
   nets:
-    type: mace # mace or egnn or e3transformer or e3gnn
-    e3gnn:
-      n_blocks: 3
-      mlp_units: [ 64, 64 ]
-      n_vec_hidden_per_vec_in: 1
-      n_invariant_feat_hidden: 64
-      sh_irreps_max_ell: 2
-      get_shifts_via_tensor_product: true
-      use_e3nn_haiku: false
-    e3transformer:
-      n_blocks: 3
-      mlp_units: [32, 32]
-      n_vectors_hidden: 8
-      n_invariant_feat_hidden: 16
-      bessel_number: 10  # Number of bessel functions.
-      r_max: 10.
-      raw_distance_in_radial_embedding: true
-      node_feat_as_edge_feat: true
-    mace:
-      n_vec_residual_per_vec_in: 1
-      n_invariant_feat_residual: 64
-      n_vectors_hidden_readout_block: 16
-      n_invariant_hidden_readout_block: 64
-      hidden_irreps: 64x0e+64x1o
-      max_ell: 3
-      num_layers: 2
-      correlation: 3
-      interaction_mlp_depth: 3
-      interaction_mlp_width: 64
-      residual_mlp_width: 64
-      residual_mlp_depth: 1
+    type: egnn # mace or egnn or e3transformer or e3gnn
     egnn:
-      mlp_units: [64,64]
+      mlp_units: [128,128]
       n_layers: 3
       normalize_by_norms: true
       variance_scaling_init: 0.001
       agg: mean
       normalization_constant: 1.0
       h_linear_softmax: true
-      h_embedding_dim: 64
-    transformer: # for proj flow
-      mlp_units: [64,64]
-      num_heads: 6
-      key_size: 16
-      w_init_scale: 0.1
-      n_layers: 3
+      h_embedding_dim: 128
     mlp_head_config:
-      mlp_units: [ 64, 64 ]
+      mlp_units: [ 128, 128 ]
 
 
 training:
@@ -88,7 +55,7 @@ training:
     init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 6e-4 # can be null
+    peak_lr: 6e-4
     end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
@@ -106,15 +73,16 @@ training:
   save: true
   save_dir: qm9pos_results
   use_flow_aux_loss: true
-  aux_loss_weight: 1.0
+  aux_loss_weight: 10.0
   last_iter_info_only: true
+  debug: false
 
 logger:
 #  list_logger: null
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size}_naug${flow.n_aug} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size}_naug${flow.n_aug}_trainabletarg${target.aux.trainable_augmented_scale}_actnorm${flow.act_norm}_ExtraFat # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]
