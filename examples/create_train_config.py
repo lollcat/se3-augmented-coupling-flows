@@ -14,6 +14,7 @@ from functools import partial
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 from molboil.train.train import TrainConfig
+from molboil.utils.eval import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -206,6 +207,8 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                     batch_size=cfg.training.batch_size)
             return eval_info
 
+    plot_and_eval_fn = get_eval_and_plot_fn(evaluation_fn, plotter)
+
 
     return TrainConfig(
         n_iteration=cfg.training.n_epoch,
@@ -213,11 +216,9 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,
         n_eval=cfg.training.n_eval,
-        n_plot=cfg.training.n_plots,
-        plotter=plotter,
         init_state=init_fn,
         update_state=update_fn,
-        eval_state=evaluation_fn,
+        plot_and_eval_fn=plot_and_eval_fn,
         save=cfg.training.save,
         save_dir=save_path,
         use_64_bit=cfg.training.use_64_bit

@@ -66,9 +66,8 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  n_plots: 10
   n_checkpoints: 0
-  n_eval: 20
+  n_eval: 15
   K_marginal_log_lik: 20
   save: true
   save_dir: qm9pos_results

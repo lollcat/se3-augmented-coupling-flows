@@ -68,7 +68,6 @@ training:
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_plots: 6
   n_checkpoints: 2
   n_eval: 10
   K_marginal_log_lik: 20
