@@ -82,7 +82,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             bijectors.append(bijector)
 
         if config.n_aug > 1:
-            bijectors.append(AugPermuteBijector())
+            bijectors.append(AugPermuteBijector(aug_only=False))
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.

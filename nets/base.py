@@ -92,13 +92,13 @@ class EGNN(hk.Module):
         n_nodes, multiplicity, dim = positions.shape[-3:]
         if features.shape[-2] != multiplicity:
             # Add multiplicity axis, and feature encoding.
-            chex.assert_axis_dimension(features, 1, 1)
+            chex.assert_axis_dimension(features, -2, 1)
             multiplicity_encoding = hk.get_parameter(
                 f'multiplicity_encoding', shape=(multiplicity,),
                 init=hk.initializers.TruncatedNormal(stddev=1. / np.sqrt(multiplicity)))
-            features = jnp.concatenate([jnp.concatenate([features,
-                                                         jnp.ones((n_nodes, 1, 1))*multiplicity_encoding[i]], axis=-1)
-                        for i in range(multiplicity)], axis=1)
+            features = jnp.concatenate([jnp.concatenate([
+                features, jnp.ones((*features.shape[:-2], 1, 1))*multiplicity_encoding[i]], axis=-1)
+                        for i in range(multiplicity)], axis=-2)
 
         if len(positions.shape) == 3:
             positions_flat, features_flat, senders, receivers = \

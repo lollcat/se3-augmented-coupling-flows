@@ -7,7 +7,8 @@ from flow.distrax_with_extra import BijectorWithExtra
 
 
 class AugPermuteBijector(BijectorWithExtra):
-    def __init__(self):
+    def __init__(self, aug_only: bool = False):
+        self.aug_only = aug_only
         super().__init__(event_ndims_in=3, is_constant_jacobian=True)
 
     def _split(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
@@ -20,9 +21,12 @@ class AugPermuteBijector(BijectorWithExtra):
 
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
-        orig, aug = self._split(x)
-        aug = jnp.roll(aug, shift=1, axis=-2)
-        y = self._recombine(orig, aug)
+        if self.aug_only:
+            orig, aug = self._split(x)
+            aug = jnp.roll(aug, shift=1, axis=-2)
+            y = self._recombine(orig, aug)
+        else:
+            y = jnp.roll(x, shift=1, axis=-2)
         return y
     def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
         """Computes log|det J(f)(x)|."""
@@ -35,9 +39,12 @@ class AugPermuteBijector(BijectorWithExtra):
 
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
-        orig, aug = self._split(y)
-        aug = jnp.roll(aug, shift=-1, axis=-2)
-        x = self._recombine(orig, aug)
+        if self.aug_only:
+            orig, aug = self._split(y)
+            aug = jnp.roll(aug, shift=-1, axis=-2)
+            x = self._recombine(orig, aug)
+        else:
+            x = jnp.roll(y, shift=-1, axis=-2)
         return x
 
     def inverse_log_det_jacobian(self, y: chex.Array) -> chex.Array:
