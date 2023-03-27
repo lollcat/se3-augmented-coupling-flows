@@ -15,33 +15,9 @@ from openmmtools.testsystems import AlanineDipeptideVacuum
 from boltzgen.flows import CoordinateTransform
 import torch
 
-from target.alanine_dipeptide import get_atom_encoding
+from molboil.targets.data import load_aldp
+
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from examples.lj13 import to_local_config
-
-
-def load_dataset(batch_size, train_data_n_points = None, test_data_n_points = None,
-                 path_train='target/data/aldp_500K_train_mini.h5',
-                 path_test='target/data/aldp_500K_test_mini.h5') -> \
-        Tuple[FullGraphSample, FullGraphSample]:
-    train_traj = mdtraj.load(path_train)
-    test_traj = mdtraj.load(path_test)
-    features = get_atom_encoding(train_traj)
-
-    positions_train = train_traj.xyz
-    positions_test = test_traj.xyz
-    if train_data_n_points is not None:
-        positions_train = positions_train[:train_data_n_points]
-    positions_train = positions_train[:positions_train.shape[0] - (positions_train.shape[0] % batch_size)]
-    if test_data_n_points is not None:
-        positions_test = positions_test[:test_data_n_points]
-
-    train_data = FullGraphSample(positions=positions_train,
-                           features=jnp.repeat(features[None, :], positions_train.shape[0], axis=0))
-    test_data = FullGraphSample(positions=positions_test,
-                          features=jnp.repeat(features[None, :], positions_test.shape[0], axis=0))
-    return train_data, test_data
-
 
 def custom_aldp_plotter(params: AugmentedFlowParams,
                     flow: AugmentedFlow,
@@ -299,17 +275,15 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
-    local_config = False
-    if local_config:
-        cfg = to_local_config(cfg)
+    plotter = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
+    def load_dataset(train_set_size: int, val_set_size: int):
+        return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
+                         train_n_points=train_set_size, val_n_points=val_set_size)
 
-    custom_aldp_plotter_ = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
-    load_dataset_ = partial(load_dataset, path_train=cfg.target.data.train,
-                            path_test=cfg.target.data.test)
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
-                                            load_dataset=load_dataset_,
-                                            plotter=custom_aldp_plotter_)
-    #experiment_config.plotter = custom_aldp_plotter
+                                            load_dataset=load_dataset,
+                                            plotter=plotter)
+
     train(experiment_config)
 
 

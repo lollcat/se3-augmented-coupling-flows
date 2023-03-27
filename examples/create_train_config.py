@@ -154,7 +154,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                                               total_n_epoch=cfg.training.n_epoch)
 
 
-    if plotter is None:
+    if plotter is None and eval_and_plot_fn is None:
         plotter = make_default_plotter(train_data,
                                        test_data,
                                        flow=flow,
@@ -196,7 +196,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                 params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
         return TrainingState(params, opt_state, key), info
 
-    if evaluation_fn is None:
+    if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
