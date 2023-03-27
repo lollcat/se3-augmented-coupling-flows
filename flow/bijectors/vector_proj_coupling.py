@@ -135,7 +135,7 @@ class VectorProjSplitCoupling(BijectorWithExtra):
                             log_det_unconstrained_rv + log_det_norm_fwd + log_det_norm_rv
             chex.assert_shape(log_det_total, ())
         y2 = x2
-        return self._recombine(x1, y2), log_det_total
+        return self._recombine(x1, y2), log_det_total*dim
 
     def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
@@ -161,7 +161,7 @@ class VectorProjSplitCoupling(BijectorWithExtra):
                             log_det_unconstrained_rv  + log_det_norm_fwd + log_det_norm_rv
             chex.assert_shape(log_det_total, ())
         x2 = y2
-        return self._recombine(y1, x2), log_det_total
+        return self._recombine(y1, x2), log_det_total*dim
 
     def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
