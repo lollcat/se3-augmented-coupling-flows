@@ -59,7 +59,7 @@ class EGNN(hk.Module):
         n_invariant_feat_out: int,
         n_equivariant_vectors_out: int,
                   ):
-        super().__init__(name=name)
+        super().__init__(name="EGNN_module" + name)
         self.name = name
         self.nets_config = nets_config
         self.zero_init_invariant_feat = zero_init_invariant_feat

@@ -28,21 +28,21 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
-    cfg.training.optimizer.init_lr = 1e-3
+    cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
     cfg.training.n_epoch = 200
     cfg.training.save = False
     cfg.training.n_plots = 5
     cfg.training.n_eval = 10
-    cfg.training.plot_batch_size = 32
+    cfg.training.plot_batch_size = 64
     cfg.training.K_marginal_log_lik = 2
     cfg.logger = DictConfig({"list_logger": None})
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['nice']
+    cfg.flow.type = ['vector_proj']
     cfg.flow.n_aug = 1
-    cfg.flow.n_layers = 2
+    cfg.flow.n_layers = 3
     cfg.flow.act_norm = False
 
     cfg.target.aux.trainable_augmented_scale = False

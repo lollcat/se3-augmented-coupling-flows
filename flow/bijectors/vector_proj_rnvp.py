@@ -1,5 +1,3 @@
-from typing import Tuple, Optional, Callable
-
 import chex
 import distrax
 import numpy as np
@@ -8,9 +6,12 @@ import haiku as hk
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerMLP
-from flow.bijectors.proj_coupling import ProjSplitCoupling
+from flow.bijectors.vector_proj_coupling import VectorProjSplitCoupling
 
-def make_proj_realnvp(
+
+
+
+def make_vector_proj_realnvp(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -18,31 +19,44 @@ def make_proj_realnvp(
         swap: bool,
         nets_config: NetsConfig,
         identity_init: bool = True,
-        origin_on_coupled_pair: bool = True,
         add_small_identity: bool = True,
-        ) -> ProjSplitCoupling:
+        n_vectors: int = 1,
+        transform_type = 'real_nvp',
+        ) -> VectorProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
     base_name = f"layer_{layer_number}_swap{swap}"
 
-    n_heads = dim - 1 if origin_on_coupled_pair else dim
-    n_invariant_params = dim * 2 * ((n_aug + 1) // 2)
 
-    def bijector_fn(params: chex.Array) -> distrax.ScalarAffine:
+    n_invariant_params = ((n_aug + 1) // 2)
+    if transform_type == 'real_nvp':
+        params_per_dim = 2
+    elif transform_type == 'spline':
+        raise NotImplementedError  # TODO
+    else:
+        raise NotImplementedError
+    n_invariant_params = n_invariant_params * params_per_dim
+
+
+    def bijector_fn(params: chex.Array, vector_index: int) -> distrax.ScalarAffine:
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
         mlp_function = ConditionerMLP(
-            name=f"conditionermlp_cond_mlp_" + base_name,
+            name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             identity_init=identity_init,
             n_output_params=n_invariant_params,
-        )
+                                      )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim*2))
-        log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-        return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, params_per_dim))
+        if transform_type == 'real_nvp':
+            log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
+            chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
+            return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+        else:
+            raise NotImplementedError
 
 
     if nets_config.type == "egnn":
@@ -56,15 +70,14 @@ def make_proj_realnvp(
 
     equivariant_fn = EGNN(name=base_name,
                           nets_config=nets_config,
-                          n_equivariant_vectors_out=n_heads,
+                          n_equivariant_vectors_out=n_vectors,
                           n_invariant_feat_out=n_invariant_feat_out,
                           zero_init_invariant_feat=False)
 
-    return ProjSplitCoupling(
+    return VectorProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
         event_ndims=3,  # [nodes, n_aug+1, dim]
-        origin_on_coupled_pair=origin_on_coupled_pair,
-        get_basis_vectors_and_invariant_vals=equivariant_fn,
+        get_reference_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
