@@ -26,7 +26,9 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                 n_aug=n_aux,
                 swap=swap,
                 identity_init=False,
-                nets_config=nets_config)
+                nets_config=nets_config,
+                add_small_identity=False
+            )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow

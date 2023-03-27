@@ -18,6 +18,7 @@ def make_proj_realnvp(
         nets_config: NetsConfig,
         identity_init: bool = True,
         origin_on_coupled_pair: bool = True,
+        add_small_identity: bool = True,
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -68,5 +69,6 @@ def make_proj_realnvp(
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-2
+        split_axis=-2,
+        add_small_identity=add_small_identity
     )

@@ -26,7 +26,7 @@ def unproject(x, origin, change_of_basis_matrix):
 
 
 
-def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = False) -> chex.Array:
+def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True) -> chex.Array:
     """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
     vectors as it's columns."""
 
@@ -71,7 +71,9 @@ class ProjSplitCoupling(BijectorWithExtra):
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  origin_on_coupled_pair: bool = True,
                  swap: bool = False,
-                 split_axis: int = -1):
+                 split_axis: int = -1,
+                 add_small_identity: bool = True,
+                 ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
           raise ValueError(
@@ -93,6 +95,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         self._split_axis = split_axis
         self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
         self._graph_features = graph_features
+        self._add_small_identity = add_small_identity
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -142,7 +145,8 @@ class ProjSplitCoupling(BijectorWithExtra):
             vectors = vectors_out[:, :, 1:]
         # jax.vmap(get_directions_for_closest_atoms, in_axes=(1, None), out_axes=1)(x, vectors.shape[2])
         # Vmap over multiplicity.
-        change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=1, out_axes=1)(vectors)
+        change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1)(
+            vectors, self._add_small_identity)
 
         # Stack h, and x projected into the space.
         x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
