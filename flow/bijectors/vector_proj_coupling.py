@@ -48,7 +48,7 @@ class VectorProjSplitCoupling(BijectorWithExtra):
 
     @property
     def norm_to_unconstrained_bijector(self):
-        return distrax.Block(distrax.Inverse(tfp.bijectors.Exp()), 3)
+        return distrax.Block(distrax.Inverse(tfp.bijectors.Softplus(low=1e-3)), 3)
 
 
     def dist_to_norm_and_log_det(self, difference: Array) -> Tuple[Array, Array]:
