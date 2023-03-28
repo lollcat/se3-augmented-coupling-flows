@@ -2,28 +2,33 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
-from nets.base import NetsConfig, TransformerConfig, EgnnTorsoConfig, MLPHeadConfig, MACETorsoConfig, E3GNNTorsoConfig
+from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d, param_count
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig_v0
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
-def get_minimal_nets_config(type = 'egnn'):
+def get_minimal_nets_config(type = 'e3gnn'):
     nets_config = NetsConfig(type=type,
-                             mace_torso_config=MACETorsoConfig(
-                                 n_vec_residual_per_vec_in=1,
-                                 n_invariant_feat_residual=3,
-                                 n_vectors_hidden_readout_block=3,
-                                 n_invariant_hidden_readout_block=3,
-                                 hidden_irreps='4x0e+4x1o'
-                             ),
-                             egnn_torso_config=EgnnTorsoConfig(mlp_units=(3,), h_embedding_dim=5),
+                             egnn_torso_config=EGNNTorsoConfig(
+                                 n_blocks=2,
+                                 mlp_units=(4,),
+                                 multiplicity=2,
+                                 n_invariant_feat_hidden=3,
+                                 name='e3gnn_torso'),
+                             egnn_v0_torso_config=EGNNTorsoConfig_v0(
+                                    n_blocks=2,
+                                    mlp_units=(4,),
+                                    n_vectors_hidden=2,
+                                    n_invariant_feat_hidden=3,
+                                    name='e3gnn_v0_torso'),
                              e3gnn_torso_config=E3GNNTorsoConfig(
                                  n_blocks=2,
                                  mlp_units=(4,),
-                                 n_vec_hidden_per_vec_in=1,
-                                 n_invariant_feat_hidden=3),
+                                 n_vectors_hidden=2,
+                                 n_invariant_feat_hidden=3,
+                                 name='e3gnn_torso'
+                             ),
                              mlp_head_config=MLPHeadConfig((4,)),
-                             transformer_config=TransformerConfig()
                              )
     return nets_config
 
@@ -32,7 +37,7 @@ def get_pairwise_distances(x):
     return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
 
 
-def test_fn_is_equivariant(equivariant_fn, key, event_shape):
+def test_fn_is_equivariant(equivariant_fn, key, event_shape, translate: bool = True):
     dim = event_shape[-1]
     assert dim in (2, 3)
 
@@ -44,7 +49,7 @@ def test_fn_is_equivariant(equivariant_fn, key, event_shape):
 
     # Get rotated version of x_and_a.
     theta = jax.random.uniform(key2) * 2*jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,))
+    translation = jax.random.normal(key3, shape=(dim,)) * (1 if translate else 0)
     phi = jax.random.uniform(key4) * 2 * jnp.pi
 
     def group_action(x_and_a):
@@ -120,15 +125,19 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Initialise bijector parameters.
     params = bijector_forward.init(key, x_and_a)
+    print(f"bijector param count of {param_count(params)}")
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
     # Check inverse gives original `x_and_a`
+    magnitude_of_bijector = jnp.mean(jnp.linalg.norm(x_and_a_new - x_and_a, axis=-1))
     chex.assert_tree_all_finite(log_det_fwd)
     chex.assert_shape(log_det_fwd, ())
-    chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
+    chex.assert_trees_all_close((x_and_a - x_and_a_old)/magnitude_of_bijector,
+                                jnp.zeros_like(x_and_a),
+                                atol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
 
     # Test the transformation is equivariant.

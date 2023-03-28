@@ -3,8 +3,13 @@ from typing import List
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 
-from flow.aug_flow_dist import FullGraphSample
+
+def param_count(x: chex.ArrayTree) -> int:
+    """Count the number of parameters in a PyTree of parameters."""
+    return sum(np.prod(p.shape) for p in jax.tree_util.tree_leaves(x))
+
 
 def safe_norm(x: jnp.ndarray, axis: int = None, keepdims=False) -> jnp.ndarray:
     """nan-safe norm. Copied from mace-jax"""

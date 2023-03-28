@@ -14,7 +14,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # cfg.flow.nets.type = "e3gnn"
     cfg.flow.nets.egnn.mlp_units = (4,)
-    cfg.flow.nets.egnn.h_embedding_dim = 3
     cfg.flow.n_layers = 2
     cfg.training.batch_size = 4
 

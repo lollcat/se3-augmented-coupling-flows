@@ -1,6 +1,6 @@
 # Equivariant Augmented Normalizing Flows
 
-
+Equivariance looking broken for multiplicity. 
 
 # Overview of the repo
 - For blackjax we need `pip install blackjax-nightly` (latest version) otherwise we get errors.
@@ -12,6 +12,8 @@
 ListLogger that can may used if you don't want to use wandb.
 - `qmp.py` the whole folder is a copy and paste (with some small adjustments). The key file is `dataset.py` which 
 **MUST** be run before running `examples/qm9.py`.
+- We have to be very careful with haiku params, as the flow forward and reverse call the params in different orders. 
+Hence naming of modules is crucial. 
 
 
 ## Experiments
