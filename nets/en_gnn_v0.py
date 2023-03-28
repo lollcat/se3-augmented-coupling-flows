@@ -73,9 +73,10 @@ class EGCL(hk.Module):
         # Prepare the edge attributes.
         vectors = node_positions[receivers] - node_positions[senders]
         lengths = safe_norm(vectors, axis=-1, keepdims=False)
+        sq_lengths = lengths ** 2
 
         # build messages
-        edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], lengths], axis=-1)
+        edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], sq_lengths], axis=-1)
         m_ij = self.phi_e(edge_feat_in)
 
         # Get positional output
