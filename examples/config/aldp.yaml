@@ -37,7 +37,7 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: egnn # mace or egnn or e3transformer or e3gnn
+    type: egnn_v0 # mace or egnn or e3transformer or e3gnn
     egnn_v0:
       name: egnn_v0
       n_blocks: 3 # number of layers
