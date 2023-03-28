@@ -22,6 +22,9 @@ def make_vector_proj_realnvp(
         add_small_identity: bool = True,
         n_vectors: int = 1,
         transform_type = 'real_nvp',
+        num_bins: int = 4,
+        lower: float = -4.,
+        upper: float = 4.,
         ) -> VectorProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -32,13 +35,13 @@ def make_vector_proj_realnvp(
     if transform_type == 'real_nvp':
         params_per_dim = 2
     elif transform_type == 'spline':
-        raise NotImplementedError  # TODO
+        params_per_dim = (3 * num_bins + 1)
     else:
         raise NotImplementedError
     n_invariant_params = n_invariant_params * params_per_dim
 
 
-    def bijector_fn(params: chex.Array, vector_index: int) -> distrax.ScalarAffine:
+    def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
@@ -55,6 +58,9 @@ def make_vector_proj_realnvp(
             log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
             chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
             return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+        elif transform_type == 'spline':
+            params = params[:, :, None, :]
+            return distrax.RationalQuadraticSpline(params, lower, upper)
         else:
             raise NotImplementedError
 
