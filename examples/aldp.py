@@ -1,5 +1,6 @@
-from typing import Optional, List
+from typing import List
 
+import os
 from functools import partial
 import hydra
 from omegaconf import DictConfig
@@ -21,13 +22,16 @@ from flow.aug_flow_dist import FullGraphSample, AugmentedFlow
 from examples.create_train_config import create_train_config, create_flow_config
 from examples.configs import TrainingState
 
-def custom_aldp_plotter(state: TrainingState,
-                        key: chex.PRNGKey,
-                        flow: AugmentedFlow,
-                        train_data: FullGraphSample,
-                        test_data: FullGraphSample,
-                        n_samples: int,
-                        n_batches: int = 1) -> List[plt.Subplot]:
+def aldp_eval_and_plot_fn(state: TrainingState,
+                          key: chex.PRNGKey,
+                          iteration: int,
+                          save: bool,
+                          plots_dir: str,
+                          flow: AugmentedFlow,
+                          train_data: FullGraphSample,
+                          test_data: FullGraphSample,
+                          n_samples: int,
+                          n_batches: int = 1) -> List[plt.Subplot]:
 
     # Set up coordinate transform
     ndim = 66
@@ -63,36 +67,27 @@ def custom_aldp_plotter(state: TrainingState,
     params = state.params
     sample_fn = jax.jit(flow.sample_apply, static_argnums=3)
     separate_samples_fn = jax.jit(flow.joint_to_separate_samples)
-    aux_target_sample_n_apply_fn = jax.jit(flow.aux_target_sample_n_apply)
     positions_x = []
     internal_gen = []
     internal_test = []
-    positions_a = []
-    positions_a_target = []
     for i in range(n_batches):
         key, key_ = jax.random.split(key)
         joint_samples_flow = sample_fn(params, train_data.features[0], key_,
                                                                           (n_samples,))
-        _, positions_x_, positions_a_ = separate_samples_fn(joint_samples_flow)
+        _, positions_x_, _ = separate_samples_fn(joint_samples_flow)
         positions_x_torch = torch.tensor(np.array(positions_x_).reshape(-1, ndim),
                                          dtype=torch.float64)
         internal_gen_ = transform.inverse(positions_x_torch)[0].detach().numpy()
         positions_x.append(positions_x_)
-        positions_a.append(positions_a_)
         internal_gen.append(internal_gen_)
         if len(test_data.positions) > i * n_samples:
             key, key_ = jax.random.split(key)
             end = min((i + 1) * n_samples, len(test_data.positions))
-            positions_a_target_ = aux_target_sample_n_apply_fn(params.aux_target,
-                                                               test_data[(i * n_samples):end], key_)
             positions_x_torch = torch.tensor(np.array(test_data[(i * n_samples):end].positions).reshape(-1, ndim),
                                              dtype=torch.float64)
             internal_test_ = transform.inverse(positions_x_torch)[0].detach().numpy()
-            positions_a_target.append(positions_a_target_)
             internal_test.append(internal_test_)
     positions_x = jnp.concatenate(positions_x, axis=0)
-    positions_a = jnp.concatenate(positions_a, axis=0)
-    positions_a_target = jnp.concatenate(positions_a_target, axis=0)
     internal_gen = np.concatenate(internal_gen, axis=0)
     internal_test = np.concatenate(internal_test, axis=0)
 
@@ -117,6 +112,9 @@ def custom_aldp_plotter(state: TrainingState,
     htrain_psi, _ = np.histogram(psi_train, nbins, range=[-np.pi, np.pi], density=True);
     htest_psi, _ = np.histogram(psi_test, nbins, range=[-np.pi, np.pi], density=True);
     hgen_psi, _ = np.histogram(psi, nbins, range=[-np.pi, np.pi], density=True);
+
+    # Prepare output
+    info = {}
 
     # Plot phi and psi
     fig1, ax = plt.subplots(1, 2, figsize=(20, 10))
@@ -152,14 +150,13 @@ def custom_aldp_plotter(state: TrainingState,
     kld_test = np.sum(hist_ram_test * np.log((hist_ram_test + eps_ram)
                                              / (hist_ram_gen + eps_ram))) \
                * (2 * np.pi / nbins_ram) ** 2
+    info.update(kld_train=kld_train, kld_test=kld_test)
     fig2, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.hist2d(phi, psi, bins=nbins_ram, norm=mpl.colors.LogNorm(),
               range=[[-np.pi, np.pi], [-np.pi, np.pi]])
     ax.tick_params(axis='both', labelsize=20)
     ax.set_xlabel('$\phi$', fontsize=24)
     ax.set_ylabel('$\psi$', fontsize=24)
-    ax.set_title('KLD train: {:.2f}, KLD test: {:.2f}'.format(kld_train, kld_test),
-                 fontsize=24)
 
     # Internal coordinates
     ndim = internal_gen.shape[1]
@@ -227,7 +224,19 @@ def custom_aldp_plotter(state: TrainingState,
             ax[j // ncol, j % ncol].plot(x, hists_gen_list[i][:, j])
         figs_internal.append(fig)
 
-    return [fig1, fig2, *figs_internal]
+    # Plot or save figures
+    figures = [fig1, fig2, *figs_internal]
+    fig_names = ['phi_psi', 'ramachandran', 'bond', 'angle', 'dih']
+    for i, figure in enumerate(figures):
+        if save:
+            figure.savefig(
+                os.path.join(plots_dir, "%s_iter_%08i.png" % (fig_names[i], iteration))
+            )
+        else:
+            plt.show()
+        plt.close(figure)
+
+    return info
 
 
 
@@ -240,12 +249,12 @@ def run(cfg: DictConfig):
     train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
-    plotter = partial(custom_aldp_plotter, flow=flow, train_data=train_set, test_data=val_set,
+    eval_and_plot_fn = partial(aldp_eval_and_plot_fn, flow=flow, train_data=train_set, test_data=val_set,
                       n_samples=cfg.training.plot_batch_size, n_batches=cfg.eval.plot_n_batches)
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
-                                            plotter=plotter)
+                                            eval_and_plot_fn=eval_and_plot_fn)
 
     train(experiment_config)
 
