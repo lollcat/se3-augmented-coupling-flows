@@ -85,7 +85,7 @@ class EGCL(hk.Module):
 
         edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], sq_lengths], axis=-1)
 
-        if self.cross_multiplicty_node_feat or self.cross_multiplicity_shifts:
+        if (self.cross_multiplicty_node_feat or self.cross_multiplicity_shifts) and n_vectors > 1:
             senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
             cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
             n_cross_vectors = np.math.factorial(n_vectors)
@@ -116,7 +116,7 @@ class EGCL(hk.Module):
         vectors_out = shifts_i / avg_num_neighbours
         chex.assert_equal_shape((vectors_out, node_positions))
 
-        if self.cross_multiplicity_shifts:
+        if self.cross_multiplicity_shifts and n_vectors > 1:
             phi_cross_in = e3nn.scatter_sum(m_ij, dst=senders, output_size=n_nodes)  # [n_nodes, feat]
             phi_x_cross_out = self.phi_x_cross_torso(phi_cross_in)
             phi_x_cross_out = hk.Linear(
