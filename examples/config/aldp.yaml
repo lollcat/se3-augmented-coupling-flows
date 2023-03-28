@@ -77,6 +77,7 @@ training:
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
+  debug: false
 
 
 eval:

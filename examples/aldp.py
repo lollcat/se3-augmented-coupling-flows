@@ -16,17 +16,18 @@ import torch
 
 from molboil.targets.data import load_aldp
 from molboil.train.train import train
-from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from examples.create_train_config import create_train_config
+from flow.build_flow import build_flow
+from flow.aug_flow_dist import FullGraphSample, AugmentedFlow
+from examples.create_train_config import create_train_config, create_flow_config
+from examples.configs import TrainingState
 
-def custom_aldp_plotter(params: AugmentedFlowParams,
-                    flow: AugmentedFlow,
-                    key: chex.PRNGKey,
-                    n_samples: int,
-                    train_data: FullGraphSample,
-                    test_data: FullGraphSample,
-                    n_batches: int = 1,
-                    plotting_n_nodes: Optional[int] = None) -> List[plt.Subplot]:
+def custom_aldp_plotter(state: TrainingState,
+                        key: chex.PRNGKey,
+                        flow: AugmentedFlow,
+                        train_data: FullGraphSample,
+                        test_data: FullGraphSample,
+                        n_samples: int,
+                        n_batches: int = 1) -> List[plt.Subplot]:
 
     # Set up coordinate transform
     ndim = 66
@@ -59,6 +60,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
                                     mode="internal", ind_circ_dih=ind_circ_dih)
 
     # Generate samples
+    params = state.params
     sample_fn = jax.jit(flow.sample_apply, static_argnums=3)
     separate_samples_fn = jax.jit(flow.joint_to_separate_samples)
     aux_target_sample_n_apply_fn = jax.jit(flow.aux_target_sample_n_apply)
@@ -231,10 +233,15 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
-    plotter = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
                          train_n_points=train_set_size, val_n_points=val_set_size)[:2]
+
+    train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
+    flow_config = create_flow_config(cfg)
+    flow = build_flow(flow_config)
+    plotter = partial(custom_aldp_plotter, flow=flow, train_data=train_set, test_data=val_set,
+                      n_samples=cfg.training.plot_batch_size, n_batches=cfg.eval.plot_n_batches)
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
