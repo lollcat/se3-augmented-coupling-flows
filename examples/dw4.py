@@ -51,7 +51,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Configure NNs
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
-    cfg.flow.nets.egnn.mlp_units = (8,)
+    cfg.flow.nets.egnn_v0.mlp_units = (8,)
+    cfg.flow.nets.egnn_v0.n_blocks = 2
 
     debug = False
     if debug:
