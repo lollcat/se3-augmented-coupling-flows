@@ -19,7 +19,7 @@ class VectorProjSplitCoupling(BijectorWithExtra):
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
-                 split_axis: int = -1,
+                 split_axis: int = -2,
                  add_small_identity: bool = True,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
@@ -104,12 +104,14 @@ class VectorProjSplitCoupling(BijectorWithExtra):
             chex.assert_equal_shape((x1, reference_point))
             vector = x2 - reference_point
             norm_in = safe_norm(vector, axis=-1, keepdims=True)
+            log_det_norm_in = - (dim - 1) * jnp.sum(jnp.log(norm_in))
             unit_vector = vector / norm_in
             norm_out, logdet_inner_bijector = \
                 self._inner_bijector(bijector_feat_in, i).forward_and_log_det(norm_in)
             chex.assert_equal_shape((norm_in, norm_out))
             x2 = reference_point + norm_out * unit_vector
-            log_det_total = log_det_total + logdet_inner_bijector
+            log_det_norm_out = (dim - 1) * jnp.sum(jnp.log(norm_out))
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_in + log_det_norm_out
             chex.assert_shape(log_det_total, ())
         y2 = x2
         return self._recombine(x1, y2), log_det_total
@@ -128,9 +130,11 @@ class VectorProjSplitCoupling(BijectorWithExtra):
             vector = y2 - reference_point
             norm_in = safe_norm(vector, axis=-1, keepdims=True)
             normed_vector = vector / norm_in
+            log_det_norm_in = - (dim - 1) * jnp.sum(jnp.log(norm_in))
             norm_out, logdet_inner_bijector = \
                 self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(norm_in)
-            log_det_total = log_det_total + logdet_inner_bijector
+            log_det_norm_out = (dim - 1) * jnp.sum(jnp.log(norm_out))
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_in + log_det_norm_out
             y2 = reference_point + norm_out * normed_vector
             chex.assert_shape(log_det_total, ())
         x2 = y2
