@@ -92,8 +92,9 @@ class EGNN(hk.Module):
 
         if self.nets_config.softmax_layer_invariant_feat:
             h = jax.nn.softmax(h, axis=-1)
-        h = hk.Linear(self.n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
-            if self.zero_init_invariant_feat else hk.Linear(self.n_invariant_feat_out)(h)
+        final_layer_h = hk.Linear(self.n_invariant_feat_out, w_init=jnp.zeros, b_init=jnp.zeros) \
+            if self.zero_init_invariant_feat else hk.Linear(self.n_invariant_feat_out)
+        h = final_layer_h(h)
         return vectors, h
 
     def __call__(

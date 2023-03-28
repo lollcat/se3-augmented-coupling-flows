@@ -45,8 +45,6 @@ class EGCL(hk.Module):
         self.residual_x = residual_x
         self.normalization_constant = normalization_constant
 
-        self.n_invariant_feat_hidden = n_invariant_feat_hidden
-
 
         self.phi_e = hk.nets.MLP(mlp_units, activation=activation_fn, activate_final=True)
         self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
@@ -120,7 +118,7 @@ class EGNNTorsoConfig(NamedTuple):
     n_blocks: int  # number of layers
     mlp_units: Sequence[int]
     n_invariant_feat_hidden: int
-    n_vectors_hidden: int = 1 # Typically gets manually overwritten by the flow.
+    n_vectors_hidden: int = 1  # Typically gets manually overwritten by the flow.
     activation_fn: Callable = jax.nn.silu
     residual_h: bool = True
     residual_x: bool = True
@@ -159,15 +157,13 @@ def make_egnn_torso_forward_fn(
         vectors = jnp.repeat(vectors, torso_config.n_vectors_hidden, axis=1)
         h = hk.Linear(torso_config.n_invariant_feat_hidden)(node_features)
 
-        # Perform flattening so we can pass this all into the EGCL layer.
-        senders, receivers = get_senders_and_receivers_fully_connected(n_nodes)
-
         for i in range(torso_config.n_blocks):
             vectors, h = EGCL(
                 torso_config.name + str(i), **torso_config.get_EGCL_kwargs()
             )(vectors, h, senders, receivers)
 
-        vectors = vectors - initial_vectors
+        if torso_config.residual_x:
+            vectors = vectors - initial_vectors
         return vectors, h
 
     return forward_fn
