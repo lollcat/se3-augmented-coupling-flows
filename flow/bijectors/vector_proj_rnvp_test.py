@@ -1,12 +1,10 @@
 import distrax
 import haiku as hk
-import jax
 import jax.numpy as jnp
-import chex
 
 
 from flow.test_utils import bijector_test
-from flow.bijectors.proj_real_nvp import make_proj_realnvp
+from flow.bijectors.vector_proj_rnvp import make_vector_proj_realnvp
 from flow.test_utils import get_minimal_nets_config
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
@@ -19,7 +17,7 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_realnvp(
+            bijector = make_vector_proj_realnvp(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
@@ -27,7 +25,8 @@ def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                 swap=swap,
                 identity_init=False,
                 nets_config=nets_config,
-                add_small_identity=False
+                add_small_identity=False,
+                n_vectors=2
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

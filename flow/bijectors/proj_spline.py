@@ -6,7 +6,8 @@ import numpy as np
 import jax.numpy as jnp
 import haiku as hk
 
-from nets.base import NetsConfig, build_egnn_fn
+from nets.base import NetsConfig, EGNN
+from nets.conditioner_mlp import ConditionerMLP
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
 def make_proj_spline(
@@ -25,26 +26,23 @@ def make_proj_spline(
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
 
+    base_name = f"layer_{layer_number}_swap{swap}"
+
     n_heads = dim - 1 if origin_on_coupled_pair else dim
     params_per_dim_per_var_group = (3 * num_bins + 1)
     n_variable_groups = ((n_aug + 1) // 2)
     n_invariant_params = dim * n_variable_groups * params_per_dim_per_var_group
 
-    mlp_function = hk.Sequential(
-        name=f"layer_{layer_number}_swap{swap}_cond_mlp",
-        layers=[
-            hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1),
-            hk.nets.MLP(nets_config.mlp_head_config.mlp_units, activate_final=True),
-            hk.Linear(n_invariant_params, b_init=jnp.zeros, w_init=jnp.zeros) if identity_init else
-            hk.Linear(n_invariant_params,
-                      b_init=hk.initializers.VarianceScaling(0.01),
-                      w_init=hk.initializers.VarianceScaling(0.01))
-        ])
-
     def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
+        mlp_function = ConditionerMLP(
+            name=f"conditionermlp_cond_mlp_" + base_name,
+            mlp_units=nets_config.mlp_head_config.mlp_units,
+            identity_init=identity_init,
+            n_output_params=n_invariant_params,
+        )
         params = mlp_function(params)
         # reshape
         params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim, params_per_dim_per_var_group))
@@ -56,29 +54,20 @@ def make_proj_spline(
             min_bin_size=(upper - lower) * 1e-4)
         return bijector
 
-
-
-    n_coupling_variable_groups = n_aug + 1
-    if nets_config.type == "mace":
-        n_invariant_feat_out = int(nets_config.mace_torso_config.n_invariant_feat_residual
-                                       / (n_coupling_variable_groups / 2))
-    elif nets_config.type == "egnn":
-        n_invariant_feat_out = int(nets_config.egnn_torso_config.h_embedding_dim
-                                       / (n_coupling_variable_groups / 2))
-    elif nets_config.type == 'e3transformer':
-        n_invariant_feat_out = int(nets_config.e3transformer_lay_config.n_invariant_feat_hidden
-                                       / (n_coupling_variable_groups / 2))
+    if nets_config.type == "egnn":
+        n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = int(nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-                                       / (n_coupling_variable_groups / 2))
+        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
+    elif nets_config.type == "egnn_v0":
+        n_invariant_feat_out = nets_config.egnn_v0_torso_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 
-    equivariant_fn = build_egnn_fn(name=f"layer_{layer_number}_swap{swap}",
-                                   nets_config=nets_config,
-                                   n_equivariant_vectors_out=n_heads,
-                                   n_invariant_feat_out=n_invariant_feat_out,
-                                   zero_init_invariant_feat=False)
+    equivariant_fn = EGNN(name=base_name,
+                          nets_config=nets_config,
+                          n_equivariant_vectors_out=n_heads,
+                          n_invariant_feat_out=n_invariant_feat_out,
+                          zero_init_invariant_feat=False)
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
