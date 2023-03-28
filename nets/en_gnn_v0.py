@@ -25,6 +25,7 @@ class EGCL(hk.Module):
         residual_x: bool,
         normalization_constant: float,
         variance_scaling_init: float,
+        cross_multiplicty_node_feat: bool,
     ):
         """_summary_
 
@@ -35,6 +36,7 @@ class EGCL(hk.Module):
             residual_x (bool): whether to use a residual connectio probability density for vectors.
             get_shifts_via_tensor_product (bool): Whether to use tensor product for message construction
             variance_scaling_init (float): Value to scale the output variance of MLP multiplying message vectors
+            cross_multiplicty_node_feat (bool): Whether to use cross multiplicity for node features.
         """
         super().__init__(name=name)
         self.variance_scaling_init = variance_scaling_init
@@ -44,6 +46,7 @@ class EGCL(hk.Module):
         self.residual_h = residual_h
         self.residual_x = residual_x
         self.normalization_constant = normalization_constant
+        self.cross_multiplicty_node_feat = cross_multiplicty_node_feat
 
 
         self.phi_e = hk.nets.MLP(mlp_units, activation=activation_fn, activate_final=True)
@@ -75,8 +78,17 @@ class EGCL(hk.Module):
         lengths = safe_norm(vectors, axis=-1, keepdims=False)
         sq_lengths = lengths ** 2
 
-        # build messages
         edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], sq_lengths], axis=-1)
+
+        if self.cross_multiplicty_node_feat:
+            senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
+            cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
+            chex.assert_shape(cross_vectors, (n_nodes, n_vectors, dim))
+            cross_sq_lengths = jnp.sum(cross_vectors ** 2, axis=-1)
+            edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
+                                           axis=-1)
+
+        # build messages
         m_ij = self.phi_e(edge_feat_in)
 
         # Get positional output
@@ -125,6 +137,7 @@ class EGNNTorsoConfig(NamedTuple):
     residual_x: bool = True
     normalization_constant: float = 1.0
     variance_scaling_init: float = 0.001
+    cross_multiplicty_node_feat: bool = True
 
     def get_EGCL_kwargs(self):
         kwargs = self._asdict()
