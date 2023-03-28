@@ -1,5 +1,6 @@
 import chex
 import distrax
+import jax.nn
 import numpy as np
 import jax.numpy as jnp
 import haiku as hk
@@ -23,7 +24,6 @@ def make_vector_proj_realnvp(
         n_vectors: int = 1,
         transform_type = 'real_nvp',
         num_bins: int = 4,
-        lower: float = -4.,
         upper: float = 4.,
         ) -> VectorProjSplitCoupling:
     assert n_aug % 2 == 1
@@ -42,6 +42,7 @@ def make_vector_proj_realnvp(
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
+        # Note must map positive scalars to positive scalars.
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
@@ -55,12 +56,14 @@ def make_vector_proj_realnvp(
         # reshape
         params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, params_per_dim))
         if transform_type == 'real_nvp':
-            log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
+            log_scale, log_shift = jnp.split(params, axis=-1, indices_or_sections=2)
+            shift = jax.nn.softplus(log_shift)*0.01
             chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
             return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
         elif transform_type == 'spline':
             params = params[:, :, None, :]
-            return distrax.RationalQuadraticSpline(params, lower, upper)
+            return distrax.RationalQuadraticSpline(params, range_min=0.0, range_max=upper,
+                                                   boundary_slopes='lower_identity')
         else:
             raise NotImplementedError
 
