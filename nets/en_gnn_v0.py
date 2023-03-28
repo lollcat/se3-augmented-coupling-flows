@@ -26,6 +26,7 @@ class EGCL(hk.Module):
         normalization_constant: float,
         variance_scaling_init: float,
         cross_multiplicty_node_feat: bool,
+        cross_multiplicity_shifts: bool,
     ):
         """_summary_
 
@@ -37,6 +38,7 @@ class EGCL(hk.Module):
             get_shifts_via_tensor_product (bool): Whether to use tensor product for message construction
             variance_scaling_init (float): Value to scale the output variance of MLP multiplying message vectors
             cross_multiplicty_node_feat (bool): Whether to use cross multiplicity for node features.
+            cross_multiplicity_shifts (bool): Whether to use cross multiplicity for shifts.
         """
         super().__init__(name=name)
         self.variance_scaling_init = variance_scaling_init
@@ -47,6 +49,7 @@ class EGCL(hk.Module):
         self.residual_x = residual_x
         self.normalization_constant = normalization_constant
         self.cross_multiplicty_node_feat = cross_multiplicty_node_feat
+        self.cross_multiplicity_shifts = cross_multiplicity_shifts
 
 
         self.phi_e = hk.nets.MLP(mlp_units, activation=activation_fn, activate_final=True)
@@ -55,6 +58,8 @@ class EGCL(hk.Module):
         self.phi_x_torso = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
         self.phi_h = hk.nets.MLP((*mlp_units, self.n_invariant_feat_hidden), activate_final=False,
                                  activation=activation_fn)
+        if self.cross_multiplicity_shifts:
+            self.phi_x_cross_torso = hk.nets.MLP(mlp_units, activate_final=True, activation=activation_fn)
 
     def __call__(self, node_positions, node_features, senders, receivers):
         """E(N)GNN layer implemented with E3NN package
@@ -80,13 +85,16 @@ class EGCL(hk.Module):
 
         edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], sq_lengths], axis=-1)
 
-        if self.cross_multiplicty_node_feat:
+        if self.cross_multiplicty_node_feat or self.cross_multiplicity_shifts:
             senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
             cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
-            chex.assert_shape(cross_vectors, (n_nodes, np.math.factorial(n_vectors), dim))
-            cross_sq_lengths = jnp.sum(cross_vectors ** 2, axis=-1)
-            edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
-                                           axis=-1)
+            n_cross_vectors = np.math.factorial(n_vectors)
+            chex.assert_shape(cross_vectors, (n_nodes, n_cross_vectors, dim))
+            if self.cross_multiplicty_node_feat:
+                cross_lengths = safe_norm(cross_vectors, axis=-1, keepdims=False)
+                cross_sq_lengths = cross_lengths**2
+                edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
+                                               axis=-1)
 
         # build messages
         m_ij = self.phi_e(edge_feat_in)
@@ -107,6 +115,22 @@ class EGCL(hk.Module):
         )
         vectors_out = shifts_i / avg_num_neighbours
         chex.assert_equal_shape((vectors_out, node_positions))
+
+        if self.cross_multiplicity_shifts:
+            phi_cross_in = e3nn.scatter_sum(m_ij, dst=senders, output_size=n_nodes)  # [n_nodes, feat]
+            phi_x_cross_out = self.phi_x_cross_torso(phi_cross_in)
+            phi_x_cross_out = hk.Linear(
+                n_cross_vectors, w_init=hk.initializers.VarianceScaling(self.variance_scaling_init, "fan_avg", "uniform")
+            )(phi_x_cross_out)
+            cross_shifts_im = (
+                phi_x_cross_out[:, :, None]
+                * cross_vectors
+                / (self.normalization_constant + cross_sq_lengths[:, :, None])
+            )
+            cross_shifts_i = e3nn.scatter_sum(jnp.swapaxes(cross_shifts_im, 0, 1), dst=recievers_cross, output_size=n_vectors)
+            cross_shifts_i = jnp.swapaxes(cross_shifts_i, 0, 1)
+            chex.assert_equal_shape((cross_shifts_i, vectors_out))
+            vectors_out = vectors_out + cross_shifts_i / (n_vectors - 1)
 
         # Get feature output
         e = self.phi_inf(m_ij)
@@ -138,6 +162,7 @@ class EGNNTorsoConfig(NamedTuple):
     normalization_constant: float = 1.0
     variance_scaling_init: float = 0.001
     cross_multiplicty_node_feat: bool = True
+    cross_multiplicity_shifts: bool = True
 
     def get_EGCL_kwargs(self):
         kwargs = self._asdict()
