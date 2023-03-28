@@ -83,7 +83,7 @@ class EGCL(hk.Module):
         if self.cross_multiplicty_node_feat:
             senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
             cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
-            chex.assert_shape(cross_vectors, (n_nodes, n_vectors, dim))
+            chex.assert_shape(cross_vectors, (n_nodes, np.math.factorial(n_vectors), dim))
             cross_sq_lengths = jnp.sum(cross_vectors ** 2, axis=-1)
             edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
                                            axis=-1)
