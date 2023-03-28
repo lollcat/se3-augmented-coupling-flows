@@ -210,7 +210,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
             return eval_info
 
     if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):
-        plot_and_eval_fn = get_eval_and_plot_fn(evaluation_fn, plotter)
+        eval_and_plot_fn = get_eval_and_plot_fn(evaluation_fn, plotter)
 
 
     return TrainConfig(
@@ -221,7 +221,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
         n_eval=cfg.training.n_eval,
         init_state=init_fn,
         update_state=update_fn,
-        plot_and_eval_fn=plot_and_eval_fn,
+        eval_and_plot_fn=eval_and_plot_fn,
         save=cfg.training.save,
         save_dir=save_path,
         resume=cfg.training.resume,
