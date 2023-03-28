@@ -53,11 +53,11 @@ flow:
 
 training:
   optimizer:
-    init_lr: 6e-5
+    init_lr: 0.
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 6e-4 # can be null
-    end_lr: 6e-5 # can be null
+    peak_lr: 1e-4 # can be null
+    end_lr: 0. # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
   use_64_bit: false
@@ -67,7 +67,6 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  n_plots: 10
   n_checkpoints: 0
   n_eval: 20
   K_marginal_log_lik: 20

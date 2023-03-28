@@ -1,9 +1,8 @@
-from typing import Tuple, Optional, List
+from typing import Optional, List
 
 from functools import partial
 import hydra
 from omegaconf import DictConfig
-from examples.train import train, create_train_config, plot_original_aug_norms_sample_hist, plot_sample_hist, plot_orig_aug_centre_mass_diff_hist
 import jax.numpy as jnp
 import numpy as np
 import chex
@@ -16,8 +15,9 @@ from boltzgen.flows import CoordinateTransform
 import torch
 
 from molboil.targets.data import load_aldp
-
+from molboil.train.train import train
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
+from examples.create_train_config import create_train_config
 
 def custom_aldp_plotter(params: AugmentedFlowParams,
                     flow: AugmentedFlow,
@@ -94,50 +94,6 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     internal_gen = np.concatenate(internal_gen, axis=0)
     internal_test = np.concatenate(internal_test, axis=0)
 
-    # Plot original coords
-    fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
-    plot_sample_hist(positions_x[:n_samples], axs[0], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(positions_x[:n_samples], axs[1], label="flow samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(train_data.positions[:n_samples],
-                     axs[0], label="train samples", n_vertices=plotting_n_nodes)
-    plot_sample_hist(test_data.positions[:n_samples],
-                     axs[1], label="test samples", n_vertices=plotting_n_nodes)
-
-    axs[0].set_title(f"norms between original coordinates train")
-    axs[1].set_title(f"norms between original coordinates test")
-    axs[0].legend()
-    axs[1].legend()
-    fig1.tight_layout()
-
-    # Augmented info.
-    fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
-    axs2 = [axs2] if isinstance(axs2, plt.Subplot) else axs2
-    for i in range(flow.n_augmented):
-        positions_a_single = positions_a[:n_samples, :, i]  # get single group of augmented coordinates
-        positions_a_target_single = positions_a_target[:n_samples, :, i]  # Get first set of aux variables.
-        #chex.assert_equal_shape((positions_x, positions_a_single, positions_a_target_single))
-        plot_sample_hist(positions_a_single, axs2[i], label="flow samples", n_vertices=plotting_n_nodes)
-        plot_sample_hist(positions_a_target_single, axs2[i], label="test samples", n_vertices=plotting_n_nodes)
-        axs2[i].set_title(f"norms between augmented coordinates (aug group {i})")
-    axs[0].legend()
-    fig2.tight_layout()
-
-    # Plot histogram for centre of mean
-    fig3, axs3 = plt.subplots(1, 2, figsize=(10, 5))
-    positions_a_single = positions_a[:n_samples, :, 0]  # get single group of augmented coordinates
-    positions_a_target_single = positions_a_target[:n_samples, :, 0]  # Get first set of aux variables.
-
-    plot_orig_aug_centre_mass_diff_hist(positions_x[:n_samples], positions_a_single, ax=axs3[0], label='flow samples')
-    plot_orig_aug_centre_mass_diff_hist(test_data[:n_samples].positions,
-                                        positions_a_target_single, ax=axs3[0], label='test samples')
-    plot_original_aug_norms_sample_hist(positions_x[:n_samples], positions_a_single, axs3[1], label='flow samples')
-    plot_original_aug_norms_sample_hist(test_data[:n_samples].positions,
-                                        positions_a_target_single, axs3[1], label='test samples')
-    axs3[0].legend()
-    axs3[0].set_title("norms orig - aug centre of mass (aug group 1) ")
-    axs3[1].set_title("norms orig - augparticles (aug group 1)")
-    fig3.tight_layout()
-
     # Compute Ramachandran plot angles
     aldp = AlanineDipeptideVacuum(constraints=None)
     topology = mdtraj.Topology.from_openmm(aldp.topology)
@@ -161,7 +117,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     hgen_psi, _ = np.histogram(psi, nbins, range=[-np.pi, np.pi], density=True);
 
     # Plot phi and psi
-    fig4, ax = plt.subplots(1, 2, figsize=(20, 10))
+    fig1, ax = plt.subplots(1, 2, figsize=(20, 10))
     x = np.linspace(-np.pi, np.pi, nbins)
     ax[0].plot(x, htrain_phi, linewidth=3)
     ax[0].plot(x, htest_phi, linewidth=3)
@@ -194,7 +150,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
     kld_test = np.sum(hist_ram_test * np.log((hist_ram_test + eps_ram)
                                              / (hist_ram_gen + eps_ram))) \
                * (2 * np.pi / nbins_ram) ** 2
-    fig5, ax = plt.subplots(1, 1, figsize=(10, 10))
+    fig2, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.hist2d(phi, psi, bins=nbins_ram, norm=mpl.colors.LogNorm(),
               range=[[-np.pi, np.pi], [-np.pi, np.pi]])
     ax.tick_params(axis='both', labelsize=20)
@@ -269,7 +225,7 @@ def custom_aldp_plotter(params: AugmentedFlowParams,
             ax[j // ncol, j % ncol].plot(x, hists_gen_list[i][:, j])
         figs_internal.append(fig)
 
-    return [fig1, fig2, fig3, fig4, fig5, *figs_internal]
+    return [fig1, fig2, *figs_internal]
 
 
 
