@@ -92,7 +92,7 @@ class EGCL(hk.Module):
             chex.assert_shape(cross_vectors, (n_nodes, n_cross_vectors, dim))
             if self.cross_multiplicty_node_feat:
                 cross_lengths = safe_norm(cross_vectors, axis=-1, keepdims=False)
-                cross_sq_lengths = cross_lengths**2
+                cross_sq_lengths = cross_lengths**2  # node features [n_nodes, n_cross_vectors]
                 edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
                                                axis=-1)
 
