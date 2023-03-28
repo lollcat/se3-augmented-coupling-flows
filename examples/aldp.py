@@ -234,7 +234,7 @@ def run(cfg: DictConfig):
     plotter = partial(custom_aldp_plotter, n_batches=cfg.eval.plot_n_batches)
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
-                         train_n_points=train_set_size, val_n_points=val_set_size)
+                         train_n_points=train_set_size, val_n_points=val_set_size)[:2]
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
