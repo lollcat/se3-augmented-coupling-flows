@@ -3,22 +3,16 @@ import jax.numpy as jnp
 import jax
 
 from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d, param_count
-from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig_v0
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 def get_minimal_nets_config(type = 'e3gnn'):
     nets_config = NetsConfig(type=type,
                              egnn_torso_config=EGNNTorsoConfig(
-                                 n_blocks=2,
-                                 mlp_units=(4,),
-                                 multiplicity=2,
-                                 n_invariant_feat_hidden=3,
-                                 name='e3gnn_torso'),
-                             egnn_v0_torso_config=EGNNTorsoConfig_v0(
                                     n_blocks=2,
                                     mlp_units=(4,),
-                                    n_vectors_hidden=2,
+                                    n_vectors_hidden_per_vec_in=2,
                                     n_invariant_feat_hidden=3,
                                     name='e3gnn_v0_torso'),
                              e3gnn_torso_config=E3GNNTorsoConfig(

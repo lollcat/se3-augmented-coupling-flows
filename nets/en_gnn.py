@@ -13,7 +13,8 @@ from molboil.models.base import EquivariantForwardFunction
 from utils.graph import get_senders_and_receivers_fully_connected
 
 class EGCL(hk.Module):
-    """A version of EGCL coded only with haiku (not e3nn) so works for arbitary dimension of inputs."""
+    """A version of EGCL coded only with haiku (not e3nn) so works for arbitary dimension of inputs.
+    Follows notation of https://arxiv.org/abs/2105.09016. """
 
     def __init__(
         self,
@@ -35,7 +36,8 @@ class EGCL(hk.Module):
             mlp_units (Sequence[int]): sizes of hidden layers for all MLPs
             residual_h (bool): whether to use a residual connectio probability density for scalars
             residual_x (bool): whether to use a residual connectio probability density for vectors.
-            get_shifts_via_tensor_product (bool): Whether to use tensor product for message construction
+            normalization_constant (float): Value to normalize the output of MLP multiplying message vectors.
+                C in the en normalizing flows paper (https://arxiv.org/abs/2105.09016).
             variance_scaling_init (float): Value to scale the output variance of MLP multiplying message vectors
             cross_multiplicty_node_feat (bool): Whether to use cross multiplicity for node features.
             cross_multiplicity_shifts (bool): Whether to use cross multiplicity for shifts.
@@ -74,6 +76,10 @@ class EGCL(hk.Module):
             senders:
             receivers:
         """
+        chex.assert_rank(node_positions, 3)
+        chex.assert_rank(node_features, 2)
+        chex.assert_rank(senders, 1)
+        chex.assert_equal_shape([senders, receivers])
         n_nodes, n_vectors, dim = node_positions.shape
         avg_num_neighbours = n_nodes - 1
         chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
@@ -88,7 +94,7 @@ class EGCL(hk.Module):
         if (self.cross_multiplicty_node_feat or self.cross_multiplicity_shifts) and n_vectors > 1:
             senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
             cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
-            n_cross_vectors = np.math.factorial(n_vectors)
+            n_cross_vectors = n_vectors * (n_vectors - 1)
             chex.assert_shape(cross_vectors, (n_nodes, n_cross_vectors, dim))
             if self.cross_multiplicty_node_feat:
                 cross_lengths = safe_norm(cross_vectors, axis=-1, keepdims=False)
@@ -155,7 +161,7 @@ class EGNNTorsoConfig(NamedTuple):
     n_blocks: int  # number of layers
     mlp_units: Sequence[int]
     n_invariant_feat_hidden: int
-    n_vectors_hidden: int = 1  # Typically gets manually overwritten by the flow.
+    n_vectors_hidden_per_vec_in: int = 1
     activation_fn: Callable = jax.nn.silu
     residual_h: bool = True
     residual_x: bool = True
@@ -164,11 +170,11 @@ class EGNNTorsoConfig(NamedTuple):
     cross_multiplicty_node_feat: bool = True
     cross_multiplicity_shifts: bool = True
 
-    def get_EGCL_kwargs(self):
+    def get_EGCL_kwargs(self, i):
         kwargs = self._asdict()
         del kwargs["n_blocks"]
-        del kwargs["name"]
-        del kwargs["n_vectors_hidden"]
+        kwargs["name"] = kwargs["name"] + f"_{i}"
+        del kwargs["n_vectors_hidden_per_vec_in"]
         return kwargs
 
 
@@ -181,28 +187,30 @@ def make_egnn_torso_forward_fn(
         senders: chex.Array,
         receivers: chex.Array,
     ):
-        chex.assert_rank(positions, 2)
+        chex.assert_rank(positions, 3)
         chex.assert_rank(node_features, 2)
         chex.assert_rank(senders, 1)
         chex.assert_rank(receivers, 1)
 
-        n_nodes, dim = positions.shape
+        n_nodes, vec_multiplicity_in, dim = positions.shape
 
+        # Setup torso input.
         vectors = positions - positions.mean(axis=0, keepdims=True)
-        vectors = vectors[:, None]
-        initial_vectors = vectors
-
         # Create n-multiplicity copies of h and vectors.
-        vectors = jnp.repeat(vectors, torso_config.n_vectors_hidden, axis=1)
+        vectors = jnp.repeat(vectors, torso_config.n_vectors_hidden_per_vec_in, axis=1)
+        initial_vectors = vectors
         h = hk.Linear(torso_config.n_invariant_feat_hidden)(node_features)
 
+        # Loop through torso layers.
         for i in range(torso_config.n_blocks):
-            vectors, h = EGCL(
-                torso_config.name + str(i), **torso_config.get_EGCL_kwargs()
+            vectors, h = EGCL(**torso_config.get_EGCL_kwargs(i)
             )(vectors, h, senders, receivers)
 
         if torso_config.residual_x:
             vectors = vectors - initial_vectors
+
+        chex.assert_shape(vectors, (n_nodes, vec_multiplicity_in*torso_config.n_vectors_hidden_per_vec_in, dim))
+        chex.assert_shape(h, (n_nodes, torso_config.n_invariant_feat_hidden))
         return vectors, h
 
     return forward_fn

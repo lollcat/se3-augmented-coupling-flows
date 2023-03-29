@@ -12,10 +12,10 @@ def load_dataset(train_set_size: int, valid_set_size: int):
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.nets.type = "egnn_v0"
-    cfg.flow.nets.egnn_v0.mlp_units = (4,)
+    cfg.flow.nets.type = "egnn"
+    cfg.flow.nets.egnn.mlp_units = (4,)
     cfg.flow.n_layers = 1
-    cfg.flow.nets.egnn_v0.n_blocks = 2
+    cfg.flow.nets.egnn.n_blocks = 2
     cfg.training.batch_size = 4
     cfg.flow.type = 'nice'
 

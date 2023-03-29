@@ -1,3 +1,4 @@
+import chex
 import distrax
 import jax.numpy as jnp
 import haiku as hk
@@ -9,7 +10,7 @@ from flow.distrax_with_extra import SplitCouplingWithExtra
 def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
     def conditioner(x):
         shift = equivariant_fn(x, graph_features) * get_scaling_weight_fn()
-        shift = jnp.squeeze(shift, axis=-2)  # Only want 1 vector per input vector
+        chex.assert_equal_shape([shift, x])
         return shift
     return conditioner
 
@@ -22,9 +23,10 @@ def make_se_equivariant_nice(graph_features,
     """Flow is x + (x - r)*scale where scale is an invariant scalar, and r is equivariant reference point"""
     assert n_aug % 2 == 1
 
+    n_vectors_within_coupling = (n_aug + 1) // 2
     equivariant_fn = EGNN(name=f"layer_{layer_number}_swap{swap}",
                           nets_config=nets_config,
-                          n_equivariant_vectors_out=1,
+                          n_equivariant_vectors_out=n_vectors_within_coupling,
                           n_invariant_feat_out=0,
                           zero_init_invariant_feat=False)
 
