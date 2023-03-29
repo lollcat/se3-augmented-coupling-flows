@@ -137,6 +137,8 @@ class ProjSplitCoupling(BijectorWithExtra):
 
         # Calculate new basis for the affine transform
         vectors_out, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
+        chex.assert_rank(vectors_out, 4)
+        chex.assert_rank(h, 2)
         if self._origin_on_aug:
             origin = x
             vectors = vectors_out
@@ -150,6 +152,7 @@ class ProjSplitCoupling(BijectorWithExtra):
 
         # Stack h, and x projected into the space.
         x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
+        h = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
         bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
         extra = self.get_extra(vectors)
         return origin, change_of_basis_matrix, bijector_feat_in, extra
