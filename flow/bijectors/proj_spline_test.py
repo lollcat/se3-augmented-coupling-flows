@@ -1,13 +1,10 @@
 import distrax
 import haiku as hk
-import jax
 import jax.numpy as jnp
-import chex
 
-
-from flow.test_utils import bijector_test
+from utils.test import bijector_test
 from flow.bijectors.proj_spline import make_proj_spline
-from flow.test_utils import get_minimal_nets_config
+from utils.test import get_minimal_nets_config
 
 def test_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                             n_nodes: int = 4, n_aux: int = 3):

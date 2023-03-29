@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from flow.test_utils import test_fn_is_invariant, rotate_translate_x_and_a_3d, rotate_translate_x_and_a_2d
-from flow.test_utils import get_minimal_nets_config
+from utils.test import test_fn_is_invariant
+from utils.test import get_minimal_nets_config
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra

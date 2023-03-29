@@ -49,7 +49,7 @@ flow:
       name: e3gnn
       n_blocks: 3 # number of layers
       mlp_units: [64, 64]
-      n_vectors_hidden: 4
+      n_vectors_hidden_per_vec_in: 4
       n_invariant_feat_hidden: 64
       get_shifts_via_tensor_product: false
     mlp_head_config:

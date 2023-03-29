@@ -1,12 +1,11 @@
-from typing import Callable, Tuple, Optional
+from typing import Callable, Tuple
 
 import chex
 import jax
 import jax.numpy as jnp
-from functools import partial
 import optax
 
-from flow.test_utils import get_max_diff_log_prob_invariance_test
+from utils.test import get_max_diff_log_prob_invariance_test
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
 

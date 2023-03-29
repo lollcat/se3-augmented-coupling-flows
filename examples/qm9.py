@@ -12,8 +12,8 @@ def load_dataset(train_set_size, valid_set_size):
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.nets.egnn.mlp_units = (4,)
-    cfg.flow.nets.egnn.n_blocks = 2
+    cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
+    cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
     cfg.flow.n_layers = 1
     cfg.training.batch_size = 4
     cfg.flow.type = 'nice'
@@ -25,7 +25,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.test_set_size = 1000
     cfg.logger = DictConfig({"list_logger": None})
     return cfg
-
 
 
 @hydra.main(config_path="./config", config_name="qm9.yaml")
