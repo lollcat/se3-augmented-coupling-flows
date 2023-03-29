@@ -34,7 +34,7 @@ class CentreGravitryGaussianAndCondtionalGuassian(DistributionWithExtra):
             self.x_log_scale = hk.get_parameter(name='x_log_scale', shape=(),
                                                           init=hk.initializers.Constant(jnp.log(x_scale_init)))
         else:
-            self.x_log_scale = jnp.zeros(())
+            self.x_log_scale = jnp.log(x_scale_init)
         self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=self.x_log_scale)
 
 
