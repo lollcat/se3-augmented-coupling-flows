@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional, Sequence, Tuple
+from typing import NamedTuple, Optional, Sequence
 import chex
 import jax.numpy as jnp
 import e3nn_jax as e3nn
@@ -30,7 +30,8 @@ def build_torso(name: str, config: NetsConfig, n_vectors_out: int,
                 n_vectors_in: int) -> EquivariantForwardFunction:
     if config.type == 'e3gnn':
         torso = make_e3nn_torso_forward_fn(torso_config=config.e3gnn_torso_config._replace(
-            name=name + config.e3gnn_torso_config.name))
+            name=name + config.e3gnn_torso_config.name),
+        )
     elif config.type == 'egnn':
         assert n_vectors_out % n_vectors_in == 0
         torso = make_egnn_torso_forward_fn(config.egnn_torso_config._replace(

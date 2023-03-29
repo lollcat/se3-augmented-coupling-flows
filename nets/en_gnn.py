@@ -206,11 +206,12 @@ def make_egnn_torso_forward_fn(
             vectors, h = EGCL(**torso_config.get_EGCL_kwargs(i)
             )(vectors, h, senders, receivers)
 
+        chex.assert_shape(vectors, (n_nodes, vec_multiplicity_in*torso_config.n_vectors_hidden_per_vec_in, dim))
+        chex.assert_shape(h, (n_nodes, torso_config.n_invariant_feat_hidden))
+
         if torso_config.residual_x:
             vectors = vectors - initial_vectors
 
-        chex.assert_shape(vectors, (n_nodes, vec_multiplicity_in*torso_config.n_vectors_hidden_per_vec_in, dim))
-        chex.assert_shape(h, (n_nodes, torso_config.n_invariant_feat_hidden))
         return vectors, h
 
     return forward_fn
