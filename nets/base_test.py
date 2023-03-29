@@ -10,7 +10,8 @@ def test_net_does_not_smoke(type="egnn"):
     nets_config = get_minimal_nets_config(type=type)
     zero_init_invariant_feat = False
     n_invariant_feat_out = 5
-    n_equivariant_vectors_out = 3
+    n_equivariant_vectors_in = 2
+    n_equivariant_vectors_out = n_equivariant_vectors_in * 2
     dim = 2 if type == 'egnn' else 3
     n_nodes = 5
     multiplicity = 2
@@ -34,8 +35,8 @@ def test_net_does_not_smoke(type="egnn"):
     params = forward.init(key, positions, features)
 
     vectors, scalars = forward.apply(params, positions, features)
-    chex.assert_shape(vectors, (n_nodes, multiplicity, n_equivariant_vectors_out, dim))
-    chex.assert_shape(scalars, (n_nodes, multiplicity, n_invariant_feat_out))
+    chex.assert_shape(vectors, (n_nodes, n_equivariant_vectors_out, dim))
+    chex.assert_shape(scalars, (n_nodes, n_invariant_feat_out))
 
 
 if __name__ == '__main__':

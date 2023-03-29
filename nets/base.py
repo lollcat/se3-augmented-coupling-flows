@@ -5,13 +5,11 @@ import e3nn_jax as e3nn
 import haiku as hk
 import jax
 
-from molboil.utils.graph_utils import get_senders_and_receivers_fully_connected
+from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.models.base import EquivariantForwardFunction
 from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
 from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
-
-from nets.en_gnn import make_egnn_torso_forward_fn
-from nets.en_gnn import EGNNTorsoConfig
+from molboil.models.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
 
 
 class MLPHeadConfig(NamedTuple):
@@ -26,7 +24,8 @@ class NetsConfig(NamedTuple):
     softmax_layer_invariant_feat: bool = True
 
 
-def build_torso(name: str, config: NetsConfig, n_vectors_out: int,
+def build_torso(name: str, config: NetsConfig,
+                n_vectors_out: int,
                 n_vectors_in: int) -> EquivariantForwardFunction:
     if config.type == 'e3gnn':
         torso = make_e3nn_torso_forward_fn(torso_config=config.e3gnn_torso_config._replace(
