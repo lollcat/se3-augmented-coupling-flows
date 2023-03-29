@@ -5,7 +5,9 @@ import distrax
 import jax
 import jax.numpy as jnp
 
-from utils.numerical import vector_rejection, safe_norm, rotate_2d
+from molboil.utils.numerical import rotate_2d
+
+from utils.numerical import vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
 BijectorParams = chex.Array
@@ -22,7 +24,6 @@ def unproject(x, origin, change_of_basis_matrix):
     chex.assert_rank(change_of_basis_matrix, 2)
     chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
     return change_of_basis_matrix @ x + origin
-
 
 
 

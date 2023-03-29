@@ -21,6 +21,7 @@ def make_proj_spline(
         num_bins: int = 10,
         lower: float = -10.,
         upper: float = 10.,
+        add_small_identity: bool = True
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -84,5 +85,6 @@ def make_proj_spline(
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
-        origin_on_coupled_pair=origin_on_coupled_pair
+        origin_on_coupled_pair=origin_on_coupled_pair,
+        add_small_identity=add_small_identity,
     )
