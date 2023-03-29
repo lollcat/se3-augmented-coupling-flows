@@ -3,7 +3,6 @@ from typing import Callable, Optional, List
 from functools import partial
 import chex
 import jax
-import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
@@ -52,10 +51,10 @@ def make_default_plotter(
         pairwise_distances_flow_x = get_pairwise_distances_for_plotting(positions_x, plotting_n_nodes, max_distance)
         counts_flow_x = get_counts(pairwise_distances_flow_x, bins_x)
 
-        bins_a, count_list_a = jax.vmap(bin_samples_by_dist, in_axes=-2, out_axes=0
-                                        )([positions_a_flow, positions_a_target])
-        bins_a_minus_x, count_list_a_minus_x = jax.vmap(bin_samples_by_dist, in_axes=-2, out_axes=0)(
-            [a_minus_x_flow, a_minus_x_target])
+        bins_a, count_list_a = jax.vmap(bin_samples_by_dist, in_axes=(-2, None), out_axes=0
+                                        )([positions_a_flow, positions_a_target], max_distance)
+        bins_a_minus_x, count_list_a_minus_x = jax.vmap(bin_samples_by_dist, in_axes=(-2, None), out_axes=0)(
+            [a_minus_x_flow, a_minus_x_target], max_distance)
         return counts_flow_x, bins_a, count_list_a, bins_a_minus_x, count_list_a_minus_x
 
 
