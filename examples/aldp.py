@@ -162,13 +162,13 @@ def aldp_eval_and_plot_fn(state: TrainingState,
     hist_ram_gen = np.histogram2d(phi, psi, nbins_ram,
                                   range=[[-np.pi, np.pi], [-np.pi, np.pi]],
                                   density=True)[0]
-    kld_train = np.sum(hist_ram_train * np.log((hist_ram_train + eps_ram)
-                                             / (hist_ram_gen + eps_ram))) \
-                * (2 * np.pi / nbins_ram) ** 2
-    kld_test = np.sum(hist_ram_test * np.log((hist_ram_test + eps_ram)
-                                             / (hist_ram_gen + eps_ram))) \
-               * (2 * np.pi / nbins_ram) ** 2
-    info.update(kld_train=kld_train, kld_test=kld_test)
+    kld_ram_train = np.sum(hist_ram_train * np.log((hist_ram_train + eps_ram)
+                                                   / (hist_ram_gen + eps_ram))) \
+                    * (2 * np.pi / nbins_ram) ** 2
+    kld_ram_test = np.sum(hist_ram_test * np.log((hist_ram_test + eps_ram)
+                                                 / (hist_ram_gen + eps_ram))) \
+                   * (2 * np.pi / nbins_ram) ** 2
+    info.update(kld_ram_train=kld_ram_train, kld_ram_test=kld_ram_test)
     fig2, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.hist2d(phi, psi, bins=nbins_ram, norm=mpl.colors.LogNorm(),
               range=[[-np.pi, np.pi], [-np.pi, np.pi]])
