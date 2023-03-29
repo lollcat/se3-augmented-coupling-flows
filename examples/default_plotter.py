@@ -31,9 +31,10 @@ def make_default_plotter(
         n_samples_from_flow: int,
         max_n_samples: int = 10000,
         plotting_n_nodes: Optional[int] = None,
+        max_distance: Optional[float] = 9.0,
 ):
     bins_x, count_list = bin_samples_by_dist([train_data.positions[:max_n_samples],
-                                              test_data.positions[:max_n_samples]])
+                                              test_data.positions[:max_n_samples]], max_distance=max_distance)
     n_samples = n_samples_from_flow
 
     @partial(jax.jit)
@@ -48,7 +49,7 @@ def make_default_plotter(
         a_minus_x_target = positions_a_target - test_data.positions[:n_samples, :, None]
 
         # Get counts flow x.
-        pairwise_distances_flow_x = get_pairwise_distances_for_plotting(positions_x, plotting_n_nodes)
+        pairwise_distances_flow_x = get_pairwise_distances_for_plotting(positions_x, plotting_n_nodes, max_distance)
         counts_flow_x = get_counts(pairwise_distances_flow_x, bins_x)
 
         bins_a, count_list_a = jax.vmap(bin_samples_by_dist, in_axes=-2, out_axes=0
