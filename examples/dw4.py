@@ -39,8 +39,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['proj_spline']
-    cfg.flow.n_aug = 1
+    cfg.flow.type = ['nice']
+    cfg.flow.n_aug = 3
     cfg.flow.n_layers = 2
     cfg.flow.act_norm = False
 

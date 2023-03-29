@@ -3,7 +3,6 @@
 Equivariance looking broken for multiplicity. 
 
 # Overview of the repo
-- For blackjax we need `pip install blackjax-nightly` (latest version) otherwise we get errors.
 - `flow`: Contains the base distributions, bijectors (e.g. projected flow transform), and EGNNs.
 - `examples/train.py`: Generic training script for all problems.
 - `utils/train_and_eval.py`: Various utils used for training, such as the loss function and evaluation functions.
@@ -15,6 +14,10 @@ ListLogger that can may used if you don't want to use wandb.
 - We have to be very careful with haiku params, as the flow forward and reverse call the params in different orders. 
 Hence naming of modules is crucial. 
 
+
+# Install
+For the alanine dipeptide problem we need to install openmmtools with conda:
+`conda install -c conda-forge openmm openmmtools`
 
 ## Experiments
 ```shell
