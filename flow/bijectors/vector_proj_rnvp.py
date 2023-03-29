@@ -24,7 +24,7 @@ def make_vector_proj_realnvp(
         n_vectors: int = 1,
         transform_type = 'real_nvp',
         num_bins: int = 4,
-        upper: float = 4.,
+        upper: float = 10.,
         ) -> VectorProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
