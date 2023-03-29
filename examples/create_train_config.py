@@ -122,8 +122,8 @@ def create_flow_config(cfg: DictConfig):
 def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
-                        eval_and_plot_fn = None,
-                        date_folder = True) -> TrainConfig:
+                        eval_and_plot_fn: Optional = None,
+                        date_folder: bool = True) -> TrainConfig:
     """Creates `mol_boil` style train config"""
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes

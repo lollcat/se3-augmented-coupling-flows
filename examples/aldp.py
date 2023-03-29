@@ -17,10 +17,13 @@ import torch
 
 from molboil.targets.data import load_aldp
 from molboil.train.train import train
+from molboil.train.base import eval_fn
+
 from flow.build_flow import build_flow
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow
 from examples.create_train_config import create_train_config, create_flow_config
 from examples.configs import TrainingState
+from utils.aug_flow_train_and_eval import get_eval_on_test_batch
 
 def aldp_eval_and_plot_fn(state: TrainingState,
                           key: chex.PRNGKey,
@@ -31,7 +34,9 @@ def aldp_eval_and_plot_fn(state: TrainingState,
                           train_data: FullGraphSample,
                           test_data: FullGraphSample,
                           n_samples: int,
-                          n_batches: int = 1) -> List[plt.Subplot]:
+                          n_batches: int = 1,
+                          K_marginal_log_lik: int = 1,
+                          test_invariances: bool = False) -> List[plt.Subplot]:
 
     # Set up coordinate transform
     ndim = 66
@@ -104,6 +109,9 @@ def aldp_eval_and_plot_fn(state: TrainingState,
     psi = mdtraj.compute_psi(sampled_traj)[1].reshape(-1)
     phi = mdtraj.compute_phi(sampled_traj)[1].reshape(-1)
 
+    # Prepare output
+    info = {}
+
     # Compute histograms
     nbins = 200
     htrain_phi, _ = np.histogram(phi_train, nbins, range=[-np.pi, np.pi], density=True);
@@ -113,8 +121,18 @@ def aldp_eval_and_plot_fn(state: TrainingState,
     htest_psi, _ = np.histogram(psi_test, nbins, range=[-np.pi, np.pi], density=True);
     hgen_psi, _ = np.histogram(psi, nbins, range=[-np.pi, np.pi], density=True);
 
-    # Prepare output
-    info = {}
+    # Compute KLDs for phi and psi
+    eps = 1e-10
+    kld_phi_train = np.sum(htrain_phi * np.log((htrain_phi + eps) / (hgen_phi + eps))) \
+                    * 2 * np.pi / nbins
+    kld_phi_test = np.sum(htest_phi * np.log((htest_phi + eps) / (hgen_phi + eps))) \
+                   * 2 * np.pi / nbins
+    info.update(kld_phi_train=kld_phi_train, kld_phi_test=kld_phi_test)
+    kld_psi_train = np.sum(htrain_psi * np.log((htrain_psi + eps) / (hgen_psi + eps))) \
+                    * 2 * np.pi / nbins
+    kld_psi_test = np.sum(htest_psi * np.log((htest_psi + eps) / (hgen_psi + eps))) \
+                   * 2 * np.pi / nbins
+    info.update(kld_psi_train=kld_psi_train, kld_psi_test=kld_psi_test)
 
     # Plot phi and psi
     fig1, ax = plt.subplots(1, 2, figsize=(20, 10))
@@ -236,6 +254,16 @@ def aldp_eval_and_plot_fn(state: TrainingState,
             plt.show()
         plt.close(figure)
 
+    # Get eval like log-likelihood on test set
+    eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                    flow=flow, K=K_marginal_log_lik,
+                                    test_invariances=test_invariances)
+    eval_info = eval_fn(test_data, key, state.params,
+                        eval_on_test_batch_fn=eval_on_test_batch_fn,
+                        eval_batch_free_fn=None,
+                        batch_size=n_samples)
+    info.update(eval_info)
+
     return info
 
 
@@ -250,11 +278,13 @@ def run(cfg: DictConfig):
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
     eval_and_plot_fn = partial(aldp_eval_and_plot_fn, flow=flow, train_data=train_set, test_data=val_set,
-                      n_samples=cfg.training.plot_batch_size, n_batches=cfg.eval.plot_n_batches)
+                               n_samples=cfg.training.plot_batch_size, n_batches=cfg.eval.plot_n_batches,
+                               K_marginal_log_lik=cfg.training.K_marginal_log_lik)
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=22,
                                             load_dataset=load_dataset,
-                                            eval_and_plot_fn=eval_and_plot_fn)
+                                            eval_and_plot_fn=eval_and_plot_fn,
+                                            date_folder=False)
 
     train(experiment_config)
 
