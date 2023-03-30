@@ -1,10 +1,9 @@
-from typing import Tuple, Optional, Callable
+from typing import Tuple
 
 import chex
 import distrax
 import numpy as np
 import jax.numpy as jnp
-import haiku as hk
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerMLP
@@ -22,6 +21,7 @@ def make_proj_spline(
         num_bins: int = 10,
         lower: float = -10.,
         upper: float = 10.,
+        add_small_identity: bool = True
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -30,8 +30,8 @@ def make_proj_spline(
 
     n_heads = dim - 1 if origin_on_coupled_pair else dim
     params_per_dim_per_var_group = (3 * num_bins + 1)
-    n_variable_groups = ((n_aug + 1) // 2)
-    n_invariant_params = dim * n_variable_groups * params_per_dim_per_var_group
+    multiplicity_within_coupling_split = ((n_aug + 1) // 2)
+    n_invariant_params = dim * multiplicity_within_coupling_split * params_per_dim_per_var_group
 
     def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
         leading_shape = params.shape[:-2]
@@ -63,11 +63,19 @@ def make_proj_spline(
     else:
         raise NotImplementedError
 
-    equivariant_fn = EGNN(name=base_name,
-                          nets_config=nets_config,
-                          n_equivariant_vectors_out=n_heads,
-                          n_invariant_feat_out=n_invariant_feat_out,
-                          zero_init_invariant_feat=False)
+    def equivariant_fn(positions: chex.Array, features: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        chex.assert_rank(positions, 3)
+        chex.assert_rank(features, 3)
+        n_nodes, n_vec_multiplicity_in, dim = positions.shape
+        assert n_vec_multiplicity_in == multiplicity_within_coupling_split
+        net = EGNN(name=base_name,
+                      nets_config=nets_config,
+                      n_equivariant_vectors_out=n_heads*multiplicity_within_coupling_split,
+                      n_invariant_feat_out=n_invariant_feat_out,
+                      zero_init_invariant_feat=False)
+        vectors, h = net(positions, features)
+        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_heads, dim))
+        return vectors, h
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
@@ -77,5 +85,6 @@ def make_proj_spline(
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
-        origin_on_coupled_pair=origin_on_coupled_pair
+        origin_on_coupled_pair=origin_on_coupled_pair,
+        add_small_identity=add_small_identity,
     )

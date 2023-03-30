@@ -39,12 +39,7 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: egnn_v0 # egnn_v0 or egnn or e3gnn
-    egnn_v0:
-      name: egnn_v0
-      n_blocks: 3 # number of layers
-      mlp_units: [ 32, 32 ]
-      n_invariant_feat_hidden: 32
+    type: egnn
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
@@ -54,7 +49,7 @@ flow:
       name: e3gnn
       n_blocks: 3 # number of layers
       mlp_units: [32, 32]
-      n_vectors_hidden: 4
+      n_vectors_hidden_per_vec_in: 4
       n_invariant_feat_hidden: 32
       get_shifts_via_tensor_product: false
     mlp_head_config:

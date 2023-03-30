@@ -2,109 +2,31 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.numerical import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d, param_count
-from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig_v0
+from molboil.utils.test import test_fn_is_equivariant, test_fn_is_invariant, random_rotate_translate_perumute
+
+from utils.numerical import param_count
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 def get_minimal_nets_config(type = 'e3gnn'):
     nets_config = NetsConfig(type=type,
                              egnn_torso_config=EGNNTorsoConfig(
-                                 n_blocks=2,
-                                 mlp_units=(4,),
-                                 multiplicity=2,
-                                 n_invariant_feat_hidden=3,
-                                 name='e3gnn_torso'),
-                             egnn_v0_torso_config=EGNNTorsoConfig_v0(
                                     n_blocks=2,
                                     mlp_units=(4,),
-                                    n_vectors_hidden=2,
+                                    n_vectors_hidden_per_vec_in=2,
                                     n_invariant_feat_hidden=3,
                                     name='e3gnn_v0_torso'),
                              e3gnn_torso_config=E3GNNTorsoConfig(
                                  n_blocks=2,
                                  mlp_units=(4,),
-                                 n_vectors_hidden=2,
+                                 n_vectors_hidden_per_vec_in=2,
                                  n_invariant_feat_hidden=3,
                                  name='e3gnn_torso'
                              ),
                              mlp_head_config=MLPHeadConfig((4,)),
                              )
     return nets_config
-
-
-def get_pairwise_distances(x):
-    return jnp.linalg.norm(x - x[:, None], ord=2, axis=-1)
-
-
-def test_fn_is_equivariant(equivariant_fn, key, event_shape, translate: bool = True):
-    dim = event_shape[-1]
-    assert dim in (2, 3)
-
-    # Setup
-    key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
-
-    rtol = 1e-5 if x_and_a.dtype == jnp.float64 else 1e-3
-
-    # Get rotated version of x_and_a.
-    theta = jax.random.uniform(key2) * 2*jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,)) * (1 if translate else 0)
-    phi = jax.random.uniform(key4) * 2 * jnp.pi
-
-    def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = rotate_translate_x_and_a_2d(x_and_a, theta, translation)
-        else:  #  dim == 3:
-            x_and_a_rot = rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation)
-        return x_and_a_rot
-
-    x_and_a_rot = group_action(x_and_a)
-
-    # Compute equivariant_fn of both the original and rotated matrices.
-    x_and_a_new = equivariant_fn(x_and_a)
-    x_and_a_new_rot = equivariant_fn(x_and_a_rot)
-
-    # Check that rotating x_and_a_new gives x_and_a_new_rot
-
-    chex.assert_trees_all_close(x_and_a_new_rot, group_action(x_and_a_new), rtol=rtol)
-
-
-def test_fn_is_invariant(invariante_fn, key, event_shape):
-    dim = event_shape[-1]
-    assert dim in (2, 3)
-
-    # Setup
-    key1, key2, key3, key4 = jax.random.split(key, 4)
-    x_and_a = jax.random.normal(key1, shape=event_shape) * 0.1
-
-    # Get rotated version of x_and_a.
-    theta = jax.random.uniform(key2) * 2 * jnp.pi
-    translation = jax.random.normal(key3, shape=(dim,)) * 10
-    phi = jax.random.uniform(key4) * 2 * jnp.pi
-
-    def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = rotate_translate_x_and_a_2d(x_and_a, theta, translation)
-        else:  #  dim == 3:
-            x_and_a_rot = rotate_translate_x_and_a_3d(x_and_a, theta, phi, translation)
-        return x_and_a_rot
-
-
-    x_and_a_rot = group_action(x_and_a)
-
-    # Compute invariante_fn of both the original and rotated matrices.
-    out = invariante_fn(x_and_a)
-    out_rot = invariante_fn(x_and_a_rot)
-
-    # Check that rotating x_and_a_new_rot gives x_and_a_new
-    if x_and_a.dtype == jnp.float64:
-        rtol = 1e-6
-    else:
-        rtol = 1e-3
-    chex.assert_trees_all_close(out, out_rot, rtol=rtol)
-
-
 
 def bijector_test(bijector_forward, bijector_backward,
                   dim: int, n_nodes: int, n_aux: int):
@@ -177,26 +99,13 @@ def bijector_test(bijector_forward, bijector_backward,
 def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
                                           flow: AugmentedFlow,
                                           params: AugmentedFlowParams,
-                                          key: chex.PRNGKey):
+                                          key: chex.PRNGKey,
+                                          permute: bool = False):
+
     log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
 
-    # Used in evaluation
-    batch_size, n_nodes, n_var_groups, dim = samples.positions.shape
-    n_aux = n_var_groups - 1
-
-    key1, key2, key3 = jax.random.split(key, 3)
-
-    # Get rotated version of x_and_a.
-    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
-    translation = jax.random.normal(key2, shape=(batch_size, dim))
-    phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
-
     def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:  # dim == 3:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
-        return x_and_a_rot
+        return random_rotate_translate_perumute(x_and_a, key, permute=permute, translate=True)
 
 
     positions_rot = group_action(samples.positions)

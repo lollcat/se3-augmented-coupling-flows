@@ -42,17 +42,12 @@ flow:
   act_norm: false
   compile_n_unroll: 1
   nets:
-    type: egnn_v0
-    egnn_v0:
+    type: egnn
+    egnn:
         name: egnn
         n_blocks: 3 # number of layers
         mlp_units: [ 32, 32 ]
         n_invariant_feat_hidden: 32
-    egnn:
-      name: egnn
-      n_blocks: 3 # number of layers
-      mlp_units: [ 32, 32 ]
-      n_invariant_feat_hidden: 32
     mlp_head_config:
       mlp_units: [32, 32]
 

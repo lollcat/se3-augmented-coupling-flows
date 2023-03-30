@@ -6,17 +6,21 @@ import jax
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils.numerical import get_pairwise_distances, set_diagonal_to_zero
+
+from molboil.utils.graph import get_senders_and_receivers_fully_connected
+from utils.numerical import safe_norm
 from utils.smc import run_smc_molecule
 
 def energy(x: chex.Array, epsilon: float = 1.0, tau: float = 1.0, r: Union[float, chex.Array] = 1.0,
            harmonic_potential_coef: float = 0.3) -> chex.Array:
     chex.assert_rank(x, 2)
+    n_nodes, dim = x.shape
     if isinstance(r, float):
-        r = jnp.ones(x.shape[:-1])
-    d = get_pairwise_distances(x)
-    term_inside_sum = (r[:, None] / d)**12 - 2*(r[:, None] / d)**6
-    term_inside_sum = set_diagonal_to_zero(term_inside_sum)
+        r = jnp.ones(n_nodes) * r
+    senders, receivers = get_senders_and_receivers_fully_connected(n_nodes)
+    vectors = x[senders] - x[receivers]
+    d = safe_norm(vectors, axis=-1)
+    term_inside_sum = (r[receivers] / d)**12 - 2*(r[receivers] / d)**6
     energy = epsilon / (2 * tau) * jnp.sum(term_inside_sum)
     harmonic_potential = jnp.sum(d) * harmonic_potential_coef
     return energy + harmonic_potential

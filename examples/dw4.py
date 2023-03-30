@@ -40,8 +40,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Flow
     cfg.flow.type = ['nice']
-    cfg.flow.n_aug = 1
-    cfg.flow.n_layers = 3
+    cfg.flow.n_aug = 3
+    cfg.flow.n_layers = 2
     cfg.flow.act_norm = False
 
     cfg.target.aux.trainable_augmented_scale = False
@@ -51,8 +51,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Configure NNs
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
-    cfg.flow.nets.egnn_v0.mlp_units = (8,)
-    cfg.flow.nets.egnn_v0.n_blocks = 2
+    cfg.flow.nets.egnn.mlp_units = (8,)
+    cfg.flow.nets.egnn.n_blocks = 2
 
     debug = False
     if debug:
