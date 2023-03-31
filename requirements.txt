@@ -1,7 +1,7 @@
 dm-haiku
 blackjax-nightly
 distrax
-chex==0.1.5
+chex
 matplotlib
 optax
 tqdm
@@ -12,7 +12,6 @@ hydra-core
 hydra-joblib-launcher
 joblib
 e3nn-jax
-git+https://github.com/ACEsuit/mace-jax@main#egg=mace_jax
 mdtraj
 tables
-git+https://github.com/VincentStimper/boltzmann-generators.git@master#egg=boltzmann_generators
+git+https://github.com/VincentStimper/boltzmann-generators
