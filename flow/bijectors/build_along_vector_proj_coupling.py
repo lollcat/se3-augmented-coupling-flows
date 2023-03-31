@@ -64,7 +64,7 @@ def make_vector_proj(
                 params,
                 range_min=0.0,
                 range_max=spline_max,
-                boundary_slopes='unconstrained',
+                boundary_slopes='lower_identity',
                 min_bin_size=(spline_max - 0.0) * 1e-4)
             return bijector
         else:
