@@ -5,6 +5,7 @@ import distrax
 import numpy as np
 import jax.numpy as jnp
 import haiku as hk
+import tensorflow_probability.substrates.jax as tfp
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerMLP
@@ -36,7 +37,7 @@ def make_vector_proj(
     n_invariant_params = multiplicity_within_coupling_split * params_per_dim
 
 
-    def bijector_fn(params: chex.Array, vector_index: int) -> distrax.ScalarAffine:
+    def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
@@ -52,7 +53,9 @@ def make_vector_proj(
         if transform_type == 'real_nvp':
             log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
             chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
-            return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+            inner_bijector = distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+            bijector = distrax.Chain([tfp.bijectors.Exp(), inner_bijector, distrax.Inverse(tfp.bijectors.Exp())])
+            return bijector
         else:
             raise NotImplementedError
 

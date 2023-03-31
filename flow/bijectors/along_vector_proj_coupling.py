@@ -4,7 +4,6 @@ import chex
 import distrax
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax as tfp
 
 from utils.numerical import safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
@@ -42,11 +41,6 @@ class VectorProjSplitCoupling(BijectorWithExtra):
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
         super().__init__(event_ndims_in=event_ndims)
-
-
-    @property
-    def norm_to_unconstrained_bijector(self):
-        return distrax.Block(distrax.Inverse(tfp.bijectors.Exp()), 3)
 
 
     def dist_to_norm_and_log_det(self, difference: Array) -> Tuple[Array, Array]:
@@ -122,15 +116,11 @@ class VectorProjSplitCoupling(BijectorWithExtra):
             vector = x2 - reference_point
             norms_in, log_det_norm_fwd = self.dist_to_norm_and_log_det(vector)
             unit_vector = vector / norms_in
-            unconstrained_in, log_det_unconstrained_fwd = self.norm_to_unconstrained_bijector.forward_and_log_det(
-                norms_in)
-            unconstrained_out, logdet_inner_bijector = \
-                self._inner_bijector(bijector_feat_in, i).forward_and_log_det(unconstrained_in)
-            chex.assert_equal_shape((unconstrained_out, unconstrained_in))
-            norms_out, log_det_unconstrained_rv = self.norm_to_unconstrained_bijector.inverse_and_log_det(unconstrained_out)
+            norms_out, logdet_inner_bijector = \
+                self._inner_bijector(bijector_feat_in, i).forward_and_log_det(norms_in)
+            chex.assert_equal_shape((norms_out, norms_in))
             x2, log_det_norm_rv = self.norm_to_point_and_log_det(reference_point, norms_out, unit_vector)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_unconstrained_fwd + \
-                            log_det_unconstrained_rv + log_det_norm_fwd + log_det_norm_rv
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
             chex.assert_shape(log_det_total, ())
         y2 = x2
         return self._recombine(x1, y2), log_det_total
@@ -149,13 +139,10 @@ class VectorProjSplitCoupling(BijectorWithExtra):
             vector = y2 - reference_point
             norms_in, log_det_norm_fwd = self.dist_to_norm_and_log_det(vector)
             normed_vector = vector / norms_in
-            unconstrained_in, log_det_unconstrained_fwd = self.norm_to_unconstrained_bijector.forward_and_log_det(norms_in)
-            unconstrained_out, logdet_inner_bijector = \
-                self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(unconstrained_in)
-            norms_out, log_det_unconstrained_rv = self.norm_to_unconstrained_bijector.inverse_and_log_det(unconstrained_out)
+            norms_out, logdet_inner_bijector = \
+                self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(norms_in)
             y2, log_det_norm_rv = self.norm_to_point_and_log_det(reference_point, norms_out, normed_vector)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_unconstrained_fwd + \
-                            log_det_unconstrained_rv  + log_det_norm_fwd + log_det_norm_rv
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
             chex.assert_shape(log_det_total, ())
         x2 = y2
         return self._recombine(y1, x2), log_det_total
