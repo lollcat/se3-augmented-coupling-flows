@@ -29,7 +29,7 @@ flow:
     vector_proj:
       transform_type: spline
       n_vectors: 3
-      spline_num_bins: 5.
+      spline_num_bins: 5
       spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
