@@ -27,7 +27,7 @@ flow:
   type: vector_proj #  nice proj_rnvp  proj_spline
   kwargs:
     vector_proj:
-      transform_type: spline
+      transform_type: real_nvp
       n_vectors: 3
       spline_num_bins: 5
       spline_max: 10.
@@ -47,6 +47,7 @@ flow:
       n_blocks: 3 # number of layers
       mlp_units: [ 128, 128 ]
       n_invariant_feat_hidden: 128
+      cross_multiplicity_shifts: false
     e3gnn:
       name: e3gnn
       n_blocks: 3 # number of layers
