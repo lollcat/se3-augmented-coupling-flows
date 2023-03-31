@@ -27,10 +27,10 @@ flow:
   n_aug: 5
   n_layers: 4
   identity_init: true
-  type: proj_rnvp #  nice proj_rnvp  proj_spline
+  type: vector_proj #  nice proj_rnvp  proj_spline
   kwargs:
     vector_proj:
-      transform_type: spline
+      transform_type: real_nvp
       n_vectors: 2
     proj_rnvp:
       origin_on_coupled_pair: false
