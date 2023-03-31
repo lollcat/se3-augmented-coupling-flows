@@ -27,8 +27,10 @@ flow:
   type: vector_proj #  nice proj_rnvp  proj_spline
   kwargs:
     vector_proj:
-      transform_type: real_nvp
-      n_vectors: 3
+      transform_type: spline
+      n_vectors: 2
+      spline_num_bins: 5
+      spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:

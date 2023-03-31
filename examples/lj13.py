@@ -17,7 +17,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
     cfg.training.batch_size = 4
-    cfg.flow.type = 'nice'
+    cfg.flow.type = 'vector_proj'
     cfg.flow.n_aug = 3
 
     cfg.training.n_epoch = 32

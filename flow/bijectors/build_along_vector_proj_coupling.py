@@ -22,6 +22,8 @@ def make_vector_proj(
         identity_init: bool = True,
         n_vectors: int = 1,
         transform_type: str = 'real_nvp',
+        spline_num_bins: int = 4,
+        spline_max: float = 10.
         ) -> VectorProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -31,7 +33,7 @@ def make_vector_proj(
     if transform_type == 'real_nvp':
         params_per_dim = 2
     elif transform_type == 'spline':
-        raise NotImplementedError  # TODO
+        params_per_dim = 3 * spline_num_bins + 1
     else:
         raise NotImplementedError
     n_invariant_params = multiplicity_within_coupling_split * params_per_dim
@@ -55,6 +57,15 @@ def make_vector_proj(
             chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
             inner_bijector = distrax.ScalarAffine(log_scale=log_scale, shift=shift)
             bijector = distrax.Chain([tfp.bijectors.Exp(), inner_bijector, distrax.Inverse(tfp.bijectors.Exp())])
+            return bijector
+        elif transform_type == "spline":
+            params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, 1, params_per_dim))
+            bijector = distrax.RationalQuadraticSpline(
+                params,
+                range_min=0.0,
+                range_max=spline_max,
+                boundary_slopes='unconstrained',
+                min_bin_size=(spline_max - 0.0) * 1e-4)
             return bijector
         else:
             raise NotImplementedError
