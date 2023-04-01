@@ -97,7 +97,6 @@ def make_se2_real_nvp():
 
 
 if __name__ == '__main__':
-    from test_utils import test_fn_is_equivariant, test_fn_is_invariant
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config

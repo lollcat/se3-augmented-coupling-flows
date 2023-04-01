@@ -2,7 +2,7 @@ import chex
 import jax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
-from flow.test_utils import test_fn_is_invariant
+from utils.test import test_fn_is_invariant
 
 
 def test_base_distribution():

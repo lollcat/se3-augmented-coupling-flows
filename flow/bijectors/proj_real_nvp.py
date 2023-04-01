@@ -25,8 +25,9 @@ def make_proj_realnvp(
     assert dim in (2, 3)  # Currently just written for 2D and 3D
     base_name = f"layer_{layer_number}_swap{swap}"
 
+    multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
-    n_invariant_params = dim * 2 * ((n_aug + 1) // 2)
+    n_invariant_params = dim * 2 * multiplicity_within_coupling_split
 
     def bijector_fn(params: chex.Array) -> distrax.ScalarAffine:
         leading_shape = params.shape[:-2]
@@ -49,16 +50,23 @@ def make_proj_realnvp(
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "e3gnn":
         n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "egnn_v0":
-        n_invariant_feat_out = nets_config.egnn_v0_torso_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 
-    equivariant_fn = EGNN(name=base_name,
-                          nets_config=nets_config,
-                          n_equivariant_vectors_out=n_heads,
-                          n_invariant_feat_out=n_invariant_feat_out,
-                          zero_init_invariant_feat=False)
+    def equivariant_fn(positions: chex.Array, features: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        chex.assert_rank(positions, 3)
+        chex.assert_rank(features, 3)
+        n_nodes, n_vec_multiplicity_in, dim = positions.shape
+        assert n_vec_multiplicity_in == multiplicity_within_coupling_split
+        net = EGNN(name=base_name,
+                      nets_config=nets_config,
+                      n_equivariant_vectors_out=n_heads*multiplicity_within_coupling_split,
+                      n_invariant_feat_out=n_invariant_feat_out,
+                      zero_init_invariant_feat=False)
+        vectors, h = net(positions, features)
+        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_heads, dim))
+        return vectors, h
+
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,

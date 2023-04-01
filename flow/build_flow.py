@@ -10,7 +10,6 @@ from flow.conditional_dist import build_aux_dist
 from flow.bijectors.proj_real_nvp import make_proj_realnvp
 from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.equi_nice import make_se_equivariant_nice
-from flow.bijectors.vector_proj_rnvp import make_vector_proj_realnvp
 from flow.bijectors.shrink_aug import make_shrink_aug_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
@@ -87,18 +86,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
-            if 'vector_proj' in flow_type:
-                kwargs_vec_proj_rnvp = config.kwargs['vector_proj'] if 'vector_proj' in config.kwargs.keys() else {}
-                bijector = make_vector_proj_realnvp(
-                    graph_features=graph_features, n_aug=config.n_aug,
-                    layer_number=layer_number, dim=config.dim,
-                    swap=swap,
-                    identity_init=config.identity_init,
-                    nets_config=config.nets_config,
-                    **kwargs_vec_proj_rnvp
-                )
-                bijectors.append(bijector)
-
             if "proj_rnvp" in flow_type:
                 kwargs_proj_rnvp = config.kwargs["proj_rnvp"] if "proj_rnvp" in config.kwargs.keys() else {}
                 bijector = make_proj_realnvp(

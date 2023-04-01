@@ -1,11 +1,9 @@
 import chex
 import jax.numpy as jnp
-import distrax
-import haiku as hk
 import jax
 
-from flow.test_utils import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
-from flow.aug_flow_dist import FullGraphSample, separate_samples_to_full_joint, joint_to_separate_samples
+from utils.test import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+from flow.aug_flow_dist import FullGraphSample
 from flow.conditional_dist import build_aux_dist
 
 _N_NODES = 7
