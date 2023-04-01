@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Optional, List, NamedTuple
+from typing import Tuple, Optional
 
 import chex
 import jax
@@ -14,7 +14,7 @@ from functools import partial
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 from molboil.train.train import TrainConfig
-from molboil.utils.eval import get_eval_and_plot_fn
+from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
