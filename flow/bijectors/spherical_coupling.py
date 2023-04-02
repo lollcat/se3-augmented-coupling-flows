@@ -5,10 +5,11 @@ import distrax
 import jax
 import jax.numpy as jnp
 
-from utils.numerical import safe_norm
+from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
 BijectorParams = chex.Array
+
 
 class SphericalSplitCoupling(BijectorWithExtra):
     def __init__(self,
@@ -41,36 +42,6 @@ class SphericalSplitCoupling(BijectorWithExtra):
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
         super().__init__(event_ndims_in=event_ndims)
-
-
-    def dist_to_spherical_and_log_det(self, x, reference) -> Tuple[Array, Array]:
-        """Computes f(x) and log|det df/dx|m where f calculates the norm of the difference vector."""
-        chex.assert_rank(x, 3)
-        n_nodes, multiplicity, dim = x.shape
-        origin, _ = jnp.split(reference, (1,), axis=-2)
-        origin = jnp.squeeze(origin, axis=-2)
-        chex.assert_equal_shape([x, origin])
-
-        # Only transform d for now.
-        vector = x - origin
-        norm = safe_norm(vector, axis=-1, keepdims=True)
-        unit_vector = vector / norm
-        x = jnp.concatenate([norm, unit_vector], axis=-1)
-        log_det = -jnp.sum(jnp.log(norm)) * (dim - 1)
-        return x, log_det
-
-    def spherical_to_cartesian_and_log_det(self, sph_x, reference) -> \
-            Tuple[Array, Array]:
-        chex.assert_rank(sph_x, 3)
-        n_nodes, multiplicity, dim = sph_x.shape
-        origin, _ = jnp.split(reference, (1,), axis=-2)
-        origin = jnp.squeeze(origin, axis=-2)
-
-        # Only transform d for now.
-        norm, unit_vector = jnp.split(sph_x, (1,), axis=-1)
-        x = origin + norm * unit_vector
-        log_det = jnp.sum(jnp.log(norm)) * (dim - 1)
-        return x, log_det
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
@@ -117,6 +88,19 @@ class SphericalSplitCoupling(BijectorWithExtra):
         extra = Extra()  # self.get_extra(vectors)
         return reference_points, bijector_feat_in, extra
 
+    def to_spherical_and_log_det(self, x, reference):
+        chex.assert_rank(x, 3)
+        chex.assert_rank(reference, 4)
+        sph_x, log_det = jax.vmap(jax.vmap(to_spherical_and_log_det))(x, reference)
+        return sph_x, jnp.sum(log_det)
+
+    def to_cartesian_and_log_det(self, x_sph, reference):
+        chex.assert_rank(x_sph, 3)
+        chex.assert_rank(reference, 4)
+        x, log_det = jax.vmap(jax.vmap(to_cartesian_and_log_det))(x_sph, reference)
+        return x, jnp.sum(log_det)
+
+
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         i = 0  # TODO: multiple reference frames
@@ -125,13 +109,12 @@ class SphericalSplitCoupling(BijectorWithExtra):
         x1, x2 = self._split(x)
         reference_points, bijector_feat_in, _ = self.get_reference_points_and_h(x1, graph_features)
         n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
-        log_det_total = jnp.zeros(())
-        sph_x_in, log_det_norm_fwd = self.dist_to_spherical_and_log_det(x2, reference_points)
+        sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
         sph_x_out, logdet_inner_bijector = \
             self._inner_bijector(bijector_feat_in, i).forward_and_log_det(sph_x_in)
         chex.assert_equal_shape((sph_x_out, sph_x_in))
-        x2, log_det_norm_rv = self.spherical_to_cartesian_and_log_det(sph_x_out, reference_points)
-        log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+        x2, log_det_norm_rv = self.to_cartesian_and_log_det(sph_x_out, reference_points)
+        log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det_total, ())
         y2 = x2
         return self._recombine(x1, y2), log_det_total
@@ -144,11 +127,10 @@ class SphericalSplitCoupling(BijectorWithExtra):
         y1, y2 = self._split(y)
         reference_points, bijector_feat_in, _ = self.get_reference_points_and_h(y1, graph_features)
         n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
-        log_det_total = jnp.zeros(())
-        sph_y_in, log_det_norm_fwd = self.dist_to_spherical_and_log_det(y2, reference_points)
+        sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
         ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
-        y2, log_det_norm_rv = self.spherical_to_cartesian_and_log_det(ph_y_out, reference_points)
-        log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+        y2, log_det_norm_rv = self.to_cartesian_and_log_det(ph_y_out, reference_points)
+        log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det_total, ())
         x2 = y2
         return self._recombine(y1, x2), log_det_total

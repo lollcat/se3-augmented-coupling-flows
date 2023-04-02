@@ -6,7 +6,7 @@ from utils.test import bijector_test
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
+def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 1, type='egnn',
                              n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
