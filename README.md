@@ -36,9 +36,9 @@ pip install -e .
 
 ## Burning
     - Spherical Flow
-        - Global Frame Layer.
+        - Global Frame Layer (seems like it could transform distance in a useful way)
     - Base distribution.
-        - Sampld d from a distribution
+        - Sample radius (e.g. from normal distribution)
         - Sample direction randomly. 
     - Act norm options: 
         - Scaling towards centre of mass. 

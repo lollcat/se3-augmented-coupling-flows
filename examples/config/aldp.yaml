@@ -16,6 +16,7 @@ target:
 
 flow:
   n_aug: 1
+  act_norm: true
   base:
     aux:
       global_centering: false
@@ -25,8 +26,13 @@ flow:
   nodes: 22
   n_layers: 8
   identity_init: true
-  type: proj_rnvp #  nice proj_rnvp  proj_spline
+  type: proj_rnvp #  nice proj_rnvp  proj_spline vector_proj
   kwargs:
+    vector_proj:
+      transform_type: real_nvp
+      n_vectors: 3
+      spline_num_bins: 8
+      spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:
@@ -34,8 +40,6 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-  act_norm: false
-  compile_n_unroll: 1
   nets:
     type: egnn
     egnn:
