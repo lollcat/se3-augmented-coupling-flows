@@ -16,7 +16,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     aux:
       global_centering: false

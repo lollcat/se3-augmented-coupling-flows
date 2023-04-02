@@ -13,7 +13,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     train_x_scale: true
     x_scale_init: 1.0
@@ -22,7 +22,6 @@ flow:
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: true
   dim: 3
-
   nodes: 13
   n_layers: 8
   identity_init: true
