@@ -12,6 +12,7 @@ from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.build_along_vector_proj_coupling import make_vector_proj
 from flow.bijectors.pseudo_act_norm import make_act_norm
+from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
@@ -52,7 +53,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj_rnvp', 'proj_spline', 'vector_proj']
+        assert flow in ['nice', 'proj_rnvp', 'proj_spline', 'vector_proj', 'spherical']
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
@@ -86,6 +87,19 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
+            if 'spherical' in flow_type:
+                kwargs_vec_proj_rnvp = config.kwargs['spherical'] if 'spherical' in config.kwargs.keys() else {}
+                bijector = make_spherical_coupling_layer(
+                    graph_features=graph_features,
+                    n_aug=config.n_aug,
+                    layer_number=layer_number,
+                    dim=config.dim,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_vec_proj_rnvp
+                )
+                bijectors.append(bijector)
             if 'vector_proj' in flow_type:
                 kwargs_vec_proj_rnvp = config.kwargs['vector_proj'] if 'vector_proj' in config.kwargs.keys() else {}
                 bijector = make_vector_proj(

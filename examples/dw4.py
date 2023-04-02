@@ -39,7 +39,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['vector_proj']
+    cfg.flow.type = ['spherical']
     cfg.flow.n_aug = 3
     cfg.flow.n_layers = 2
 
