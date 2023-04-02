@@ -21,7 +21,6 @@ def make_vector_proj(
         nets_config: NetsConfig,
         identity_init: bool = True,
         n_vectors: int = 1,
-        global_frame: bool = True,
         transform_type: str = 'real_nvp',
         spline_num_bins: int = 4,
         spline_max: float = 10.
@@ -41,10 +40,6 @@ def make_vector_proj(
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
-        if global_frame and (vector_index == n_vectors):
-            max_spline_bin = spline_max*3
-        else:
-            max_spline_bin = spline_max
         leading_shape = params.shape[:-2]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
@@ -68,7 +63,7 @@ def make_vector_proj(
             bijector = distrax.RationalQuadraticSpline(
                 params,
                 range_min=0.0,
-                range_max=max_spline_bin,
+                range_max=spline_max,
                 boundary_slopes='lower_identity',
                 min_bin_size=(spline_max - 0.0) * 1e-4)
             return bijector
@@ -95,10 +90,6 @@ def make_vector_proj(
                       zero_init_invariant_feat=False)
         vectors, h = net(positions, features)
         vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_vectors, dim))
-        if global_frame:
-            global_mean = jnp.mean(positions, axis=0, keepdims=True)
-            global_vector = global_mean - positions
-            vectors = jnp.concatenate([vectors, global_vector[:, :, None, :]], axis=-2)
         return vectors, h
 
     return VectorProjSplitCoupling(
