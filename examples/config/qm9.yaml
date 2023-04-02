@@ -30,15 +30,15 @@ flow:
     vector_proj:
       transform_type: real_nvp
       n_vectors: 3
-      spline_num_bins: 5
+      spline_num_bins: 8
       spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -5.
+      upper: 5.
   nets:
     type: egnn
     egnn:
