@@ -11,7 +11,7 @@ from flow.bijectors.proj_real_nvp import make_proj_realnvp
 from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.build_along_vector_proj_coupling import make_vector_proj
-from flow.bijectors.shrink_aug import make_shrink_aug_layer
+from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
@@ -73,12 +73,11 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         layer_number = 0
 
         if config.act_norm:
-            bijector = make_shrink_aug_layer(
+            bijector = make_act_norm(
                 layer_number=layer_number,
                 graph_features=graph_features,
                 dim=config.dim,
                 n_aug=config.n_aug,
-                swap=False,
                 identity_init=config.identity_init)
             bijectors.append(bijector)
 

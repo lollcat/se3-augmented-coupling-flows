@@ -2,7 +2,7 @@ import haiku as hk
 import distrax
 
 from utils.test import bijector_test
-from flow.bijectors.shrink_aug import make_shrink_aug_layer
+from flow.bijectors.shrink import make_shrink_aug_layer
 import jax.numpy as jnp
 
 

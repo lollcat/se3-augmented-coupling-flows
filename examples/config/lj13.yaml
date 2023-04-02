@@ -12,6 +12,8 @@ target:
     trainable_augmented_scale: false
 
 flow:
+  n_aug: 1
+  act_norm: true
   base:
     train_x_scale: true
     x_scale_init: 1.0
@@ -20,7 +22,7 @@ flow:
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: true
   dim: 3
-  n_aug: 1
+
   nodes: 13
   n_layers: 8
   identity_init: true
@@ -38,8 +40,6 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-  act_norm: false
-  compile_n_unroll: 1
   nets:
     type: egnn
     egnn:

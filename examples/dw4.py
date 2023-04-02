@@ -42,7 +42,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.type = ['vector_proj']
     cfg.flow.n_aug = 3
     cfg.flow.n_layers = 2
-    cfg.flow.act_norm = False
 
     cfg.target.aux.trainable_augmented_scale = False
     cfg.flow.base.aux.trainable_augmented_scale = False

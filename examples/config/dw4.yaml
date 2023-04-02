@@ -26,6 +26,7 @@ flow:
   nodes: 4
   n_aug: 5
   n_layers: 4
+  act_norm: true
   identity_init: true
   type: vector_proj #  nice proj_rnvp  proj_spline
   kwargs:
@@ -41,8 +42,6 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-  act_norm: false
-  compile_n_unroll: 1
   nets:
     type: egnn
     egnn:

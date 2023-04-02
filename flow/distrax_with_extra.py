@@ -62,7 +62,7 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
             info_aggregator.update({f"lay_{n_layers - 1 - i}\{n_layers}" + key: value for key, value in
                                     extra.info_aggregator.items()})
             losses.append(extra.aux_loss)
-        extras = Extra(aux_loss = jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
+        extras = Extra(aux_loss=jnp.squeeze(jnp.stack(losses)), aux_info=info, info_aggregator=info_aggregator)
         return x, log_det, extras
 
     def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
@@ -83,7 +83,7 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
             info_aggregator.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in
                                     extra.info_aggregator.items()})
             losses.append(extra.aux_loss)
-        extras = Extra(aux_loss=jnp.stack(losses), aux_info=info, info_aggregator=info_aggregator)
+        extras = Extra(aux_loss=jnp.squeeze(jnp.stack(losses)), aux_info=info, info_aggregator=info_aggregator)
         return y, log_det, extras
 
 
