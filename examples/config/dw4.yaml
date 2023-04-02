@@ -26,7 +26,7 @@ flow:
   nodes: 4
   n_aug: 5
   n_layers: 4
-  act_norm: false
+  act_norm: true
   identity_init: true
   type: vector_proj #  nice proj_rnvp  proj_spline vector_proj
   kwargs:
