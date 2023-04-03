@@ -33,13 +33,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.n_epoch = 200
     cfg.training.save = False
     cfg.training.n_eval = 10
-    cfg.training.plot_batch_size = 64
+    cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
     cfg.logger = DictConfig({"list_logger": None})
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['vector_proj']
+    cfg.flow.type = ['spherical']
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 2
 

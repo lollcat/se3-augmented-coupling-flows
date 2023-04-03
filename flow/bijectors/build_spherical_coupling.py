@@ -36,10 +36,9 @@ def make_spherical_coupling_layer(
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
-        chex.assert_rank(params, 3)
-        leading_shape = params.shape[:1]
+        chex.assert_rank(params, 2)
+        n_nodes, n_dim = params.shape
         # Flatten last 2 axes.
-        params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
@@ -48,7 +47,7 @@ def make_spherical_coupling_layer(
                                       )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim, params_per_dim))
+        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
         d_bijector = distrax.RationalQuadraticSpline(
             params[:, :, :1, :],
             range_min=0.0,
@@ -56,12 +55,13 @@ def make_spherical_coupling_layer(
             boundary_slopes='lower_identity',
             min_bin_size=(spline_max - 0.0) * 1e-4)
         if dim == 2:
-            theta_bijector = distrax.RationalQuadraticSpline(
-                params[:, :, 1:2, :],
-                range_min=-jnp.pi,
-                range_max=jnp.pi,
-                boundary_slopes='lower_identity',
-                min_bin_size=(spline_max - 0.0) * 1e-4)
+            # theta_bijector = distrax.RationalQuadraticSpline(
+            #     params[:, :, 1:2, :],
+            #     range_min=-jnp.pi,
+            #     range_max=jnp.pi,
+            #     boundary_slopes='circular',
+            #     min_bin_size=(spline_max - 0.0) * 1e-4)
+            theta_bijector = distrax.Lambda(lambda x: x)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector],
                 split_indices=[1, ],

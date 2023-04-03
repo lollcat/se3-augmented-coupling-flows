@@ -32,7 +32,6 @@ flow:
       n_vectors: 3
       spline_num_bins: 8
       spline_max: 10.
-      global_frame: true
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:
