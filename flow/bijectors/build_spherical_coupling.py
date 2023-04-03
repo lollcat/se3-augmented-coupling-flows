@@ -68,7 +68,7 @@ def make_spherical_coupling_layer(
                 params[:, :, 1:2, :],
                 range_min=0,
                 range_max=jnp.pi,
-                boundary_slopes='circular',
+                boundary_slopes='identity',
                 min_bin_size=(dist_spline_max - 0.0) * 1e-4)
             torsional_bijector = distrax.RationalQuadraticSpline(
                 params[:, :, 2:3, :],
