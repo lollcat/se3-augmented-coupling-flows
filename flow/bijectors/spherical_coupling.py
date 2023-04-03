@@ -21,6 +21,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
                  split_axis: int = -2,
+                 use_aux_loss: bool = False
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
@@ -42,6 +43,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         self._split_axis = split_axis
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
+        self.use_aux_loss = use_aux_loss
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -118,7 +120,10 @@ class SphericalSplitCoupling(BijectorWithExtra):
                 mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
                 min_log_barrier_in=jnp.min(log_barrier_in)
             )
-            aux_loss = jnp.mean(aux_loss)
+            if self.use_aux_loss:
+                aux_loss = jnp.mean(aux_loss)
+            else:
+                aux_loss = jnp.array(0.)
             extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
             return extra
 
