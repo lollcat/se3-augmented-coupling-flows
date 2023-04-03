@@ -2,7 +2,6 @@ from typing import Tuple
 
 import chex
 import distrax
-import numpy as np
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
@@ -21,7 +20,8 @@ def make_spherical_coupling_layer(
         identity_init: bool = True,
         n_transforms: int = 1,
         spline_num_bins: int = 4,
-        dist_spline_max: float = 10.
+        dist_spline_max: float = 10.,
+        use_aux_loss: bool = True,
         ) -> SphericalSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -113,4 +113,5 @@ def make_spherical_coupling_layer(
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
+        use_aux_loss=use_aux_loss
     )

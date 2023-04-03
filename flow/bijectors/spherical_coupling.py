@@ -21,7 +21,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
                  split_axis: int = -2,
-                 use_aux_loss: bool = False,
+                 use_aux_loss: bool = True,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
