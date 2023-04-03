@@ -21,7 +21,8 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
                  split_axis: int = -2,
-                 use_aux_loss: bool = False
+                 use_aux_loss: bool = False,
+                 condition_on_x_proj: bool = True
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
@@ -44,6 +45,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
         self.use_aux_loss = use_aux_loss
+        self.condition_on_x_proj = condition_on_x_proj
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -86,9 +88,15 @@ class SphericalSplitCoupling(BijectorWithExtra):
         # Calculate new basis for the affine transform
         reference_vectors, h = self._get_reference_points_and_invariant_vals(x, graph_features)
         reference_points = x[:, :, None, :] + reference_vectors
-        # TODO: Can project coupled points into spherical coords and make this part of bijector_params.
-        h = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
-        bijector_feat_in = h
+
+        bijector_feat_in = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
+        if self.condition_on_x_proj:
+            # For each set of reference points (for each multiplicity) project all points
+            x_sh = jax.vmap(jax.vmap(jax.vmap(to_spherical_and_log_det, in_axes=(0, None)), in_axes=(None, 0))
+                            )(x, reference_points)[0]
+            x_sh = jnp.reshape(x_sh, (n_nodes, multiplicity, multiplicity*dim))
+            bijector_feat_in = jnp.concatenate([bijector_feat_in, x_sh], axis=-1)
+
         extra = self.get_extra(reference_vectors)
         return reference_points, bijector_feat_in, extra
 

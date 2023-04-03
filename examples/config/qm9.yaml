@@ -25,7 +25,7 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: proj_rnvp #  nice proj_rnvp  proj_spline
+  type: spherical #  nice proj_rnvp  proj_spline
   kwargs:
     spherical:
       dist_spline_max: 10.
