@@ -10,7 +10,6 @@ from flow.conditional_dist import build_aux_dist
 from flow.bijectors.proj_real_nvp import make_proj_realnvp
 from flow.bijectors.proj_spline import make_proj_spline
 from flow.bijectors.equi_nice import make_se_equivariant_nice
-from flow.bijectors.build_along_vector_proj_coupling import make_vector_proj
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
@@ -90,19 +89,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             if 'spherical' in flow_type:
                 kwargs_vec_proj_rnvp = config.kwargs['spherical'] if 'spherical' in config.kwargs.keys() else {}
                 bijector = make_spherical_coupling_layer(
-                    graph_features=graph_features,
-                    n_aug=config.n_aug,
-                    layer_number=layer_number,
-                    dim=config.dim,
-                    swap=swap,
-                    identity_init=config.identity_init,
-                    nets_config=config.nets_config,
-                    **kwargs_vec_proj_rnvp
-                )
-                bijectors.append(bijector)
-            if 'vector_proj' in flow_type:
-                kwargs_vec_proj_rnvp = config.kwargs['vector_proj'] if 'vector_proj' in config.kwargs.keys() else {}
-                bijector = make_vector_proj(
                     graph_features=graph_features,
                     n_aug=config.n_aug,
                     layer_number=layer_number,

@@ -25,16 +25,11 @@ flow:
   nodes: 13
   n_layers: 8
   identity_init: true
-  type: spherical #  nice proj_rnvp  proj_spline vector_proj
+  type: spherical #  nice proj_rnvp  proj_spline
   kwargs:
     spherical:
       dist_spline_max: 10.
       spline_num_bins: 8
-    vector_proj:
-      transform_type: spline
-      n_vectors: 2
-      spline_num_bins: 5
-      spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:

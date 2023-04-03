@@ -28,16 +28,11 @@ flow:
   n_layers: 4
   act_norm: true
   identity_init: true
-  type: spherical #  nice proj_rnvp  proj_spline vector_proj
+  type: spherical #  nice proj_rnvp  proj_spline
   kwargs:
     spherical:
       dist_spline_max: 10.
       spline_num_bins: 8
-    vector_proj:
-      transform_type: spline
-      n_vectors: 2
-      spline_num_bins: 4
-      spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:

@@ -25,16 +25,11 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: spherical #  nice proj_rnvp  proj_spline vector_proj
+  type: proj_rnvp #  nice proj_rnvp  proj_spline
   kwargs:
     spherical:
       dist_spline_max: 10.
       spline_num_bins: 8
-    vector_proj:
-      transform_type: real_nvp
-      n_vectors: 3
-      spline_num_bins: 8
-      spline_max: 10.
     proj_rnvp:
       origin_on_coupled_pair: false
     proj_spline:
@@ -71,7 +66,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
   use_64_bit: false
-  n_epoch: 128
+  n_epoch: 64
   batch_size: 32
   plot_batch_size: 128
   seed: 0
