@@ -25,7 +25,7 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: vector_proj #  nice proj_rnvp  proj_spline vector_proj
+  type: spherical #  nice proj_rnvp  proj_spline vector_proj
   kwargs:
     vector_proj:
       transform_type: real_nvp
