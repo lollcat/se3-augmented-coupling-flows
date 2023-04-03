@@ -87,6 +87,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         reference_vectors, h = self._get_reference_points_and_invariant_vals(x, graph_features)
         reference_points = x[:, :, None, :] + reference_vectors
         # TODO: Can project coupled points into spherical coords and make this part of bijector_params.
+        h = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
         bijector_feat_in = h
         extra = self.get_extra(reference_vectors)
         return reference_points, bijector_feat_in, extra
