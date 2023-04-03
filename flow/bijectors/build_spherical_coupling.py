@@ -55,13 +55,12 @@ def make_spherical_coupling_layer(
             boundary_slopes='lower_identity',
             min_bin_size=(spline_max - 0.0) * 1e-4)
         if dim == 2:
-            # theta_bijector = distrax.RationalQuadraticSpline(
-            #     params[:, :, 1:2, :],
-            #     range_min=-jnp.pi,
-            #     range_max=jnp.pi,
-            #     boundary_slopes='circular',
-            #     min_bin_size=(spline_max - 0.0) * 1e-4)
-            theta_bijector = distrax.Lambda(lambda x: x)
+            theta_bijector = distrax.RationalQuadraticSpline(
+                params[:, :, 1:2, :],
+                range_min=-jnp.pi,
+                range_max=jnp.pi,
+                boundary_slopes='circular',
+                min_bin_size=(spline_max - 0.0) * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector],
                 split_indices=[1, ],
