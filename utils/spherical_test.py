@@ -4,7 +4,7 @@ import jax
 
 from molboil.utils.test import test_fn_is_invariant, test_fn_is_equivariant
 
-from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det
+from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det, _to_polar_and_log_det, polar_to_cartesian_and_log_det
 
 
 def tesst_does_not_smoke_and_invertible():
@@ -14,6 +14,22 @@ def tesst_does_not_smoke_and_invertible():
     x_sph, log_det_fwd = to_spherical_and_log_det(x, reference)
 
     x_, log_det_rv = to_cartesian_and_log_det(x_sph, reference)
+
+    chex.assert_trees_all_close(x, x_, rtol=1e-5)
+    chex.assert_trees_all_close(log_det_fwd, -log_det_rv, rtol=1e-5)
+
+
+def tesst_polar_does_not_smoke_and_invertible():
+    origin = jnp.array([0, 0])
+    y_axis = jnp.array([1, 0])
+    reference = jnp.stack([origin, y_axis], axis=-2)
+    x = jnp.array([1., 1.])
+
+    x_sph, log_det_fwd = _to_polar_and_log_det(x, reference)
+    r, theta = x_sph
+    chex.assert_trees_all_close((r, theta), (jnp.sqrt(2.), jnp.pi*0.25))
+
+    x_, log_det_rv = polar_to_cartesian_and_log_det(x_sph, reference)
 
     chex.assert_trees_all_close(x, x_, rtol=1e-5)
     chex.assert_trees_all_close(log_det_fwd, -log_det_rv, rtol=1e-5)
@@ -54,6 +70,7 @@ def tesst_does_not_smoke_and_invertible():
 
 
 if __name__ == '__main__':
+    tesst_polar_does_not_smoke_and_invertible()
     tesst_does_not_smoke_and_invertible()
     # tesst_to_spherical_is_invariant()
     # tesst_to_spherical_and_back_is_equivariant()

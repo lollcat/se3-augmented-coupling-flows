@@ -30,9 +30,11 @@ def make_proj_realnvp(
     n_invariant_params = dim * 2 * multiplicity_within_coupling_split
 
     def bijector_fn(params: chex.Array) -> distrax.ScalarAffine:
-        leading_shape = params.shape[:-2]
+        chex.assert_rank(params, 3)
+        n_nodes, multpl, n_dim = params.shape
+        assert multpl == multiplicity_within_coupling_split
         # Flatten last 2 axes.
-        params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
+        params = jnp.reshape(params, (n_nodes, multpl*n_dim))
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
@@ -41,7 +43,7 @@ def make_proj_realnvp(
         )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim*2))
+        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim*2))
         log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
         return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
 

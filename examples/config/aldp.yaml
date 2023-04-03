@@ -18,10 +18,11 @@ flow:
   n_aug: 1
   act_norm: true
   base:
+    train_x_scale: false
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: true
+      trainable_augmented_scale: false
   dim: 3
   nodes: 22
   n_layers: 8

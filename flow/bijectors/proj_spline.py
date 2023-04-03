@@ -34,9 +34,11 @@ def make_proj_spline(
     n_invariant_params = dim * multiplicity_within_coupling_split * params_per_dim_per_var_group
 
     def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
-        leading_shape = params.shape[:-2]
+        chex.assert_rank(params, 3)
+        n_nodes, multpl, n_dim = params.shape
+        assert multpl == multiplicity_within_coupling_split
         # Flatten last 2 axes.
-        params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
+        params = jnp.reshape(params, (n_nodes, multpl*n_dim))
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
@@ -45,7 +47,7 @@ def make_proj_spline(
         )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim, params_per_dim_per_var_group))
+        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim_per_var_group))
         bijector = distrax.RationalQuadraticSpline(
             params,
             range_min=lower,
@@ -58,8 +60,6 @@ def make_proj_spline(
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "e3gnn":
         n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "egnn_v0":
-        n_invariant_feat_out = nets_config.egnn_v0_torso_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 

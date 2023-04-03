@@ -40,9 +40,10 @@ def make_vector_proj(
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
-        leading_shape = params.shape[:-2]
+        chex.assert_rank(params, 2)
+        n_nodes, n_feat_in = params.shape
         # Flatten last 2 axes.
-        params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
+        params = jnp.reshape(params, (n_nodes, np.prod(params.shape[-2:])))
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,

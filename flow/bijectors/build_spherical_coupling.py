@@ -22,7 +22,6 @@ def make_spherical_coupling_layer(
         nets_config: NetsConfig,
         identity_init: bool = True,
         n_transforms: int = 1,
-        transform_type: str = 'real_nvp',
         spline_num_bins: int = 4,
         spline_max: float = 10.
         ) -> SphericalSplitCoupling:
@@ -31,18 +30,14 @@ def make_spherical_coupling_layer(
     base_name = f"layer_{layer_number}_swap{swap}"
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
-    if transform_type == 'real_nvp':
-        params_per_dim = 2
-    elif transform_type == 'spline':
-        params_per_dim = 3 * spline_num_bins + 1
-    else:
-        raise NotImplementedError
-    n_invariant_params = multiplicity_within_coupling_split * params_per_dim
+    params_per_dim = 3 * spline_num_bins + 1
+    n_invariant_params = multiplicity_within_coupling_split * dim * params_per_dim
     n_vectors = n_transforms * dim
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
-        leading_shape = params.shape[:-2]
+        chex.assert_rank(params, 3)
+        leading_shape = params.shape[:1]
         # Flatten last 2 axes.
         params = jnp.reshape(params, (*leading_shape, np.prod(params.shape[-2:])))
         mlp_function = ConditionerMLP(
@@ -53,27 +48,30 @@ def make_spherical_coupling_layer(
                                       )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, params_per_dim))
-        if transform_type == 'real_nvp':
-            log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-            chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
-            inner_bijector = distrax.ScalarAffine(log_scale=log_scale, shift=shift)
-            d_bijector = distrax.Chain([tfp.bijectors.Exp(), inner_bijector, distrax.Inverse(tfp.bijectors.Exp())])
-        elif transform_type == "spline":
-            params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, 1, params_per_dim))
-            d_bijector = distrax.RationalQuadraticSpline(
-                params,
-                range_min=0.0,
-                range_max=spline_max,
+        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, dim, params_per_dim))
+        d_bijector = distrax.RationalQuadraticSpline(
+            params[:, :, :1, :],
+            range_min=0.0,
+            range_max=spline_max,
+            boundary_slopes='lower_identity',
+            min_bin_size=(spline_max - 0.0) * 1e-4)
+        if dim == 2:
+            theta_bijector = distrax.RationalQuadraticSpline(
+                params[:, :, 1:2, :],
+                range_min=-jnp.pi,
+                range_max=jnp.pi,
                 boundary_slopes='lower_identity',
                 min_bin_size=(spline_max - 0.0) * 1e-4)
+            bijector = Blockwise(
+                bijectors=[d_bijector, theta_bijector],
+                split_indices=[1, ],
+            )
         else:
-            raise NotImplementedError
-        bijector_remaining = distrax.Lambda(lambda x: x)
-        bijector = Blockwise(
-            bijectors=[d_bijector, bijector_remaining],
-            split_indices=[1,],
-        )
+            bijector_remaining = distrax.Lambda(lambda x: x)
+            bijector = Blockwise(
+                bijectors=[d_bijector, bijector_remaining],
+                split_indices=[1,],
+            )
         return bijector
 
 

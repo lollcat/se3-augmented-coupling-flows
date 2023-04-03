@@ -4,9 +4,72 @@ import chex
 import jax.numpy as jnp
 
 from molboil.utils.numerical import safe_norm
-
+from molboil.utils.numerical import rotate_2d
 
 def to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
+    chex.assert_rank(x, 1)
+    chex.assert_rank(reference, 2)
+    dim = x.shape[0]
+    if dim == 3:
+        return _to_spherical_and_log_det(x, reference)
+    else:
+        assert dim == 2
+        return _to_polar_and_log_det(x, reference)
+
+
+def to_cartesian_and_log_det(sph_x, reference) -> \
+        Tuple[chex.Array, chex.Array]:
+    chex.assert_rank(sph_x, 1)
+    chex.assert_rank(reference, 2)
+    dim = sph_x.shape[0]
+    if dim == 2:
+        return polar_to_cartesian_and_log_det(sph_x, reference)
+    else:
+        assert dim == 4 # current hack
+        return _to_cartesian_and_log_det(sph_x, reference)
+
+
+def _to_polar_and_log_det(x, reference):
+    chex.assert_shape(x, (2,))
+    origin, y = jnp.split(reference, (1,), axis=-2)
+    y, origin = jnp.squeeze(y), jnp.squeeze(origin)
+    chex.assert_equal_shape((origin, y, x))
+
+    vector_x = x - origin
+    vector_y = y - origin
+
+    # Calculate radius.
+    r = safe_norm(vector_x, axis=-1)
+    unit_vector_x = vector_x / r
+
+
+    # Calculate angle
+    norm_y = safe_norm(y, axis=-1)
+    unit_vector_y = vector_y / norm_y
+    x_proj_norm = jnp.dot(unit_vector_x, unit_vector_y)
+    perp_line_norm = safe_norm(jnp.cross(unit_vector_x, unit_vector_y)) / norm_y
+    theta = jnp.arctan2(perp_line_norm, x_proj_norm)
+    log_det = - jnp.log(r)
+
+    x_polar = jnp.stack([r, theta])
+    return x_polar, log_det
+
+
+def polar_to_cartesian_and_log_det(x_polar, reference):
+    chex.assert_shape(x_polar, (2,))
+    origin, y = jnp.split(reference, (1,), axis=-2)
+    y, origin = jnp.squeeze(y), jnp.squeeze(origin)
+    chex.assert_equal_shape((origin, y, x_polar))
+
+    r, theta = x_polar
+    y_axis = y / safe_norm(y)
+
+    log_det = jnp.log(r)
+    x = rotate_2d(r * y_axis, theta)
+    return x, log_det
+
+
+def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(x, 1)
     dim = x.shape[0]
     origin, _ = jnp.split(reference, (1,), axis=-2)
@@ -22,7 +85,7 @@ def to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     return x, jnp.squeeze(log_det)
 
 
-def to_cartesian_and_log_det(sph_x, reference) -> \
+def _to_cartesian_and_log_det(sph_x, reference) -> \
         Tuple[chex.Array, chex.Array]:
     chex.assert_rank(sph_x, 1)
     dim = sph_x.shape[0] - 1  # TODO: Update when this is no longer hacky
@@ -34,3 +97,4 @@ def to_cartesian_and_log_det(sph_x, reference) -> \
     x = origin + norm * unit_vector
     log_det = jnp.log(norm) * (dim - 1)
     return x, jnp.squeeze(log_det)
+
