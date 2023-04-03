@@ -22,11 +22,13 @@ def to_cartesian_and_log_det(sph_x, reference) -> \
     chex.assert_rank(sph_x, 1)
     chex.assert_rank(reference, 2)
     dim = sph_x.shape[0]
-    if dim == 2:
-        return polar_to_cartesian_and_log_det(sph_x, reference)
-    else:
-        assert dim == 4 # current hack
+    if dim == 4:  # current hack
+        # assert
         return _to_cartesian_and_log_det(sph_x, reference)
+    else:
+        assert dim == 2
+        return polar_to_cartesian_and_log_det(sph_x, reference)
+
 
 
 def _to_polar_and_log_det(x, reference):
@@ -45,10 +47,10 @@ def _to_polar_and_log_det(x, reference):
 
     # Calculate angle
     norm_y = safe_norm(y, axis=-1)
-    unit_vector_y = vector_y / norm_y
-    x_proj_norm = jnp.dot(unit_vector_x, unit_vector_y)
-    perp_line_norm = safe_norm(jnp.cross(unit_vector_x, unit_vector_y)) / norm_y
-    theta = jnp.arctan2(perp_line_norm, x_proj_norm)
+    unit_vector_y_axis = vector_y / norm_y
+    x_proj_norm = jnp.dot(unit_vector_x, unit_vector_y_axis)
+    perp_line = jnp.cross(unit_vector_y_axis, unit_vector_x)
+    theta = jnp.arctan2(perp_line, x_proj_norm)
     log_det = - jnp.log(r)
 
     x_polar = jnp.stack([r, theta])
@@ -60,12 +62,14 @@ def polar_to_cartesian_and_log_det(x_polar, reference):
     origin, y = jnp.split(reference, (1,), axis=-2)
     y, origin = jnp.squeeze(y), jnp.squeeze(origin)
     chex.assert_equal_shape((origin, y, x_polar))
+    y_vector = y - origin
 
     r, theta = x_polar
-    y_axis = y / safe_norm(y)
+    y_unit_vec = y_vector / safe_norm(y_vector)
 
     log_det = jnp.log(r)
-    x = rotate_2d(r * y_axis, theta)
+    x_vector = rotate_2d(r * y_unit_vec, theta)
+    x = origin + x_vector
     return x, log_det
 
 
