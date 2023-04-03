@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import chex
+import jax
 import jax.numpy as jnp
 
 from molboil.utils.numerical import safe_norm
@@ -22,8 +23,7 @@ def to_cartesian_and_log_det(sph_x, reference) -> \
     chex.assert_rank(sph_x, 1)
     chex.assert_rank(reference, 2)
     dim = sph_x.shape[0]
-    if dim == 4:  # current hack
-        # assert
+    if dim == 3:
         return _to_cartesian_and_log_det(sph_x, reference)
     else:
         assert dim == 2
@@ -53,6 +53,7 @@ def _to_polar_and_log_det(x, reference):
     theta = jnp.arctan2(perp_line, x_proj_norm)
     log_det = - jnp.log(r)
 
+
     x_polar = jnp.stack([r, theta])
     return x_polar, log_det
 
@@ -76,29 +77,58 @@ def polar_to_cartesian_and_log_det(x_polar, reference):
 def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(x, 1)
     dim = x.shape[0]
-    origin, _ = jnp.split(reference, (1,), axis=-2)
-    origin = jnp.squeeze(origin, axis=-2)
-    chex.assert_equal_shape([x, origin])
+    origin, z, o = jnp.split(reference, (1,2), axis=-2)
+    origin, z, o = jnp.squeeze(origin, axis=-2), jnp.squeeze(z, axis=-2), jnp.squeeze(o, axis=-2)
+    chex.assert_equal_shape([x, origin, z, o])
 
-    # Only transform d for now.
+    # Get z, y, and x axes (unit vectors).
+    z_vector = z - origin
+    z_axis_vector = z_vector / safe_norm(z_vector)
+    o_vector = o - origin
+    x_vector = o_vector - z_axis_vector * jnp.dot(o_vector, z_axis_vector)  # vector rejection.
+    x_axis_vector = x_vector / safe_norm(x_vector)
+    y_vector = jnp.cross(x_axis_vector, z_axis_vector)
+    y_axis_vector = y_vector / safe_norm(y_vector)
+
     vector = x - origin
-    norm = safe_norm(vector, axis=-1, keepdims=True)
-    unit_vector = vector / norm
-    x = jnp.concatenate([norm, unit_vector], axis=-1)
-    log_det = - jnp.log(norm) * (dim - 1)
+    r = safe_norm(vector)
+    vector_in_z_dir = z_axis_vector * jnp.dot(vector, z_axis_vector)
+    vector_z_perp = vector - vector_in_z_dir  # vector rejection
+    theta = jnp.arctan2(safe_norm(vector_z_perp), jnp.dot(vector_in_z_dir, z_axis_vector))
+
+    a = jnp.dot(vector_z_perp, y_axis_vector)  # magnitude of vector along y axis.
+    b = jnp.dot(vector_z_perp, x_axis_vector)  # magnitude of vector along x axis
+    torsion = jnp.arctan2(a, b)
+
+    x = jnp.stack([r, theta, torsion])
+    log_det = - (2*jnp.log(r) + jnp.log(jnp.sin(theta)))
     return x, jnp.squeeze(log_det)
 
 
 def _to_cartesian_and_log_det(sph_x, reference) -> \
         Tuple[chex.Array, chex.Array]:
     chex.assert_rank(sph_x, 1)
-    dim = sph_x.shape[0] - 1  # TODO: Update when this is no longer hacky
-    origin, _ = jnp.split(reference, (1,), axis=-2)
-    origin = jnp.squeeze(origin, axis=-2)
+    origin, z, o = jnp.split(reference, (1,2), axis=-2)
+    origin, z, o = jnp.squeeze(origin, axis=-2), jnp.squeeze(z, axis=-2), jnp.squeeze(o, axis=-2)
+    chex.assert_equal_shape([sph_x, origin, z, o])
 
-    # Only transform d for now.
-    norm, unit_vector = jnp.split(sph_x, (1,), axis=-1)
-    x = origin + norm * unit_vector
-    log_det = jnp.log(norm) * (dim - 1)
-    return x, jnp.squeeze(log_det)
+    # Get z, y, and x axes (unit vectors).
+    z_vector = z - origin
+    z_axis_vector = z_vector / safe_norm(z_vector)
+    o_vector = o - origin
+    x_vector = o_vector - z_axis_vector * jnp.dot(o_vector, z_axis_vector)  # vector rejection.
+    x_axis_vector = x_vector / safe_norm(x_vector)
+    y_vector = jnp.cross(x_axis_vector, z_axis_vector)
+    y_axis_vector = y_vector / safe_norm(y_vector)
+
+    r, theta, torsion = jnp.split(sph_x, 3)
+    r, theta, torsion = jax.tree_map(jnp.squeeze, (r, theta, torsion))
+
+    vector_z_perp = x_axis_vector * jnp.cos(torsion) + y_axis_vector * jnp.sin(torsion)  # Should have norm of 1.
+    vector = r*(z_axis_vector * jnp.cos(theta) + vector_z_perp * jnp.sin(theta))
+
+    x_cartesian = vector + origin
+
+    log_det = (2*jnp.log(r) + jnp.log(jnp.sin(theta)))
+    return x_cartesian, jnp.squeeze(log_det)
 
