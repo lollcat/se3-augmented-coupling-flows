@@ -15,12 +15,12 @@ flow:
   n_aug: 1
   act_norm: true
   base:
-    train_x_scale: true
+    train_x_scale: false
     x_scale_init: 1.0
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: true
+      trainable_augmented_scale: false
   dim: 3
   nodes: 19
   n_layers: 8
@@ -66,7 +66,7 @@ training:
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
   use_64_bit: false
-  n_epoch: 64
+  n_epoch: 128
   batch_size: 32
   plot_batch_size: 128
   seed: 0
