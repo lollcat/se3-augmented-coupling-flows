@@ -74,7 +74,6 @@ class ProjSplitCoupling(BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -1,
                  add_small_identity: bool = True,
-                 condition_on_x_proj: bool = False
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
@@ -98,7 +97,6 @@ class ProjSplitCoupling(BijectorWithExtra):
         self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
         self._graph_features = graph_features
         self._add_small_identity = add_small_identity
-        self.condition_on_x_proj = condition_on_x_proj
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -152,13 +150,8 @@ class ProjSplitCoupling(BijectorWithExtra):
         # Vmap over multiplicity.
         change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1)(
             vectors, self._add_small_identity)
-
-        bijector_feat_in = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
-        if self.condition_on_x_proj:
-            x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
-            bijector_feat_in = jnp.concatenate([x_proj, bijector_feat_in], axis=-1)
         extra = self.get_extra(vectors)
-        return origin, change_of_basis_matrix, bijector_feat_in, extra
+        return origin, change_of_basis_matrix, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
         basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30

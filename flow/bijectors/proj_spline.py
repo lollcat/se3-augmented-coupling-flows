@@ -32,17 +32,17 @@ def make_proj_spline(
     params_per_dim_per_var_group = (3 * num_bins + 1)
     params_dim_channel = params_per_dim_per_var_group*dim
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
+    n_invariant_params_bijector = multiplicity_within_coupling_split*params_dim_channel
 
     def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
-        chex.assert_rank(params, 3)
-        n_nodes, multpl, n_dim = params.shape
-        assert multpl == multiplicity_within_coupling_split
+        chex.assert_rank(params, 2)
+        n_nodes, n_dim = params.shape
         # Flatten last 2 axes.
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
-            n_output_params=params_dim_channel,
+            n_output_params=n_invariant_params_bijector,
         )
         params = mlp_function(params)
         # reshape
