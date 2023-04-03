@@ -41,7 +41,7 @@ def make_proj_spline(
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
-            identity_init=identity_init,
+            zero_init=identity_init,
             n_output_params=params_dim_channel,
         )
         params = mlp_function(params)

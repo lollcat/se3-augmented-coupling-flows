@@ -42,7 +42,7 @@ def make_spherical_coupling_layer(
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
-            identity_init=identity_init,
+            zero_init=identity_init,
             n_output_params=params_per_dim_channel,
         )
         params = mlp_function(params)
