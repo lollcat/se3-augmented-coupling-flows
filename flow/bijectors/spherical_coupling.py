@@ -22,7 +22,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -2,
                  use_aux_loss: bool = False,
-                 condition_on_x_proj: bool = True
+                 condition_on_x_proj: bool = False
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
