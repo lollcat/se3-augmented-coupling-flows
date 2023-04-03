@@ -41,9 +41,7 @@ def make_vector_proj(
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
         chex.assert_rank(params, 2)
-        n_nodes, n_feat_in = params.shape
-        # Flatten last 2 axes.
-        params = jnp.reshape(params, (n_nodes, np.prod(params.shape[-2:])))
+        n_nodes, n_dim = params.shape
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
@@ -52,15 +50,15 @@ def make_vector_proj(
                                       )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, params_per_dim))
+        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, params_per_dim))
         if transform_type == 'real_nvp':
             log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-            chex.assert_shape(log_scale, (*leading_shape, (n_aug + 1) // 2, 1))
+            chex.assert_shape(log_scale, (n_nodes, (n_aug + 1) // 2, 1))
             inner_bijector = distrax.ScalarAffine(log_scale=log_scale, shift=shift)
             bijector = distrax.Chain([tfp.bijectors.Exp(), inner_bijector, distrax.Inverse(tfp.bijectors.Exp())])
             return bijector
         elif transform_type == "spline":
-            params = jnp.reshape(params, (*leading_shape, (n_aug + 1) // 2, 1, params_per_dim))
+            params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, 1, params_per_dim))
             bijector = distrax.RationalQuadraticSpline(
                 params,
                 range_min=0.0,
