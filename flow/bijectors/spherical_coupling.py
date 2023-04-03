@@ -5,6 +5,7 @@ import distrax
 import jax
 import jax.numpy as jnp
 
+from molboil.utils.numerical import safe_norm
 from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det
 from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
 
@@ -83,10 +84,43 @@ class SphericalSplitCoupling(BijectorWithExtra):
         # Calculate new basis for the affine transform
         reference_vectors, h = self._get_reference_points_and_invariant_vals(x, graph_features)
         reference_points = x[:, :, None, :] + reference_vectors
-        # TODO: Can calculate distrances to reference points and input this to bijectors.
+        # TODO: Can project coupled points into spherical coords and make this part of bijector_params.
         bijector_feat_in = h
-        extra = Extra()  # self.get_extra(vectors)
+        extra = self.get_extra(reference_vectors)
         return reference_points, bijector_feat_in, extra
+
+    def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        dim = basis_vectors.shape[-1]
+        assert dim == 3
+        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
+        vec1 = basis_vectors[:, 1]
+        vec2 = basis_vectors[:, 2]
+        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jax.vmap(jnp.arccos)(arccos_in)
+        log_barrier_in = 1 - jnp.abs(arccos_in)
+        log_barrier_in = jnp.where(log_barrier_in < 1e-6, log_barrier_in + 1e-6, log_barrier_in)
+        aux_loss = - jnp.log(log_barrier_in)
+        return theta, aux_loss, log_barrier_in
+
+    def get_extra(self, various_x_points: chex.Array) -> Extra:
+        dim = various_x_points.shape[-1]
+        if dim == 2:
+            return Extra()
+        else:
+            theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
+            info = {}
+            info_aggregator = {}
+            info_aggregator.update(
+                mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
+                min_log_barrier_in=jnp.min
+            )
+            info.update(
+                mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
+                min_log_barrier_in=jnp.min(log_barrier_in)
+            )
+            aux_loss = jnp.mean(aux_loss)
+            extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
+            return extra
 
     def to_spherical_and_log_det(self, x, reference):
         chex.assert_rank(x, 3)
@@ -101,13 +135,13 @@ class SphericalSplitCoupling(BijectorWithExtra):
         return x, jnp.sum(log_det)
 
 
-    def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+    def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         i = 0  # TODO: multiple reference frames
         self._check_forward_input_shape(x)
         dim = x.shape[-1]
         x1, x2 = self._split(x)
-        reference_points, bijector_feat_in, _ = self.get_reference_points_and_h(x1, graph_features)
+        reference_points, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
         n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
         sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
         sph_x_out, logdet_inner_bijector = \
@@ -117,15 +151,15 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det_total, ())
         y2 = x2
-        return self._recombine(x1, y2), log_det_total
+        return self._recombine(x1, y2), log_det_total, extra
 
-    def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+    def inverse_and_log_det_single_with_extra(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         i = 0  # TODO: multiple reference frames
         self._check_inverse_input_shape(y)
         dim = y.shape[-1]
         y1, y2 = self._split(y)
-        reference_points, bijector_feat_in, _ = self.get_reference_points_and_h(y1, graph_features)
+        reference_points, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
         n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
         sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
         ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
@@ -133,7 +167,13 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det_total, ())
         x2 = y2
-        return self._recombine(y1, x2), log_det_total
+        return self._recombine(y1, x2), log_det_total, extra
+
+    def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        return self.forward_and_log_det_single_with_extra(x, graph_features)[:2]
+
+    def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        return self.inverse_and_log_det_single_with_extra(y, graph_features)[:2]
 
     def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
@@ -160,3 +200,36 @@ class SphericalSplitCoupling(BijectorWithExtra):
                 return jax.vmap(self.inverse_and_log_det_single)(y, self._graph_features)
         else:
             raise NotImplementedError
+
+    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        if len(x.shape) == 3:
+            h, logdet, extra = self.forward_and_log_det_single_with_extra(x, self._graph_features)
+        elif len(x.shape) == 4:
+            if self._graph_features.shape[0] != x.shape[0]:
+                print("graph features has no batch size")
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_single_with_extra, in_axes=(0, None))(
+                    x, self._graph_features)
+            else:
+                h, logdet, extra = jax.vmap(self.forward_and_log_det_single_with_extra)(
+                    x, self._graph_features)
+            extra = extra._replace(aux_info=extra.aggregate_info(), aux_loss=jnp.mean(extra.aux_loss))
+        else:
+            raise NotImplementedError
+        return h, logdet, extra
+
+    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        if len(y.shape) == 3:
+            x, logdet, extra = self.inverse_and_log_det_single_with_extra(y, self._graph_features)
+        elif len(y.shape) == 4:
+            if self._graph_features.shape[0] != y.shape[0]:
+                print("graph features has no batch size")
+                x, logdet, extra = jax.vmap(self.inverse_and_log_det_single_with_extra, in_axes=(0, None))(
+                    y, self._graph_features)
+            else:
+                x, logdet, extra = jax.vmap(self.inverse_and_log_det_single_with_extra)(y, self._graph_features)
+            extra = extra._replace(aux_info=extra.aggregate_info(), aux_loss=jnp.mean(extra.aux_loss))
+        else:
+            raise NotImplementedError
+        return x, logdet, extra
