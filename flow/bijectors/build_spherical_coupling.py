@@ -4,8 +4,6 @@ import chex
 import distrax
 import numpy as np
 import jax.numpy as jnp
-import haiku as hk
-import tensorflow_probability.substrates.jax as tfp
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerMLP
@@ -31,20 +29,19 @@ def make_spherical_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     params_per_dim = 3 * spline_num_bins + 1
-    params_per_dim_channel = dim * params_per_dim
+    n_invariant_params = multiplicity_within_coupling_split * dim * params_per_dim
     n_vectors = n_transforms * dim
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
-        chex.assert_rank(params, 3)
-        n_nodes, multpl, n_dim = params.shape
-        assert multpl == multiplicity_within_coupling_split
+        chex.assert_rank(params, 2)
+        n_nodes, n_dim = params.shape
+        # Flatten last 2 axes.
         mlp_function = ConditionerMLP(
-            name=f"conditionermlp_cond_mlp_{vector_index}" + base_name,
+            name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
-            n_output_params=params_per_dim_channel,
-        )
+            n_output_params=n_invariant_params)
         params = mlp_function(params)
         # reshape
         params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
