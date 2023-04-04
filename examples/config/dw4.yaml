@@ -31,10 +31,12 @@ flow:
   type: spherical #  nice proj spherical
   kwargs:
     spherical:
+      n_inner_transforms: 3
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
+      n_inner_transforms: 3
       origin_on_coupled_pair: false
       num_bins: 8
       lower: -2.
@@ -48,7 +50,7 @@ flow:
         n_invariant_feat_hidden: 32
         cross_multiplicity_shifts: true
     mlp_head_config:
-      mlp_units: [32, 32]
+      mlp_units: [32,]
 
 
 training:
@@ -64,6 +66,7 @@ training:
   n_epoch: 50
   batch_size: 200
   plot_batch_size: 256
+  eval_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000

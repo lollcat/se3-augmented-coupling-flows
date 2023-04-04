@@ -5,7 +5,7 @@ import distrax
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
-from nets.conditioner_mlp import ConditionerMLP
+from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.spherical_coupling import SphericalSplitCoupling
 from flow.bijectors.blockwise import Blockwise
 
@@ -22,6 +22,7 @@ def make_spherical_coupling_layer(
         spline_num_bins: int = 4,
         dist_spline_max: float = 10.,
         use_aux_loss: bool = True,
+        n_inner_transforms: int = 1,
         ) -> SphericalSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -37,7 +38,7 @@ def make_spherical_coupling_layer(
         chex.assert_rank(params, 2)
         n_nodes, n_dim = params.shape
         # Flatten last 2 axes.
-        mlp_function = ConditionerMLP(
+        mlp_function = ConditionerHead(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
@@ -97,11 +98,11 @@ def make_spherical_coupling_layer(
         assert n_vec_multiplicity_in == multiplicity_within_coupling_split
         net = EGNN(name=base_name,
                       nets_config=nets_config,
-                      n_equivariant_vectors_out=n_vectors*multiplicity_within_coupling_split,
+                      n_equivariant_vectors_out=n_vectors*multiplicity_within_coupling_split*n_inner_transforms,
                       n_invariant_feat_out=n_invariant_feat_out,
                       zero_init_invariant_feat=False)
         vectors, h = net(positions, features)
-        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_vectors, dim))
+        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_inner_transforms, n_vectors, dim))
         return vectors, h
 
 
@@ -113,5 +114,6 @@ def make_spherical_coupling_layer(
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
-        use_aux_loss=use_aux_loss
+        use_aux_loss=use_aux_loss,
+        n_inner_transforms=n_inner_transforms
     )
