@@ -3,10 +3,12 @@ import haiku as hk
 import jax.numpy as jnp
 
 from utils.test import bijector_test
-from flow.bijectors.proj_spline import make_proj_spline
+from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
+def tesst_bijector_with_proj(
+        transform_type: str = 'spline',
+        dim: int = 3, n_layers: int = 4, type='egnn',
                              n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
@@ -16,15 +18,18 @@ def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_spline(
+            bijector = make_proj_coupling_layer(
+                transform_type=transform_type,
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
                 n_aug=n_aux,
                 swap=swap,
                 identity_init=False,
+                nets_config=nets_config,
                 add_small_identity=False,
-                nets_config=nets_config)
+                num_bins=4,
+            )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -50,9 +55,16 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    tesst_bijector_with_proj(dim=3)
-    print('passed test in 3D')
-    tesst_bijector_with_proj(dim=2)
-    print('passed test in 2D')
+    for transform_type in ["spline", "real_nvp"]:
+        tesst_bijector_with_proj(transform_type=transform_type, dim=2)
+        print('passed test in 2D')
+
+        tesst_bijector_with_proj(transform_type=transform_type, dim=3)
+        print('passed test in 3D')
+
+
+
+
+
 
 

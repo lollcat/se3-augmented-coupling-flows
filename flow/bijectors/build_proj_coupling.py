@@ -2,42 +2,46 @@ from typing import Tuple
 
 import chex
 import distrax
-import numpy as np
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerMLP
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
-def make_proj_spline(
+def make_proj_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
         n_aug: int,
         swap: bool,
         nets_config: NetsConfig,
-        origin_on_coupled_pair: bool = True,
         identity_init: bool = True,
+        origin_on_coupled_pair: bool = True,
+        add_small_identity: bool = True,
+        transform_type: str = 'real_nvp',
         num_bins: int = 10,
         lower: float = -10.,
         upper: float = 10.,
-        add_small_identity: bool = True
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
-
     base_name = f"layer_{layer_number}_swap{swap}"
 
-    n_heads = dim - 1 if origin_on_coupled_pair else dim
-    params_per_dim_per_var_group = (3 * num_bins + 1)
-    params_dim_channel = params_per_dim_per_var_group*dim
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
-    n_invariant_params_bijector = multiplicity_within_coupling_split*params_dim_channel
+    n_heads = dim - 1 if origin_on_coupled_pair else dim
+    if transform_type == "real_nvp":
+        params_per_dim_channel = dim * 2
+        n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split
+    elif transform_type == 'spline':
+        params_per_dim_per_var_group = (3 * num_bins + 1)
+        params_dim_channel = params_per_dim_per_var_group * dim
+        n_invariant_params_bijector = multiplicity_within_coupling_split * params_dim_channel
+    else:
+        raise NotImplementedError
 
-    def bijector_fn(params: chex.Array) -> distrax.RationalQuadraticSpline:
+    def bijector_fn(params: chex.Array) -> distrax.Bijector:
         chex.assert_rank(params, 2)
         n_nodes, n_dim = params.shape
-        # Flatten last 2 axes.
         mlp_function = ConditionerMLP(
             name=f"conditionermlp_cond_mlp_" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
@@ -45,15 +49,22 @@ def make_proj_spline(
             n_output_params=n_invariant_params_bijector,
         )
         params = mlp_function(params)
-        # reshape
-        params = jnp.reshape(params, (n_nodes, multiplicity_within_coupling_split, dim, params_per_dim_per_var_group))
-        bijector = distrax.RationalQuadraticSpline(
-            params,
-            range_min=lower,
-            range_max=upper,
-            boundary_slopes='unconstrained',
-            min_bin_size=(upper - lower) * 1e-4)
-        return bijector
+        if transform_type == 'real_nvp':
+            # reshape
+            params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim*2))
+            log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
+            return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+        else:
+            params = jnp.reshape(params,
+                                 (n_nodes, multiplicity_within_coupling_split, dim, params_per_dim_per_var_group))
+            bijector = distrax.RationalQuadraticSpline(
+                params,
+                range_min=lower,
+                range_max=upper,
+                boundary_slopes='unconstrained',
+                min_bin_size=(upper - lower) * 1e-4)
+            return bijector
+
 
     if nets_config.type == "egnn":
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
@@ -76,14 +87,15 @@ def make_proj_spline(
         vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_heads, dim))
         return vectors, h
 
+
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
         event_ndims=3,  # [nodes, n_aug+1, dim]
+        origin_on_coupled_pair=origin_on_coupled_pair,
         get_basis_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
-        origin_on_coupled_pair=origin_on_coupled_pair,
-        add_small_identity=add_small_identity,
+        add_small_identity=add_small_identity
     )
