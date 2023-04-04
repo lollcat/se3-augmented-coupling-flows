@@ -1,6 +1,9 @@
 import hydra
 from omegaconf import DictConfig
 
+import chex
+chex.set_n_cpu_devices(2)  # Fake pmap.
+
 from molboil.train.train import train
 from molboil.targets.data import load_lj13
 from examples.create_train_config import create_train_config
@@ -16,9 +19,9 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
-    cfg.training.batch_size = 4
-    cfg.flow.type = 'spherical'
-    cfg.flow.n_aug = 3
+    cfg.training.batch_size = 2
+    cfg.flow.type = 'nice'
+    cfg.flow.n_aug = 1
 
     cfg.training.n_epoch = 32
     cfg.training.save = False

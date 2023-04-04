@@ -81,7 +81,6 @@ training:
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
-  use_pmap: true
 
 
 logger:
