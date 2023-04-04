@@ -49,7 +49,7 @@ def make_spherical_coupling_layer(
             params[:, :, :1, :],
             range_min=0.0,
             range_max=dist_spline_max,
-            boundary_slopes='lower_identity',
+            boundary_slopes='unconstrained',
             min_bin_size=(dist_spline_max - 0.0) * 1e-4)
         if dim == 2:
             theta_bijector = distrax.RationalQuadraticSpline(
@@ -68,7 +68,7 @@ def make_spherical_coupling_layer(
                 params[:, :, 1:2, :],
                 range_min=0,
                 range_max=jnp.pi,
-                boundary_slopes='identity',
+                boundary_slopes='unconstrained',
                 min_bin_size=(dist_spline_max - 0.0) * 1e-4)
             torsional_bijector = distrax.RationalQuadraticSpline(
                 params[:, :, 2:3, :],
