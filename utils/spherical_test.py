@@ -67,7 +67,7 @@ def tesst_to_spherical_and_back_is_equivariant():
         x, reference = jnp.split(x_and_ref, [1,], axis=0)
         x = jnp.squeeze(x, axis=0)
         sph_x = to_spherical_and_log_det(x, reference)[0]
-        sph_x_new = sph_x + 0.01
+        sph_x_new = sph_x + 0.01  # Perform some transform to the spherical cooridnates.
         x_new = to_cartesian_and_log_det(sph_x_new, reference)[0]
         return x_new[None, None, :]  # Need to have same rank as input.
 
