@@ -31,12 +31,12 @@ flow:
   type: spherical #  nice proj spherical
   kwargs:
     spherical:
-      n_inner_transforms: 3
+      n_inner_transforms: 1
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
-      n_inner_transforms: 3
+      n_inner_transforms: 1
       origin_on_coupled_pair: false
       num_bins: 8
       lower: -2.
@@ -81,6 +81,7 @@ training:
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
+  use_pmap: true
 
 
 logger:
