@@ -54,7 +54,7 @@ flow:
       n_invariant_feat_hidden: 64
       get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [ 64, ]
+      mlp_units: []
 
 
 training:
