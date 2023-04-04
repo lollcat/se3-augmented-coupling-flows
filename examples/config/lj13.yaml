@@ -28,6 +28,7 @@ flow:
   type: spherical #  nice proj spherical
   kwargs:
     spherical:
+      n_inner_transforms: 2
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
