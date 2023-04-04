@@ -30,7 +30,7 @@ def make_default_plotter(
         n_samples_from_flow: int,
         max_n_samples: int = 10000,
         plotting_n_nodes: Optional[int] = None,
-        max_distance: Optional[float] = 9.0,
+        max_distance: Optional[float] = 20.,
 ):
     bins_x, count_list = bin_samples_by_dist([train_data.positions[:max_n_samples],
                                               test_data.positions[:max_n_samples]], max_distance=max_distance)

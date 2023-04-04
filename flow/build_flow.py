@@ -7,10 +7,10 @@ import distrax
 
 from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
 from flow.conditional_dist import build_aux_dist
-from flow.bijectors.proj_real_nvp import make_proj_realnvp
-from flow.bijectors.proj_spline import make_proj_spline
+from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
-from flow.bijectors.shrink_aug import make_shrink_aug_layer
+from flow.bijectors.pseudo_act_norm import make_act_norm
+from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
@@ -51,7 +51,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj_rnvp', 'proj_spline', 'vector_proj']
+        assert flow in ['nice', 'proj', 'spherical']
 
     def make_base() -> distrax.Distribution:
         base = CentreGravitryGaussianAndCondtionalGuassian(
@@ -72,12 +72,11 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         layer_number = 0
 
         if config.act_norm:
-            bijector = make_shrink_aug_layer(
+            bijector = make_act_norm(
                 layer_number=layer_number,
                 graph_features=graph_features,
                 dim=config.dim,
                 n_aug=config.n_aug,
-                swap=False,
                 identity_init=config.identity_init)
             bijectors.append(bijector)
 
@@ -86,15 +85,29 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
-            if "proj_rnvp" in flow_type:
-                kwargs_proj_rnvp = config.kwargs["proj_rnvp"] if "proj_rnvp" in config.kwargs.keys() else {}
-                bijector = make_proj_realnvp(
+            if 'spherical' in flow_type:
+                kwargs_vec_proj_rnvp = config.kwargs['spherical'] if 'spherical' in config.kwargs.keys() else {}
+                bijector = make_spherical_coupling_layer(
+                    graph_features=graph_features,
+                    n_aug=config.n_aug,
+                    layer_number=layer_number,
+                    dim=config.dim,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_vec_proj_rnvp
+                )
+                bijectors.append(bijector)
+
+            if "proj" in flow_type:
+                kwargs_proj = config.kwargs["proj"] if "proj" in config.kwargs.keys() else {}
+                bijector = make_proj_coupling_layer(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
-                    **kwargs_proj_rnvp
+                    **kwargs_proj
                 )
                 bijectors.append(bijector)
 
@@ -108,21 +121,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
                 bijectors.append(bijector)
-
-            if 'proj_spline' in flow_type:
-                kwargs_proj_spline = config.kwargs["proj_spline"] if "proj_spline" in config.kwargs.keys() else {}
-                bijector = make_proj_spline(
-                    layer_number=layer_number,
-                    graph_features=graph_features,
-                    dim=config.dim,
-                    n_aug=config.n_aug,
-                    swap=swap,
-                    identity_init=config.identity_init,
-                    nets_config=config.nets_config,
-                    **kwargs_proj_spline
-                )
-                bijectors.append(bijector)
-
 
         return ChainWithExtra(bijectors)
 

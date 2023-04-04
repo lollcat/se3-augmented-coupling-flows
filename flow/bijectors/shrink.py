@@ -109,7 +109,8 @@ def make_shrink_aug_layer(
         n_aug: int,
         swap: bool,
         identity_init: bool) -> SplitCouplingWithExtra:
-    # TODO: make option to have graph_features used, and for swap to be an option.
+    # TODO: make option to have graph_features used. Let swap be True
+    assert swap == False
 
     def bijector_fn(params):
         shift_interp_logit, alt_global_mean = params
@@ -117,7 +118,7 @@ def make_shrink_aug_layer(
                                  alt_coords=alt_global_mean)
 
     get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
-                                            shape=(n_aug,),
+                                            shape=(1 if swap else n_aug,),
                                             init=jnp.zeros if identity_init else hk.initializers.Constant(1.))
 
     conditioner = make_conditioner(get_shift_fn, n_aug)
@@ -126,6 +127,6 @@ def make_shrink_aug_layer(
         event_ndims=3,  # [nodes, n_aug, dim]
         conditioner=conditioner,
         bijector=bijector_fn,
-        swap=False,
+        swap=swap,
         split_axis=-2
     )

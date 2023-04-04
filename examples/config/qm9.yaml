@@ -8,36 +8,34 @@ hydra:
 target:
   aux:
     global_centering: false
-    scale_init: 0.1
+    scale_init: 0.2
     trainable_augmented_scale: false
 
 flow:
   n_aug: 1
+  act_norm: true
   base:
-    train_x_scale: true
+    train_x_scale: false
     x_scale_init: 1.0
     aux:
       global_centering: false
       scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: true
+      trainable_augmented_scale: false
   dim: 3
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: proj_rnvp #  nice proj_rnvp  proj_spline
+  type: spherical #  nice proj spherical
   kwargs:
-    vector_proj:
-      transform_type: real_nvp
-      n_vectors: 2
-    proj_rnvp:
-      origin_on_coupled_pair: false
-    proj_spline:
+    spherical:
+      dist_spline_max: 10.
+      spline_num_bins: 8
+    proj:
+      transform_type: spline # spline or real_nvp
       origin_on_coupled_pair: false
       num_bins: 8
       lower: -2.
       upper: 2.
-  act_norm: false
-  compile_n_unroll: 1
   nets:
     type: egnn
     egnn:
@@ -45,6 +43,7 @@ flow:
       n_blocks: 3 # number of layers
       mlp_units: [ 64, 64 ]
       n_invariant_feat_hidden: 64
+      cross_multiplicity_shifts: true
     e3gnn:
       name: e3gnn
       n_blocks: 3 # number of layers
@@ -61,7 +60,7 @@ training:
     init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 6e-4
+    peak_lr: 3e-4
     end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: 1.0
@@ -89,7 +88,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size}_naug${flow.n_aug}_trainabletarg${target.aux.trainable_augmented_scale}_actnorm${flow.act_norm} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_${flow.nets.type}_${target.aux.trainable_augmented_scale} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]
