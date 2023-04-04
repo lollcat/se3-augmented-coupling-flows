@@ -5,7 +5,7 @@ import distrax
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
-from nets.conditioner_mlp import ConditionerMLP
+from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
 def make_proj_coupling_layer(
@@ -40,11 +40,11 @@ def make_proj_coupling_layer(
     else:
         raise NotImplementedError
 
-    def bijector_fn(params: chex.Array) -> distrax.Bijector:
+    def bijector_fn(params: chex.Array, transform_index: int) -> distrax.Bijector:
         chex.assert_rank(params, 2)
         n_nodes, n_dim = params.shape
-        mlp_function = ConditionerMLP(
-            name=f"conditionermlp_cond_mlp_" + base_name,
+        mlp_function = ConditionerHead(
+            name=f"conditionermlp_cond_mlp_{transform_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
             n_output_params=n_invariant_params_bijector,
@@ -99,5 +99,5 @@ def make_proj_coupling_layer(
         swap=swap,
         split_axis=-2,
         add_small_identity=add_small_identity,
-
+        n_inner_transforms=n_inner_transforms
     )

@@ -5,7 +5,7 @@ import distrax
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
-from nets.conditioner_mlp import ConditionerMLP
+from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.spherical_coupling import SphericalSplitCoupling
 from flow.bijectors.blockwise import Blockwise
 
@@ -38,7 +38,7 @@ def make_spherical_coupling_layer(
         chex.assert_rank(params, 2)
         n_nodes, n_dim = params.shape
         # Flatten last 2 axes.
-        mlp_function = ConditionerMLP(
+        mlp_function = ConditionerHead(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,

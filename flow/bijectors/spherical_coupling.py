@@ -97,7 +97,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         n_vectors, dim = basis_vectors.shape
         assert dim == 3
         assert n_vectors == 3
-        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
+        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
         vec1 = basis_vectors[1]
         vec2 = basis_vectors[2]
         arccos_in = jnp.dot(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
