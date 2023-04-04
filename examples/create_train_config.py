@@ -11,6 +11,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 import matplotlib as mpl
 from functools import partial
+import jax.numpy as jnp
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 from molboil.train.train import TrainConfig
@@ -123,6 +124,10 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         eval_and_plot_fn: Optional = None,
                         date_folder: bool = True) -> TrainConfig:
     """Creates `mol_boil` style train config"""
+    use_pmap = cfg.training.use_pmap
+    devices = jax.devices()
+    n_devices = len(jax.devices())
+
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
@@ -165,30 +170,57 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                       aux_loss_weight=cfg.training.aux_loss_weight)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
 
-    scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
-                                         data=train_data,
-                                         last_iter_info_only=cfg.training.last_iter_info_only,
-                                         batch_size=cfg.training.batch_size)
+    if not use_pmap:
+        scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
+                                             data=train_data,
+                                             last_iter_info_only=cfg.training.last_iter_info_only,
+                                             batch_size=cfg.training.batch_size)
 
-    def init_fn(key: chex.PRNGKey) -> TrainingState:
+    def init_fn_single_devices(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)
         params = flow.init(key1, train_data[0])
         opt_state = optimizer.init(params)
         return TrainingState(params, opt_state, key2)
 
+    if use_pmap:
+        def init_fn(key: chex.PRNGKey) -> TrainingState:
+            keys = jax.random.split(key, n_devices)
+            return jax.pmap(init_fn_single_devices)
+    else:
+        init_fn = init_fn_single_devices
+
+    if use_pmap:
+        def step_function(state: TrainingState, x: chex.ArrayTree) -> Tuple[TrainingState, dict]:
+            key, subkey = jax.random.split(state.key)
+            params, opt_state, info = training_step_fn(state.params, x, state.opt_state, subkey)
+            return TrainingState(params=params, opt_state=opt_state, key=key), info
+
+
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
-        if not cfg.training.debug:
-            params, opt_state, key, info = scan_epoch_fn(state.params, state.opt_state, state.key)
-        else:  # If we want to debug.
-            batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size)
+        if use_pmap:
+            batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size*n_devices)
             params = state.params
             opt_state = state.opt_state
-            key, subkey = jax.random.split(state.key)
+            key, subkey = jax.random.split(state.key[0])
             batched_data = batchify_data(subkey)
             for i in range(batched_data.positions.shape[0]):
                 x = batched_data[i]
+                x = jnp.reshape(x, (n_devices, cfg.training.batch_size))
                 key, subkey = jax.random.split(key)
                 params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
+        else:
+            if not cfg.training.debug:
+                params, opt_state, key, info = scan_epoch_fn(state.params, state.opt_state, state.key)
+            else:  # If we want to debug.
+                batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size)
+                params = state.params
+                opt_state = state.opt_state
+                key, subkey = jax.random.split(state.key)
+                batched_data = batchify_data(subkey)
+                for i in range(batched_data.positions.shape[0]):
+                    x = batched_data[i]
+                    key, subkey = jax.random.split(key)
+                    params, opt_state, info = training_step_fn(params, x, opt_state, subkey)
         return TrainingState(params, opt_state, key), info
 
     if evaluation_fn is None and eval_and_plot_fn is None:
