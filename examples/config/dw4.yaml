@@ -65,6 +65,7 @@ training:
   n_epoch: 50
   batch_size: 200
   plot_batch_size: 256
+  eval_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000

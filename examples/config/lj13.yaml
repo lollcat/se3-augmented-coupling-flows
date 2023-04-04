@@ -68,6 +68,7 @@ training:
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
+  eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
   train_set_size: 1000
