@@ -50,7 +50,7 @@ flow:
         n_invariant_feat_hidden: 32
         cross_multiplicity_shifts: true
     mlp_head_config:
-      mlp_units: []
+      mlp_units: [32,]
 
 
 training:
