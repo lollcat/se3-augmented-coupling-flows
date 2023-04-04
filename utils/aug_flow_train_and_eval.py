@@ -3,7 +3,6 @@ from typing import Callable, Tuple
 import chex
 import jax
 import jax.numpy as jnp
-import optax
 
 from utils.test import get_max_diff_log_prob_invariance_test
 from flow.distrax_with_extra import Extra
@@ -55,24 +54,6 @@ def get_tree_leaf_norm_info(tree):
     info.update(per_layer_max_norm=max_norm, per_layer_min_norm=min_norm,
                 per_layer_mean_norm=mean_norm, per_layer_median_norm=median_norm)
     return info
-
-
-def ml_step(params: AugmentedFlowParams, x: FullGraphSample,
-            opt_state: optax.OptState,
-            flow: AugmentedFlow,
-            optimizer: optax.GradientTransformation,
-            key: chex.PRNGKey,
-            use_aux_loss: bool,
-            aux_loss_weight: float) -> Tuple[AugmentedFlowParams, optax.OptState, dict]:
-    grad, info = jax.grad(general_ml_loss_fn, has_aux=True)(
-        params, x, flow, key, use_aux_loss, aux_loss_weight)
-    updates, new_opt_state = optimizer.update(grad, opt_state, params=params)
-    new_params = optax.apply_updates(params, updates)
-    info.update(grad_norm=optax.global_norm(grad),
-                update_norm=optax.global_norm(updates))
-    info.update({"grad_" + key: value for key, value in get_tree_leaf_norm_info(grad).items()})
-    info.update({"update_" + key: value for key, value in get_tree_leaf_norm_info(updates).items()})
-    return new_params, new_opt_state, info
 
 
 def get_eval_on_test_batch(params: AugmentedFlowParams,

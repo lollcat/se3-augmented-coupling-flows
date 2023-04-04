@@ -3,10 +3,10 @@ import haiku as hk
 import jax.numpy as jnp
 
 from utils.test import bijector_test
-from flow.bijectors.proj_real_nvp import make_proj_realnvp
+from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
+def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 1, type='egnn',
                              n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
@@ -16,7 +16,7 @@ def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_realnvp(
+            bijector = make_spherical_coupling_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
@@ -24,7 +24,6 @@ def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
                 swap=swap,
                 identity_init=False,
                 nets_config=nets_config,
-                add_small_identity=False
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

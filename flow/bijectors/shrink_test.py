@@ -1,30 +1,25 @@
-import distrax
 import haiku as hk
-import jax.numpy as jnp
+import distrax
 
 from utils.test import bijector_test
-from flow.bijectors.proj_spline import make_proj_spline
-from utils.test import get_minimal_nets_config
+from flow.bijectors.shrink import make_shrink_aug_layer
+import jax.numpy as jnp
 
-def tesst_bijector_with_proj(dim: int = 3, n_layers: int = 4, type='egnn',
-                             n_nodes: int = 4, n_aux: int = 3):
-    nets_config = get_minimal_nets_config(type=type)
+
+def tesst_bijector_shrink(dim: int = 3, n_layers: int = 4, n_nodes: int = 4, n_aux=3):
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
-            swap = i % 2 == 0
-            bijector = make_proj_spline(
+            bijector = make_shrink_aug_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
                 n_aug=n_aux,
-                swap=swap,
-                identity_init=False,
-                add_small_identity=False,
-                nets_config=nets_config)
+                swap=False,
+                identity_init=False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
         return flow
@@ -50,9 +45,7 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    tesst_bijector_with_proj(dim=3)
+    tesst_bijector_shrink(dim=3)
     print('passed test in 3D')
-    tesst_bijector_with_proj(dim=2)
+    tesst_bijector_shrink(dim=2)
     print('passed test in 2D')
-
-

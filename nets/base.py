@@ -35,7 +35,7 @@ def build_torso(name: str, config: NetsConfig,
         assert n_vectors_out % n_vectors_in == 0
         torso = make_egnn_torso_forward_fn(config.egnn_torso_config._replace(
             name=name + config.egnn_torso_config.name,
-            n_vectors_hidden_per_vec_in=n_vectors_out // n_vectors_in
+            n_vectors_hidden_per_vec_in=n_vectors_out // n_vectors_in,
         ),
         )
     else:

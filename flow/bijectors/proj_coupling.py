@@ -150,13 +150,8 @@ class ProjSplitCoupling(BijectorWithExtra):
         # Vmap over multiplicity.
         change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1)(
             vectors, self._add_small_identity)
-
-        # Stack h, and x projected into the space.
-        x_proj = jax.vmap(jax.vmap(project))(x, origin, change_of_basis_matrix)
-        h = jnp.repeat(h[:, None, :], multiplicity, axis=-2)
-        bijector_feat_in = jnp.concatenate([x_proj, h], axis=-1)
         extra = self.get_extra(vectors)
-        return origin, change_of_basis_matrix, bijector_feat_in, extra
+        return origin, change_of_basis_matrix, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
         basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
@@ -184,25 +179,33 @@ class ProjSplitCoupling(BijectorWithExtra):
         extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
         return extra
 
-    def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+    def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
-        origin, change_of_basis_matrix, bijector_feat_in, _ = self.get_basis_and_h(x1, graph_features)
+        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
         x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
         y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
+        # inner_bijector = self._inner_bijector(bijector_feat_in); inner_bijector._bijector._x_pos
+        # inner_bijector.forward_and_log_det(jnp.ones_like(x2_proj)*20)
         y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-        return self._recombine(x1, y2), logdet
+        return self._recombine(x1, y2), logdet, extra
 
-    def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+    def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
         y1, y2 = self._split(y)
-        origin, change_of_basis_matrix, bijector_feat_in, _ = self.get_basis_and_h(y1, graph_features)
+        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
         x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
         x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-        return self._recombine(y1, x2), logdet
+        return self._recombine(y1, x2), logdet, extra
+
+    def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        return self.forward_and_log_det_with_extra_single(x, graph_features)[:2]
+
+    def inverse_and_log_det_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
+        return self.inverse_and_log_det_with_extra_single(y, graph_features)[:2]
 
     def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
@@ -230,25 +233,6 @@ class ProjSplitCoupling(BijectorWithExtra):
         else:
             raise NotImplementedError
 
-    def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
-        """Computes y = f(x) and log|det J(f)(x)|."""
-        self._check_forward_input_shape(x)
-        x1, x2 = self._split(x)
-        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
-        x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
-        y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
-        y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-        return self._recombine(x1, y2), logdet, extra
-
-    def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
-        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
-        self._check_inverse_input_shape(y)
-        y1, y2 = self._split(y)
-        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
-        y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
-        x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
-        x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-        return self._recombine(y1, x2), logdet, extra
 
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
@@ -282,23 +266,3 @@ class ProjSplitCoupling(BijectorWithExtra):
         else:
             raise NotImplementedError
         return x, logdet, extra
-
-
-#
-#
-# def get_min_k_vectors_by_norm(norms, vectors, receivers, n_vectors, node_index):
-#     _, min_k_indices = jax.lax.top_k(-norms[receivers == node_index], n_vectors)
-#     min_k_vectors = vectors[receivers == node_index][min_k_indices]
-#     return min_k_vectors
-#
-#
-# def get_directions_for_closest_atoms(x: chex.Array, n_vectors: int) -> chex.Array:
-#     chex.assert_rank(x, 2)  # [n_nodes, dim]
-#     n_nodes, dim = x.shape
-#     senders, receivers = get_senders_and_receivers_fully_connected(dim)
-#     vectors = x[receivers] - x[senders]
-#     norms = safe_norm(vectors, axis=-1, keepdims=False)
-#     min_k_vectors = jax.vmap(get_min_k_vectors_by_norm, in_axes=(None, None, None, None, 0))(
-#         norms, vectors, receivers, n_vectors, jnp.arange(n_nodes))
-#     chex.assert_shape(min_k_vectors, (n_nodes, n_vectors, dim))
-#     return min_k_vectors
