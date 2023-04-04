@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Optional, List, NamedTuple
+from typing import Tuple, Optional
 
 import chex
 import jax
@@ -14,7 +14,7 @@ from functools import partial
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 from molboil.train.train import TrainConfig
-from molboil.utils.eval import get_eval_and_plot_fn
+from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -120,7 +120,8 @@ def create_flow_config(cfg: DictConfig):
 def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
-                        eval_and_plot_fn = None) -> TrainConfig:
+                        eval_and_plot_fn: Optional = None,
+                        date_folder: bool = True) -> TrainConfig:
     """Creates `mol_boil` style train config"""
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
@@ -128,7 +129,10 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     logger = setup_logger(cfg)
     training_config = dict(cfg.training)
-    save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
+    if date_folder:
+        save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
+    else:
+        save_path = training_config.pop("save_dir")
     if cfg.training.save:
         if hasattr(cfg.logger, "wandb"):
             # if using wandb then save to wandb path
