@@ -2,7 +2,6 @@ import hydra
 from omegaconf import DictConfig
 from functools import partial
 
-
 from molboil.train.train import train
 from molboil.targets.data import load_dw4
 from examples.create_train_config import create_train_config
@@ -39,7 +38,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['proj']
+    cfg.flow.type = ['nice']
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 2
 
