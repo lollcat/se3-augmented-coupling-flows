@@ -305,8 +305,9 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         return TrainingState(params, opt_state, per_device_key)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
-        common_key, *per_device_keys = jax.random.split(key, num=n_devices + 1)
+        common_key, per_device_key = jax.random.split(key)
         common_keys = jnp.repeat(common_key[None, ...], n_devices, axis=0)
+        per_device_keys = jax.random.split(per_device_key, n_devices)
         init_state = jax.pmap(init_fn_single_devices)(common_keys, per_device_keys)
         # Run check to ensure params are synched.
         chex.assert_trees_all_equal(jax.tree_map(lambda x: x[0], init_state.params),
