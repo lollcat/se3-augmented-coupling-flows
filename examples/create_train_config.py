@@ -131,6 +131,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
         return create_train_config_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
                                         date_folder)
     else:
+        print(f"Running on one device only.")
         return create_train_config_non_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
                                         date_folder)
 
