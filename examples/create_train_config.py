@@ -315,7 +315,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         assert (init_state.key[0] != init_state.key[1]).all()  # Check rng per state is different.
         return init_state
 
-    data_rng_key_generator = hk.PRNGSequence(0)
+    data_rng_key_generator = hk.PRNGSequence(cfg.training.seed)
 
     def step_function(state: TrainingState, x: chex.ArrayTree) -> Tuple[TrainingState, dict]:
         key, subkey = jax.random.split(state.key)
