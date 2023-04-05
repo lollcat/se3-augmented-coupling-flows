@@ -1,9 +1,6 @@
 import hydra
 from omegaconf import DictConfig
 
-import chex
-chex.set_n_cpu_devices(2)  # Fake pmap.
-
 from molboil.train.train import train
 from molboil.targets.data import load_lj13
 from examples.create_train_config import create_train_config
