@@ -5,7 +5,7 @@ import distrax
 import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
-from nets.conditioner_mlp import ConditionerMLP
+from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
 def make_proj_coupling_layer(
@@ -22,6 +22,7 @@ def make_proj_coupling_layer(
         num_bins: int = 10,
         lower: float = -10.,
         upper: float = 10.,
+        n_inner_transforms: int = 1
         ) -> ProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -39,11 +40,11 @@ def make_proj_coupling_layer(
     else:
         raise NotImplementedError
 
-    def bijector_fn(params: chex.Array) -> distrax.Bijector:
+    def bijector_fn(params: chex.Array, transform_index: int) -> distrax.Bijector:
         chex.assert_rank(params, 2)
         n_nodes, n_dim = params.shape
-        mlp_function = ConditionerMLP(
-            name=f"conditionermlp_cond_mlp_" + base_name,
+        mlp_function = ConditionerHead(
+            name=f"conditionermlp_cond_mlp_{transform_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
             n_output_params=n_invariant_params_bijector,
@@ -80,11 +81,11 @@ def make_proj_coupling_layer(
         assert n_vec_multiplicity_in == multiplicity_within_coupling_split
         net = EGNN(name=base_name,
                       nets_config=nets_config,
-                      n_equivariant_vectors_out=n_heads*multiplicity_within_coupling_split,
+                      n_equivariant_vectors_out=n_heads*multiplicity_within_coupling_split*n_inner_transforms,
                       n_invariant_feat_out=n_invariant_feat_out,
                       zero_init_invariant_feat=False)
         vectors, h = net(positions, features)
-        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_heads, dim))
+        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_inner_transforms, n_heads, dim))
         return vectors, h
 
 
@@ -97,5 +98,6 @@ def make_proj_coupling_layer(
         bijector=bijector_fn,
         swap=swap,
         split_axis=-2,
-        add_small_identity=add_small_identity
+        add_small_identity=add_small_identity,
+        n_inner_transforms=n_inner_transforms
     )

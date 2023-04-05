@@ -22,6 +22,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -2,
                  use_aux_loss: bool = True,
+                 n_inner_transforms: int = 1,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
@@ -44,6 +45,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
         self.use_aux_loss = use_aux_loss
+        self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -84,19 +86,22 @@ class SphericalSplitCoupling(BijectorWithExtra):
         n_nodes, multiplicity, dim = x.shape
         # Calculate new basis for the affine transform
         reference_vectors, h = self._get_reference_points_and_invariant_vals(x, graph_features)
-        reference_points = x[:, :, None, :] + reference_vectors
+        chex.assert_shape(reference_vectors, (n_nodes, multiplicity, self.n_inner_transforms, dim, dim))
+        reference_points = x[:, :, None, None, :] + reference_vectors
 
         extra = self.get_extra(reference_vectors)
         return reference_points, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        dim = basis_vectors.shape[-1]
+        chex.assert_rank(basis_vectors, 2)
+        n_vectors, dim = basis_vectors.shape
         assert dim == 3
-        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
-        vec1 = basis_vectors[:, 1]
-        vec2 = basis_vectors[:, 2]
-        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
-        theta = jax.vmap(jnp.arccos)(arccos_in)
+        assert n_vectors == 3
+        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
+        vec1 = basis_vectors[1]
+        vec2 = basis_vectors[2]
+        arccos_in = jnp.dot(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jnp.arccos(arccos_in)
         log_barrier_in = 1 - jnp.abs(arccos_in)
         log_barrier_in = jnp.where(log_barrier_in < 1e-6, log_barrier_in + 1e-6, log_barrier_in)
         aux_loss = - jnp.log(log_barrier_in)
@@ -107,7 +112,8 @@ class SphericalSplitCoupling(BijectorWithExtra):
         if dim == 2:
             return Extra()
         else:
-            theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
+            # Vmap over n_nodes, multiplicity, and n_inner_transforms.
+            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(various_x_points)
             info = {}
             info_aggregator = {}
             info_aggregator.update(
@@ -140,35 +146,45 @@ class SphericalSplitCoupling(BijectorWithExtra):
 
     def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
-        i = 0  # TODO: multiple reference frames
         self._check_forward_input_shape(x)
         dim = x.shape[-1]
         x1, x2 = self._split(x)
-        reference_points, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
-        n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
-        sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
-        sph_x_out, logdet_inner_bijector = \
-            self._inner_bijector(bijector_feat_in, i).forward_and_log_det(sph_x_in)
-        chex.assert_equal_shape((sph_x_out, sph_x_in))
-        x2, log_det_norm_rv = self.to_cartesian_and_log_det(sph_x_out, reference_points)
-        log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
-        chex.assert_shape(log_det_total, ())
+        reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
+        n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
+        assert n_transforms == self.n_inner_transforms
+
+        log_det_total = jnp.zeros(())
+        for i in range(self.n_inner_transforms):
+            reference_points = reference_points_all[:, :, i]
+            sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
+            sph_x_out, logdet_inner_bijector = \
+                self._inner_bijector(bijector_feat_in, i).forward_and_log_det(sph_x_in)
+            chex.assert_equal_shape((sph_x_out, sph_x_in))
+            x2, log_det_norm_rv = self.to_cartesian_and_log_det(sph_x_out, reference_points)
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            chex.assert_shape(log_det_total, ())
+
         y2 = x2
         return self._recombine(x1, y2), log_det_total, extra
 
     def inverse_and_log_det_single_with_extra(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
-        i = 0  # TODO: multiple reference frames
         self._check_inverse_input_shape(y)
         dim = y.shape[-1]
         y1, y2 = self._split(y)
-        reference_points, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
-        n_nodes, multiplicity, n_vectors, dim_ = reference_points.shape
-        sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
-        ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
-        y2, log_det_norm_rv = self.to_cartesian_and_log_det(ph_y_out, reference_points)
-        log_det_total = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
-        chex.assert_shape(log_det_total, ())
+        reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
+        n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
+        assert n_transforms == self.n_inner_transforms
+
+        log_det_total = jnp.zeros(())
+        for i in reversed(range(self.n_inner_transforms)):
+            reference_points = reference_points_all[:, :, i]
+            sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
+            ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
+            y2, log_det_norm_rv = self.to_cartesian_and_log_det(ph_y_out, reference_points)
+            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            chex.assert_shape(log_det_total, ())
+
         x2 = y2
         return self._recombine(y1, x2), log_det_total, extra
 

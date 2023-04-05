@@ -69,11 +69,12 @@ class ProjSplitCoupling(BijectorWithExtra):
                  event_ndims: int,
                  graph_features: chex.Array,
                  get_basis_vectors_and_invariant_vals: Callable,
-                 bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
+                 bijector: Callable[[BijectorParams, int], Union[BijectorWithExtra, distrax.Bijector]],
                  origin_on_coupled_pair: bool = True,
                  swap: bool = False,
                  split_axis: int = -1,
                  add_small_identity: bool = True,
+                 n_inner_transforms: int = 1,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
@@ -97,6 +98,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
         self._graph_features = graph_features
         self._add_small_identity = add_small_identity
+        self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -110,9 +112,9 @@ class ProjSplitCoupling(BijectorWithExtra):
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def _inner_bijector(self, params: BijectorParams, transform_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
-      bijector = self._bijector(params)
+      bijector = self._bijector(params, transform_index)
       if bijector.event_ndims_in != bijector.event_ndims_out:
           raise ValueError(
               f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
@@ -138,68 +140,103 @@ class ProjSplitCoupling(BijectorWithExtra):
 
         # Calculate new basis for the affine transform
         vectors_out, h = self._get_basis_vectors_and_invariant_vals(x, graph_features)
-        chex.assert_rank(vectors_out, 4)
+        chex.assert_rank(vectors_out, 5)
+        chex.assert_tree_shape_prefix(vectors_out, (n_nodes, multiplicity, self.n_inner_transforms))
+
         chex.assert_rank(h, 2)
         if self._origin_on_aug:
-            origin = x
+            origin = jnp.repeat(x[:, :, None], self.n_inner_transforms, axis=2)
             vectors = vectors_out
         else:
-            origin = x + vectors_out[:, :, 0]
-            vectors = vectors_out[:, :, 1:]
-        # jax.vmap(get_directions_for_closest_atoms, in_axes=(1, None), out_axes=1)(x, vectors.shape[2])
+            origin = x[:, :, None] + vectors_out[:, :, :, 0]
+            vectors = vectors_out[:, :, :, 1:]
+
         # Vmap over multiplicity.
-        change_of_basis_matrix = jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1)(
-            vectors, self._add_small_identity)
+        change_of_basis_matrices = jax.vmap(jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1),
+        in_axes=(1, None), out_axes=1)(vectors, self._add_small_identity)
         extra = self.get_extra(vectors)
-        return origin, change_of_basis_matrix, h, extra
+
+        chex.assert_shape(origin, (n_nodes, multiplicity, self.n_inner_transforms, dim))
+        chex.assert_shape(vectors, (n_nodes, multiplicity, self.n_inner_transforms, dim-1, dim))
+        return origin, change_of_basis_matrices, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        basis_vectors = basis_vectors + jnp.eye(basis_vectors.shape[-1])[:basis_vectors.shape[1]][None, :, :] * 1e-30
-        vec1 = basis_vectors[:, 0]
-        vec2 = basis_vectors[:, 1]
-        arccos_in = jax.vmap(jnp.dot)(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
-        theta = jax.vmap(jnp.arccos)(arccos_in)
-        log_barrier_in = 1 - jnp.abs(arccos_in) + 1e-6
+        chex.assert_rank(basis_vectors, 2)
+        n_vectors, dim = basis_vectors.shape
+        assert dim == 3
+        assert n_vectors == 2
+        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
+        vec1 = basis_vectors[0]
+        vec2 = basis_vectors[1]
+        arccos_in = jnp.dot(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
+        theta = jnp.arccos(arccos_in)
+        log_barrier_in = 1 - jnp.abs(arccos_in)
+        log_barrier_in = jnp.where(log_barrier_in < 1e-6, log_barrier_in + 1e-6, log_barrier_in)
         aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
 
     def get_extra(self, various_x_points: chex.Array) -> Extra:
-        theta, aux_loss, log_barrier_in = jax.vmap(self.get_vector_info_single)(various_x_points)
-        info = {}
-        info_aggregator = {}
-        info_aggregator.update(
-            mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
-            min_log_barrier_in=jnp.min
-        )
-        info.update(
-            mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
-            min_log_barrier_in=jnp.min(log_barrier_in)
-        )
-        aux_loss = jnp.mean(aux_loss)
-        extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
-        return extra
+        dim = various_x_points.shape[-1]
+        if dim == 2:
+            return Extra()
+        else:
+            # Vmap over n_nodes, multiplicity, and n_inner_transforms.
+            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(various_x_points)
+            info = {}
+            info_aggregator = {}
+            info_aggregator.update(
+                mean_abs_theta=jnp.mean, min_abs_theta=jnp.min,
+                min_log_barrier_in=jnp.min
+            )
+            info.update(
+                mean_abs_theta=jnp.mean(jnp.abs(theta)), min_abs_theta=jnp.min(jnp.abs(theta)),
+                min_log_barrier_in=jnp.min(log_barrier_in)
+            )
+            aux_loss = jnp.mean(aux_loss)
+            extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
+            return extra
 
     def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
-        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
-        x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
-        y2, logdet = self._inner_bijector(bijector_feat_in).forward_and_log_det(x2_proj)
-        # inner_bijector = self._inner_bijector(bijector_feat_in); inner_bijector._bijector._x_pos
-        # inner_bijector.forward_and_log_det(jnp.ones_like(x2_proj)*20)
-        y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-        return self._recombine(x1, y2), logdet, extra
+        origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
+        n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
+        assert n_transforms == self.n_inner_transforms
+
+        log_det_total = jnp.zeros(())
+        for i in range(self.n_inner_transforms):
+            origin = origins[:, :, i]
+            change_of_basis_matrix = change_of_basis_matrices[:, :, i]
+            x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
+            x2, logdet = self._inner_bijector(bijector_feat_in, i).forward_and_log_det(x2_proj)
+            # inner_bijector = self._inner_bijector(bijector_feat_in); inner_bijector._bijector._x_pos
+            # inner_bijector.forward_and_log_det(jnp.ones_like(x2_proj)*20)
+            x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
+            log_det_total = log_det_total + logdet
+
+        y2 = x2
+        return self._recombine(x1, y2), log_det_total, extra
 
     def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
         y1, y2 = self._split(y)
-        origin, change_of_basis_matrix, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
-        y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
-        x2, logdet = self._inner_bijector(bijector_feat_in).inverse_and_log_det(y2_proj)
-        x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-        return self._recombine(y1, x2), logdet, extra
+        origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
+        n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
+        assert n_transforms == self.n_inner_transforms
+
+        log_det_total = jnp.zeros(())
+        for i in reversed(range(self.n_inner_transforms)):
+            origin = origins[:, :, i]
+            change_of_basis_matrix = change_of_basis_matrices[:, :, i]
+            y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
+            y2, logdet = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(y2_proj)
+            y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
+            log_det_total = log_det_total + logdet
+
+        x2 = y2
+        return self._recombine(y1, x2), log_det_total, extra
 
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         return self.forward_and_log_det_with_extra_single(x, graph_features)[:2]

@@ -201,7 +201,7 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
             eval_info = eval_fn(test_data, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                     eval_batch_free_fn=eval_batch_free_fn,
-                    batch_size=cfg.training.batch_size)
+                    batch_size=cfg.training.eval_batch_size)
             return eval_info
 
     if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):

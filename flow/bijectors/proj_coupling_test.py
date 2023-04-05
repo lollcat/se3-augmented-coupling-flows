@@ -29,6 +29,7 @@ def tesst_bijector_with_proj(
                 nets_config=nets_config,
                 add_small_identity=False,
                 num_bins=4,
+                n_inner_transforms=3
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
