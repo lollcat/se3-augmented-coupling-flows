@@ -298,18 +298,24 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                pmap_axis_name=pmap_axis_name)
 
 
-    def init_fn_single_devices(key: chex.PRNGKey) -> TrainingState:
-        key1, key2 = jax.random.split(key)
-        params = flow.init(key1, train_data[0])
+    def init_fn_single_devices(common_key: chex.PRNGKey, per_device_key: chex.PRNGKey) -> TrainingState:
+        """Initialise the state. `common_key` ensures that the same initialisation is used for params on all devices."""
+        params = flow.init(common_key, train_data[0])
         opt_state = optimizer.init(params)
-        return TrainingState(params, opt_state, key2)
+        return TrainingState(params, opt_state, per_device_key)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
-        init_state = init_fn_single_devices(key)
-        init_state = jax.device_put_replicated(init_state, devices)
+        common_key, per_device_key = jax.random.split(key)
+        common_keys = jnp.repeat(common_key[None, ...], n_devices, axis=0)
+        per_device_keys = jax.random.split(per_device_key, n_devices)
+        init_state = jax.pmap(init_fn_single_devices)(common_keys, per_device_keys)
+        # Run check to ensure params are synched.
+        chex.assert_trees_all_equal(jax.tree_map(lambda x: x[0], init_state.params),
+                                    jax.tree_map(lambda x: x[1], init_state.params))
+        assert (init_state.key[0] != init_state.key[1]).all()  # Check rng per state is different.
         return init_state
 
-    data_rng_key_generator = hk.PRNGSequence(0)
+    data_rng_key_generator = hk.PRNGSequence(cfg.training.seed)
 
     def step_function(state: TrainingState, x: chex.ArrayTree) -> Tuple[TrainingState, dict]:
         key, subkey = jax.random.split(state.key)
