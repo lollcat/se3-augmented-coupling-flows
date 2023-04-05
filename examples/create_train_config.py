@@ -305,7 +305,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         return TrainingState(params, opt_state, key2)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
-        keys = jax.random.split(key, n_devices)
+        keys = jnp.repeat(key[None, ...], n_devices, axis=0)
         return jax.pmap(init_fn_single_devices, axis_name=pmap_axis_name)(keys)
 
     data_rng_key_generator = hk.PRNGSequence(0)
