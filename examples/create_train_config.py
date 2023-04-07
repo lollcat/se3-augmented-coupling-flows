@@ -337,14 +337,12 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         data_shuffle_key = next(data_rng_key_generator)  # Use separate key gen to avoid grabbing from state.
         batched_data = batchify_data(data_shuffle_key)
 
-        #infos = []
         for i in range(batched_data.positions.shape[0]):
             x = batched_data[i]
             # Reshape to [n_devices, batch_size]
             x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.batch_size, *x.shape[1:])), x)
             state, info = jax.pmap(step_function, axis_name=pmap_axis_name)(state, x)
-            #infos.append(get_from_first_device(info))
-        return state, get_from_first_device(info, as_numpy=False) #jax.tree_map(lambda *xs: jnp.stack(xs), *infos)
+        return state, get_from_first_device(info, as_numpy=False)
 
     if eval_and_plot_fn is not None:
         print("Running evaluation on 1 device only.")
