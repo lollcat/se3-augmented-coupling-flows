@@ -12,7 +12,7 @@ fab:
       n_outer_steps: 1
       init_step_size: 1e-3
       target_p_accept: 0.65
-      tune_step_size: False
+      tune_step_size: true
     metropolis:
       n_outer_steps: 1
       init_step_size: 1.
@@ -76,7 +76,7 @@ training:
     peak_lr: 1e-3 # can be null
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 2. # can be null
-    max_global_norm: 0.5
+    max_global_norm: 1.
   use_64_bit: false
   n_epoch: 50
   batch_size: 200
