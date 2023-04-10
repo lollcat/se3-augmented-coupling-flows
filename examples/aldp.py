@@ -13,7 +13,7 @@ from molboil.eval.aldp import eval_and_plot_fn
 
 from flow.build_flow import build_flow
 from examples.create_train_config import create_train_config, create_flow_config
-from utils.aug_flow_train_and_eval import get_eval_on_test_batch
+from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")

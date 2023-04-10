@@ -1,0 +1,110 @@
+#defaults:
+#  - override hydra/launcher: joblib
+
+hydra:
+  job:
+    chdir: false
+
+fab:
+  use_hmc: false
+  transition_operator:
+    hmc:
+      n_outer_steps: 1
+      init_step_size: 1e-3
+      target_p_accept: 0.65
+      tune_step_size: False
+    metropolis:
+      n_outer_steps: 1
+      init_step_size: 1.
+  alpha: 2.  # alpha-divergence param
+  n_intermediate_distributions: 4
+  spacing_type: linear
+
+target:
+  aux:
+    global_centering: false
+    scale_init: 1.0
+    trainable_augmented_scale: false
+  custom_samples: false
+  temperature: 0.1  # 0.1 or 1 are two good options
+
+
+flow:
+  base:
+    train_x_scale: true
+    x_scale_init: 1.0
+    aux:
+      global_centering: false
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: true
+  dim: 2
+  nodes: 4
+  n_aug: 5
+  n_layers: 4
+  act_norm: true
+  identity_init: true
+  type: spherical #  nice proj spherical
+  kwargs:
+    spherical:
+      n_inner_transforms: 1
+      dist_spline_max: 10.
+      spline_num_bins: 8
+    proj:
+      transform_type: spline # spline or real_nvp
+      n_inner_transforms: 1
+      origin_on_coupled_pair: false
+      num_bins: 8
+      lower: -2.
+      upper: 2.
+  nets:
+    type: egnn
+    egnn:
+        name: egnn
+        n_blocks: 3 # number of layers
+        mlp_units: [ 32, 32 ]
+        n_invariant_feat_hidden: 32
+        cross_multiplicity_shifts: true
+    mlp_head_config:
+      mlp_units: []
+
+
+training:
+  optimizer:
+    init_lr: 1e-5
+    optimizer_name: adam
+    use_schedule: false
+    peak_lr: 1e-3 # can be null
+    end_lr: 1e-5 # can be null
+    warmup_n_epoch: 2. # can be null
+    max_global_norm: 0.5
+  use_64_bit: false
+  n_epoch: 50
+  batch_size: 200
+  plot_batch_size: 256
+  eval_batch_size: 128
+  seed: 0
+  train_set_size: 1000
+  test_set_size: 1000
+  n_checkpoints: 2
+  n_eval: 10
+  K_marginal_log_lik: 20
+  save: true
+  save_dir: dw4_results
+  resume: false
+  runtime_limit: null
+  use_flow_aux_loss: false
+  aux_loss_weight: 1.0
+  last_iter_info_only: true
+  debug: false
+
+
+logger:
+#  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: dw4_${flow.type}
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [dw4]
+

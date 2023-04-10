@@ -17,12 +17,12 @@ import jax.numpy as jnp
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
+from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig
-from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
-from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
+from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState, OptimizerConfig
 from utils.pmap import get_from_first_device
@@ -49,7 +49,7 @@ def plot_and_maybe_save(plotter,
         plt.close(figure)
 
 
-def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
+def get_optimizer(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
     if optimizer_config.use_schedule:
         lr = optax.warmup_cosine_decay_schedule(
             init_value=float(optimizer_config.init_lr),
@@ -162,9 +162,9 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
-    optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
-                                              total_n_epoch=cfg.training.n_epoch)
+    optimizer, lr = get_optimizer(optimizer_config,
+                                  n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
+                                  total_n_epoch=cfg.training.n_epoch)
 
 
     if plotter is None and eval_and_plot_fn is None:
@@ -274,9 +274,9 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
-    optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
-                                              total_n_epoch=cfg.training.n_epoch)
+    optimizer, lr = get_optimizer(optimizer_config,
+                                  n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
+                                  total_n_epoch=cfg.training.n_epoch)
 
 
     if plotter is None and eval_and_plot_fn is None:
