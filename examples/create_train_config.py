@@ -275,7 +275,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow = build_flow(flow_config)
     optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
     optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
+                                              n_iter_per_epoch=train_data.positions.shape[0] // (cfg.training.batch_size * n_devices),
                                               total_n_epoch=cfg.training.n_epoch)
 
 
@@ -333,7 +333,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
 
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
-        batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size*n_devices)
+        batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size * n_devices)
         data_shuffle_key = next(data_rng_key_generator)  # Use separate key gen to avoid grabbing from state.
         batched_data = batchify_data(data_shuffle_key)
 
