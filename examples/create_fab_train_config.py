@@ -14,7 +14,7 @@ from molboil.eval.base import get_eval_and_plot_fn
 
 
 from flow.build_flow import build_flow
-from examples.default_plotter import make_default_plotter
+from examples.default_plotter_fab import make_default_plotter
 from examples.configs import TrainingState, OptimizerConfig
 from train.max_lik_train_and_eval import get_eval_on_test_batch
 from examples.create_train_config import setup_logger, create_flow_config, get_optimizer
@@ -70,15 +70,6 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                                   total_n_epoch=cfg.training.n_epoch)
 
 
-    if plotter is None and eval_and_plot_fn is None:
-        plotter = make_default_plotter(train_data,
-                                       test_data,
-                                       flow=flow,
-                                       n_samples_from_flow=cfg.training.plot_batch_size,
-                                       max_n_samples=1000,
-                                       plotting_n_nodes=None
-                                       )
-
     # Setup training functions.
     dim_total = int(flow.dim_x*(flow.n_augmented+1)*train_data.features.shape[-2])
     if use_hmc:
@@ -90,6 +81,16 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     ais = build_ais(transition_operator=transition_operator,
                     n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                     alpha=alpha)
+
+    if plotter is None and eval_and_plot_fn is None:
+        plotter = make_default_plotter(
+                test_data = test_data,
+                flow = flow,
+                ais = ais,
+                log_p_x = target_log_p_x_fn,
+                n_samples_from_flow = cfg.training.plot_batch_size,
+                max_n_samples = 1000,
+                max_distance = 20.)
 
     features = train_data.features[0]
     init_fn, update_fn = build_fab_no_buffer_init_step_fns(

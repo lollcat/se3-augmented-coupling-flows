@@ -34,6 +34,47 @@ class TrainStateNoBuffer(NamedTuple):
     ais_state: AISState
 
 
+def build_ais_forward_pass(
+        flow: AugmentedFlow,
+        log_p_x: LogProbFn,
+        features: GraphFeatures,
+        ais: AnnealedImportanceSampler,
+        batch_size: int):
+
+    features_with_multiplicity = features[:, None]
+    n_nodes = features.shape[0]
+
+    def flow_log_prob_apply(params, x):
+        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
+
+    event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
+
+    def ais_forward_pass(state: TrainStateNoBuffer, key: chex.PRNGKey):
+        def log_q_fn(x: chex.Array) -> chex.Array:
+            return flow_log_prob_apply(state.params, x)
+
+        flatten, unflatten, log_q_flat_fn = setup_flat_log_prob(log_q_fn, event_shape)
+
+        def log_p_flat_fn(x: chex.Array):
+            x = unflatten(x)
+            x, a = jnp.split(x, [1, ], axis=-2)
+            x = jnp.squeeze(x, axis=-2)
+            log_prob_x = log_p_x(x)
+            log_prob_augmented = flow.aux_target_log_prob_apply(
+                state.params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
+            return log_prob_x + log_prob_augmented
+
+        sample_flow = flow.sample_apply(state.params, features, key, (batch_size,))
+        x0 = flatten(sample_flow.positions)
+        point, log_w, ais_state, ais_info = ais.step(x0, state.ais_state, log_q_flat_fn, log_p_flat_fn)
+        x_ais = unflatten(point.x)
+        return sample_flow.positions, x_ais, log_w, ais_state, ais_info
+
+    return ais_forward_pass
+
+
+
+
 def build_fab_no_buffer_init_step_fns(
         flow: AugmentedFlow,
         log_p_x: LogProbFn,
@@ -43,6 +84,12 @@ def build_fab_no_buffer_init_step_fns(
         batch_size: int):
 
     n_nodes = features.shape[0]
+    # Setup AIS forward pass.
+    ais_forward = build_ais_forward_pass(flow, log_p_x, features, ais, batch_size)
+    features_with_multiplicity = features[:, None]
+    def flow_log_prob_apply(params, x):
+        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
+
 
     def init(key: chex.PRNGKey) -> TrainStateNoBuffer:
         """Initialise the flow, optimizer and AIS states."""
@@ -53,43 +100,17 @@ def build_fab_no_buffer_init_step_fns(
         ais_state = ais.init(key2)
         return TrainStateNoBuffer(params=flow_params, key=key3, opt_state=opt_state, ais_state=ais_state)
 
-
-    features_with_multiplicity = features[:, None]
-
-    def flow_log_prob_apply(params, x):
-        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
-
-    event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
-
-
     @jax.jit
     @chex.assert_max_traces(4)
     def step(state: TrainStateNoBuffer) -> Tuple[TrainStateNoBuffer, Info]:
         key, subkey = jax.random.split(state.key)
         info = {}
 
-        # Run Ais.
-        def log_q_fn(x: chex.Array) -> chex.Array:
-            return flow_log_prob_apply(state.params, x)
-
-        flatten, unflatten, log_q_flat_fn = setup_flat_log_prob(log_q_fn, event_shape)
-
-        def log_p_flat_fn(x: chex.Array):
-            x = unflatten(x)
-            x, a = jnp.split(x, [1,], axis=-2)
-            x = jnp.squeeze(x, axis=-2)
-            log_prob_x = log_p_x(x)
-            log_prob_augmented = flow.aux_target_log_prob_apply(
-                state.params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
-            return log_prob_x + log_prob_augmented
-
-        sample_flow = flow.sample_apply(state.params, features, subkey, (batch_size,))
-        x0 = flatten(sample_flow.positions)
-        point, log_w, ais_state, ais_info = ais.step(x0, state.ais_state, log_q_flat_fn, log_p_flat_fn)
+        # Run AIS.
+        sample_flow, x_ais, log_w, ais_state, ais_info = ais_forward(state, subkey)
         info.update(ais_info)
 
         # Estimate loss and update flow params.
-        x_ais = unflatten(point.x)
         loss, grad = jax.value_and_grad(fab_loss_ais_samples)(state.params, x_ais, log_w, flow_log_prob_apply)
         updates, new_opt_state = optimizer.update(grad, state.opt_state, params=state.params)
         new_params = optax.apply_updates(state.params, updates)
