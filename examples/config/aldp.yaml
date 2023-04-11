@@ -60,7 +60,7 @@ training:
     peak_lr: 1e-4 # can be null
     end_lr: 0. # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 1.0
+    max_global_norm: 10000.0
   use_64_bit: false
   n_epoch: 64
   batch_size: 64
