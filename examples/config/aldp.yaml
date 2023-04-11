@@ -49,7 +49,7 @@ flow:
       n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
     mlp_head_config:
-      mlp_units: [64,]
+      mlp_units: [64,64]
       stable: true
 
 
