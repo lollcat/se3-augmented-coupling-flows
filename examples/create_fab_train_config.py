@@ -77,7 +77,8 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                                                      init_step_size=hmc_init_step_size, target_p_accept=target_p_accept,
                                                      adapt_step_size=tune_step_size)
     else:
-        transition_operator = build_metropolis(dim_total, metro_n_outer_steps, metro_init_step_size)
+        transition_operator = build_metropolis(dim_total, metro_n_outer_steps, metro_init_step_size,
+                                               tune_step_size=tune_step_size, target_p_accept=target_p_accept)
     ais = build_ais(transition_operator=transition_operator,
                     n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                     alpha=alpha)

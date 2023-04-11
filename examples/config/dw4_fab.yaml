@@ -16,6 +16,8 @@ fab:
     metropolis:
       n_outer_steps: 1
       init_step_size: 1.
+      target_p_accept: 0.65
+      tune_step_size: true
   alpha: 2.  # alpha-divergence param
   n_intermediate_distributions: 4
   spacing_type: linear
