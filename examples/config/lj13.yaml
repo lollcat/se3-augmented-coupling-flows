@@ -55,6 +55,7 @@ flow:
       get_shifts_via_tensor_product: false
     mlp_head_config:
       mlp_units: [32,]
+      stable: true
 
 
 training:
