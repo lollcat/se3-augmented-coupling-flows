@@ -14,6 +14,7 @@ from molboil.models.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
 
 class MLPHeadConfig(NamedTuple):
     mlp_units: Sequence[int]
+    stable: bool = True
 
 
 class NetsConfig(NamedTuple):

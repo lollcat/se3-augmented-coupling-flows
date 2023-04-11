@@ -42,7 +42,9 @@ def make_spherical_coupling_layer(
             name=f"conditionermlp_cond_mlp_vector{vector_index}" + base_name,
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
-            n_output_params=n_invariant_params)
+            n_output_params=n_invariant_params,
+            stable_layer=nets_config.mlp_head_config.stable
+        )
         params = mlp_function(params)
         # reshape
         params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
