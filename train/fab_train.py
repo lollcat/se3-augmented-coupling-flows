@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.random
 import optax
 
-from fabjax.sampling.ais import AnnealedImportanceSampler, AISState
+from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.utils.graph import setup_flat_log_prob
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
@@ -31,14 +31,14 @@ class TrainStateNoBuffer(NamedTuple):
     params: AugmentedFlowParams
     key: chex.PRNGKey
     opt_state: optax.OptState
-    ais_state: AISState
+    ais_state: SMCState
 
 
-def build_ais_forward_pass(
+def build_smc_forward_pass(
         flow: AugmentedFlow,
         log_p_x: LogProbFn,
         features: GraphFeatures,
-        ais: AnnealedImportanceSampler,
+        ais: SequentialMonteCarloSampler,
         batch_size: int):
 
     features_with_multiplicity = features[:, None]
@@ -79,13 +79,13 @@ def build_fab_no_buffer_init_step_fns(
         flow: AugmentedFlow,
         log_p_x: LogProbFn,
         features: GraphFeatures,
-        ais: AnnealedImportanceSampler,
+        ais: SequentialMonteCarloSampler,
         optimizer: optax.GradientTransformation,
         batch_size: int):
 
     n_nodes = features.shape[0]
     # Setup AIS forward pass.
-    ais_forward = build_ais_forward_pass(flow, log_p_x, features, ais, batch_size)
+    ais_forward = build_smc_forward_pass(flow, log_p_x, features, ais, batch_size)
     features_with_multiplicity = features[:, None]
     def flow_log_prob_apply(params, x):
         return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))

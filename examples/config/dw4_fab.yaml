@@ -6,6 +6,7 @@ hydra:
     chdir: false
 
 fab:
+  use_resampling: true
   use_hmc: false
   transition_operator:
     hmc:

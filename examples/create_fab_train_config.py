@@ -19,7 +19,7 @@ from examples.configs import TrainingState, OptimizerConfig
 from train.max_lik_train_and_eval import get_eval_on_test_batch
 from examples.create_train_config import setup_logger, create_flow_config, get_optimizer
 
-from fabjax.sampling import build_ais, build_blackjax_hmc, build_metropolis
+from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
 from train.fab_train import build_fab_no_buffer_init_step_fns
 
 
@@ -79,9 +79,9 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     else:
         transition_operator = build_metropolis(dim_total, metro_n_outer_steps, metro_init_step_size,
                                                tune_step_size=tune_step_size, target_p_accept=target_p_accept)
-    ais = build_ais(transition_operator=transition_operator,
+    ais = build_smc(transition_operator=transition_operator,
                     n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
-                    alpha=alpha)
+                    alpha=alpha, use_resampling=cfg.fab.use_resampling)
 
     if plotter is None and eval_and_plot_fn is None:
         plotter = make_default_plotter(

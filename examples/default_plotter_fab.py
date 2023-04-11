@@ -10,7 +10,7 @@ import matplotlib as mpl
 from molboil.utils.plotting import bin_samples_by_dist
 from fabjax.sampling import simple_resampling
 
-from train.fab_train import AnnealedImportanceSampler, build_ais_forward_pass, LogProbFn, TrainStateNoBuffer
+from train.fab_train import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
@@ -39,7 +39,7 @@ def plot_histogram_from_counts(count_list, bins, axs, labels):
 def make_default_plotter(
         test_data: FullGraphSample,
         flow: AugmentedFlow,
-        ais: AnnealedImportanceSampler,
+        ais: SequentialMonteCarloSampler,
         log_p_x: LogProbFn,
         n_samples_from_flow: int,
         max_n_samples: int = 10000,
@@ -48,7 +48,7 @@ def make_default_plotter(
 
     n_samples = n_samples_from_flow
 
-    ais_forward = build_ais_forward_pass(flow, log_p_x, test_data.features[0], ais, n_samples)
+    ais_forward = build_smc_forward_pass(flow, log_p_x, test_data.features[0], ais, n_samples)
 
     @partial(jax.jit)
     def get_data_for_plotting(state: TrainStateNoBuffer, key: chex.PRNGKey, test_data=test_data[:max_n_samples]):
