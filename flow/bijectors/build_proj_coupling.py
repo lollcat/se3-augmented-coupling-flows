@@ -48,6 +48,8 @@ def make_proj_coupling_layer(
             mlp_units=nets_config.mlp_head_config.mlp_units,
             zero_init=identity_init,
             n_output_params=n_invariant_params_bijector,
+            stable_layer=nets_config.mlp_head_config.stable
+
         )
         params = mlp_function(params)
         if transform_type == 'real_nvp':
