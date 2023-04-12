@@ -40,7 +40,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     # Flow
     cfg.flow.type = ['nice']
-    cfg.flow.n_aug = 1
+    cfg.flow.n_aug = 3
     cfg.flow.n_layers = 2
 
     cfg.target.aux.trainable_augmented_scale = False
