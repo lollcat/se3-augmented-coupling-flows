@@ -7,8 +7,7 @@ from utils.test import get_minimal_nets_config
 import jax.numpy as jnp
 
 
-def tesst_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn',
-                            n_nodes: int = 4, n_aux=3):
+def tesst_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn', n_nodes: int = 4, n_aux=3):
     nets_config = get_minimal_nets_config(type=type)
 
     graph_features = jnp.zeros((n_nodes, 1, 1))

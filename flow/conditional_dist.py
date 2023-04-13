@@ -1,54 +1,90 @@
+from typing import Tuple
+
 import chex
 import jax.numpy as jnp
-import distrax
-import haiku as hk
 import jax
 
+from flow.distrax_with_extra import DistributionWithExtra, Extra
 from flow.aug_flow_dist import FullGraphSample
+from flow.centre_of_mass_gaussian import CentreGravityGaussian
 
 
-def get_broadcasted_loc_and_scalediag(x: chex.Array, n_aux: int, global_centering: bool, scale: chex.Array):
-    chex.assert_shape(scale, (n_aux,))
-    chex.assert_rank(x, 2)
+class ConditionalCentreofMassGaussian(DistributionWithExtra):
+    """a ~ x + CentreGravityGaussian"""
+    def __init__(self,
+                 dim: int,
+                 n_nodes: int,
+                 n_aux: int,
+                 x: chex.Array):
+        self.n_aux = n_aux
+        self.dim = dim
+        self.n_nodes = n_nodes
+        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.x = x
 
-    scale_diag = jnp.zeros((x.shape[0], n_aux, x.shape[-1])) + scale[None, :, None]
-    loc = jnp.zeros((x.shape[0], n_aux, x.shape[-1]))
-    if global_centering:
-        loc = loc + jnp.mean(x, axis=-2, keepdims=True)[:, None, :]
-    else:
-        loc = loc + x[:, None, :]
+    @property
+    def event_shape(self) -> Tuple[int, ...]:
+        return (self.n_nodes, self.n_aux, self.dim)
 
-    chex.assert_equal_shape((loc, scale_diag))
-    return loc, scale_diag
-
-def get_conditional_gaussian_augmented_dist(x: chex.Array, n_aux: int, global_centering: bool, scale: chex.Array):
-    if len(x.shape) == 2:
-        loc, scale_diag = get_broadcasted_loc_and_scalediag(x, n_aux, global_centering, scale)
-    else:
-        assert len(x.shape) == 3
-        loc, scale_diag = jax.vmap(get_broadcasted_loc_and_scalediag, in_axes=(0, None, None, None))(
-            x, n_aux, global_centering, scale)
-
-    dist = distrax.Independent(distrax.MultivariateNormalDiag(loc=loc,
-                                                              scale_diag=scale_diag), reinterpreted_batch_ndims=2)
-    return dist
-
-
-def build_aux_dist(n_aug: int,
-                   name: str,
-                   global_centering: bool = False,
-                   augmented_scale_init: float = 1.0,
-                   trainable_scale: bool = True):
-    def make_aux_target(sample: FullGraphSample):
-        if trainable_scale:
-            log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(n_aug,),
-                                         init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
-            scale = jnp.exp(log_scale)
+    def _sample_n(self, key: chex.PRNGKey, n: int) -> chex.Array:
+        if self.x.ndim == 2:
+            n_x = 1
+            leading_x_shape = ()
         else:
-            scale = jnp.ones(n_aug) * augmented_scale_init
-        dist = get_conditional_gaussian_augmented_dist(sample.positions,
-                                                       n_aux=n_aug,
-                                                       global_centering=global_centering,
-                                                       scale=scale)
+            assert self.x.ndim == 3
+            n_x = self.x.shape[0]
+            leading_x_shape = (n_x,)
+        leading_shape = (n, *leading_x_shape)
+        momentum = self.centre_gravity_gaussian._sample_n(key, n_x*n*self.n_aux)
+        if self.x.ndim == 3:
+            momentum = jnp.expand_dims(momentum, 0)
+        momentum = jnp.expand_dims(momentum, -3)  # expand for n_aux
+        momentum = jnp.reshape(momentum, (*leading_shape, self.n_aux, self.n_nodes, self.dim))
+        momentum = jnp.swapaxes(momentum, -2, -3)  # swap n_aux and n_nodes axes.
+        augmented_coords = jnp.expand_dims(self.x, -2) + momentum
+        chex.assert_shape(augmented_coords, (*leading_shape, self.n_nodes, self.n_aux, self.dim))
+        return augmented_coords
+
+
+    def log_prob(self, value: chex.Array) -> chex.Array:
+        augmented_coords = value
+        batch_shape = value.shape[:-3]
+        assert value.shape[-3:] == (self.n_nodes, self.n_aux, self.dim)
+        momentum = augmented_coords - jnp.expand_dims(self.x, -2)
+
+        log_prob_momentum = jax.vmap(self.centre_gravity_gaussian.log_prob, in_axes=-2, out_axes=-1)(momentum)
+        chex.assert_shape(log_prob_momentum, (*batch_shape, self.n_aux))
+        log_prob_momentum = jnp.sum(log_prob_momentum, axis=-1)
+
+        return log_prob_momentum
+
+    def get_extra(self) -> Extra:
+        return Extra()
+
+    def log_prob_with_extra(self, value: chex.Array) -> Tuple[chex.Array, Extra]:
+        extra = self.get_extra()
+        log_prob = self.log_prob(value)
+        return log_prob, extra
+
+    def _sample_n_and_log_prob(self, key: chex.PRNGKey, n: int) -> Tuple[chex.Array, chex.Array]:
+        samples = self._sample_n(key, n)
+        log_prob = jax.vmap(self.log_prob)(samples)
+        return samples, log_prob
+
+    def sample_n_and_log_prob_with_extra(self, key: chex.PRNGKey, n: int) -> Tuple[chex.Array, chex.Array, Extra]:
+        x, log_prob = self._sample_n_and_log_prob(key, n)
+        extra = self.get_extra()
+        return x, log_prob, extra
+
+    @property
+    def event_shape(self) -> Tuple[int, ...]:
+        return (self.n_nodes, self.n_aux, self.dim)
+
+
+def build_aux_dist(n_aug: int):
+    def make_aux_target(sample: FullGraphSample):
+        x = sample.positions
+        n_nodes, dim = x.shape[-2:]
+        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aux=n_aug, x=x)
         return dist
     return make_aux_target

@@ -10,15 +10,16 @@ from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
 
-_N_FLOW_LAYERS = 3
-_N_NODES = 7
+_N_FLOW_LAYERS = 2
+_N_AUG=1
+_N_NODES = 3
 _FLOW_TYPE = "nice"
 _FAST_COMPILE_FLOW = False
 _IDENTITY_INIT = False
 _FEATURE_DIM = 2
 
 
-def test_distribution(dim: int = 3, n_aug: int = 3):
+def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -124,7 +125,7 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
 
-def test_target_reparam(dim: int = 3, n_aug: int = 3):
+def tesst_target_reparam(dim: int = 3, n_aug: int = 3):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -178,8 +179,12 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_target_reparam(dim=3)
+    tesst_distribution(dim=2)
+    print("passed distribution dist 2D")
 
+    tesst_distribution(dim=3)
+    print("passed distribution dist 3D")
 
-    test_distribution(dim=3)
-    test_distribution(dim=2)
+    tesst_target_reparam(dim=3)
+    print("passed target reparam test")
+

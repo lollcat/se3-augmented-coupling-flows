@@ -1,6 +1,7 @@
 import chex
 import jax.numpy as jnp
 import jax
+import optax
 
 from molboil.utils.test import test_fn_is_equivariant, test_fn_is_invariant, random_rotate_translate_perumute
 
@@ -9,7 +10,7 @@ from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConf
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
-def get_minimal_nets_config(type = 'e3gnn'):
+def get_minimal_nets_config(type = 'egnn'):
     nets_config = NetsConfig(type=type,
                              egnn_torso_config=EGNNTorsoConfig(
                                     n_blocks=2,
@@ -39,6 +40,7 @@ def bijector_test(bijector_forward, bijector_backward,
     key, subkey = jax.random.split(key)
 
     x_and_a = jax.random.normal(subkey, shape=event_shape) * 0.1
+    centre_of_mass_original = jnp.mean(x_and_a, axis=-3)
 
     if x_and_a.dtype == jnp.float64:
         rtol = 1e-4
@@ -51,6 +53,8 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
+    chex.assert_trees_all_close(jnp.mean(x_and_a_new, axis=-3), centre_of_mass_original,
+                                rtol=rtol)  # Check subspace restriction.
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
     # Check inverse gives original `x_and_a`
@@ -78,7 +82,10 @@ def bijector_test(bijector_forward, bijector_backward,
     # Forward reverse test but with a batch.
     batch_size = 11
     x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
+    centre_of_mass_original = jnp.mean(x_and_a, axis=-3)
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
+    chex.assert_trees_all_close(centre_of_mass_original, jnp.mean(x_and_a_new, axis=-3),
+                                rtol=rtol)  # Check subspace restriction.
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
@@ -94,6 +101,7 @@ def bijector_test(bijector_forward, bijector_backward,
     # Test we can take grad log prob
     grad = jax.grad(lambda params, x_and_a: bijector_forward.apply(params, x_and_a)[1])(params, x_and_a[0])
     chex.assert_tree_all_finite(grad)
+    assert optax.global_norm(grad) != 0.0
 
 
 def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,

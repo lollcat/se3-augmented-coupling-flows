@@ -2,6 +2,7 @@ import chex
 import distrax
 import jax.numpy as jnp
 import haiku as hk
+import jax
 
 from nets.base import EGNN, NetsConfig
 from flow.distrax_with_extra import SplitCouplingWithExtra
@@ -9,8 +10,10 @@ from flow.distrax_with_extra import SplitCouplingWithExtra
 
 def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
     def conditioner(x):
-        shift = equivariant_fn(x, graph_features) * get_scaling_weight_fn()
+        scaling_weight = get_scaling_weight_fn()
+        shift = equivariant_fn(x, graph_features) * scaling_weight
         chex.assert_equal_shape([shift, x])
+        shift = shift - jax.lax.stop_gradient(jnp.mean(shift, axis=-2, keepdims=True))  # Restrict to subspace.
         return shift
     return conditioner
 
