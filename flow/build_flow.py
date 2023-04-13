@@ -22,7 +22,7 @@ class ConditionalAuxDistConfig(NamedTuple):
     scale_init: float = 1.0
 
 class BaseConfig(NamedTuple):
-    type = 'gaussian'
+    type: str = 'gaussian'
     train_x_scale: bool = True
     x_scale_init: float = 1.0
     data_path: str = ''
