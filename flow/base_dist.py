@@ -259,10 +259,7 @@ class UniformGaussian(distrax.Distribution):
         self.ind_uniform = jnp.array(ind_uniform)
         self.ind_gaussian = jnp.array([i for i in range(dim) if i not in ind_uniform])
         perm = jnp.concatenate([self.ind_uniform, self.ind_gaussian])
-        inv_perm = jnp.zeros_like(perm)
-        for i in range(dim):
-            inv_perm[perm[i]] = i
-        self.inv_perm = inv_perm
+        self.inv_perm = jnp.zeros_like(perm).at[perm].set(jnp.arange(dim))
         if scale is None:
             self.scale = jnp.ones((dim,))
         else:
