@@ -13,7 +13,7 @@ def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
         scaling_weight = get_scaling_weight_fn()
         shift = equivariant_fn(x, graph_features) * scaling_weight
         chex.assert_equal_shape([shift, x])
-        shift = shift - jax.lax.stop_gradient(jnp.mean(shift, axis=-2, keepdims=True))  # Restrict to subspace.
+        shift = shift - jnp.mean(shift, axis=-3, keepdims=True)  # Restrict to subspace.
         return shift
     return conditioner
 

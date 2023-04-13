@@ -99,7 +99,10 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_trees_all_close(x_and_a_old[i], x_and_a_old_0, rtol=rtol)
 
     # Test we can take grad log prob
-    grad = jax.grad(lambda params, x_and_a: bijector_forward.apply(params, x_and_a)[1])(params, x_and_a[0])
+    def fake_loss_fn(params):
+        x, log_det = bijector_forward.apply(params, x_and_a)
+        return jnp.sum(log_det) + jnp.mean(x**2)
+    grad = jax.grad(fake_loss_fn)(params)
     chex.assert_tree_all_finite(grad)
     assert optax.global_norm(grad) != 0.0
 
