@@ -8,7 +8,9 @@ import jax.numpy as jnp
 from molboil.utils.numerical import rotate_2d
 
 from utils.numerical import vector_rejection, safe_norm
-from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
+from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
+from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
+
 
 BijectorParams = chex.Array
 
@@ -112,25 +114,11 @@ class ProjSplitCoupling(BijectorWithExtra):
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams, transform_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def _inner_bijector(self, params: BijectorParams, transform_index: int) -> \
+            Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
       bijector = self._bijector(params, transform_index)
-      if bijector.event_ndims_in != bijector.event_ndims_out:
-          raise ValueError(
-              f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
-              f'Instead, it has `event_ndims_in=={bijector.event_ndims_in}` and '
-              f'`event_ndims_out=={bijector.event_ndims_out}`.')
-      extra_ndims = self.event_ndims_in - bijector.event_ndims_in
-      if extra_ndims < 0:
-          raise ValueError(
-              f'The inner bijector can\'t have more event dimensions than the '
-              f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
-              f'bijector and {self.event_ndims_in} for the coupling bijector.')
-      elif extra_ndims > 0:
-          if isinstance(bijector, BijectorWithExtra):
-              bijector = BlockWithExtra(bijector, extra_ndims)
-          else:
-              bijector = distrax.Block(bijector, extra_ndims)
+      bijector = ZeroMeanBijector(bijector)
       return bijector
 
     def get_basis_and_h(self, x: chex.Array, graph_features: chex.Array) ->\

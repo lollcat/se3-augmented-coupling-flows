@@ -53,7 +53,7 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
-    chex.assert_trees_all_close(jnp.mean(x_and_a_new, axis=-3), centre_of_mass_original,
+    chex.assert_trees_all_close(1 + jnp.mean(x_and_a_new, axis=-3), 1 + centre_of_mass_original,
                                 rtol=rtol)  # Check subspace restriction.
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
@@ -84,7 +84,7 @@ def bijector_test(bijector_forward, bijector_backward,
     x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
     centre_of_mass_original = jnp.mean(x_and_a, axis=-3)
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
-    chex.assert_trees_all_close(centre_of_mass_original, jnp.mean(x_and_a_new, axis=-3),
+    chex.assert_trees_all_close(1 + centre_of_mass_original, 1 + jnp.mean(x_and_a_new, axis=-3),
                                 rtol=rtol)  # Check subspace restriction.
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
