@@ -280,7 +280,7 @@ class UniformGaussian(distrax.Distribution):
                                       value.shape[:-1] + self.ind_uniform.shape[:1])
         log_prob_g = - 0.5 * np.log(2 * np.pi) \
                      - jnp.log(self.scale[self.ind_gaussian]) \
-                     - 0.5 * (value[:, self.ind_gaussian] / self.scale[self.ind_gaussian]) ** 2
+                     - 0.5 * (value[..., self.ind_gaussian] / self.scale[self.ind_gaussian]) ** 2
         return jnp.sum(log_prob_u, -1) + jnp.sum(log_prob_g, -1)
 
     @property
