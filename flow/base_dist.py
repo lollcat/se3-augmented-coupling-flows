@@ -183,7 +183,7 @@ class AldpTransformedInternalsAndConditionalGaussian(distrax.Distribution):
 
 
 class AldpTransformedInternals(distrax.Distribution):
-    def __init(self, data_path: str):
+    def __init__(self, data_path: str):
         traj = mdtraj.load(data_path)
 
         ndim = 66
