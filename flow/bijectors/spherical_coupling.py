@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 
 from molboil.utils.numerical import safe_norm
-from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det
 from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
+from flow.bijectors.spherical_flow_layer import SphericalFlow
 from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 
 BijectorParams = chex.Array
@@ -60,10 +60,12 @@ class SphericalSplitCoupling(BijectorWithExtra):
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams, vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def _inner_bijector(self, params: BijectorParams, reference: chex.Array,
+                        vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
-      bijector = self._bijector(params, vector_index)
-      bijector = ZeroMeanBijector(bijector)
+      inner_bijector = self._bijector(params, vector_index)
+      spherical_bijector = SphericalFlow(inner_bijector, reference)
+      bijector = ZeroMeanBijector(spherical_bijector, block_dim=(-2, -1))
       return bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
@@ -117,17 +119,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
             extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
             return extra
 
-    def to_spherical_and_log_det(self, x, reference):
-        chex.assert_rank(x, 3)
-        chex.assert_rank(reference, 4)
-        sph_x, log_det = jax.vmap(jax.vmap(to_spherical_and_log_det))(x, reference)
-        return sph_x, jnp.sum(log_det)
 
-    def to_cartesian_and_log_det(self, x_sph, reference):
-        chex.assert_rank(x_sph, 3)
-        chex.assert_rank(reference, 4)
-        x, log_det = jax.vmap(jax.vmap(to_cartesian_and_log_det))(x_sph, reference)
-        return x, jnp.sum(log_det)
 
 
     def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
