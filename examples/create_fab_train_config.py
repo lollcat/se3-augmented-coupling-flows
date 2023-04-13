@@ -15,12 +15,13 @@ from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow
 from examples.default_plotter_fab import make_default_plotter
-from examples.configs import TrainingState, OptimizerConfig
+from examples.configs import TrainingState
 from train.max_lik_train_and_eval import get_eval_on_test_batch
-from examples.create_train_config import setup_logger, create_flow_config, get_optimizer
+from examples.create_train_config import setup_logger, create_flow_config
+from utils.optimize import get_optimizer, OptimizerConfig
 
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
-from train.fab_train import build_fab_no_buffer_init_step_fns
+from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns
 
 
 def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n_nodes,
@@ -64,10 +65,14 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
-    optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
-    optimizer, lr = get_optimizer(optimizer_config,
-                                  n_iter_per_epoch=1,
-                                  total_n_epoch=cfg.training.n_epoch)
+
+
+    opt_cfg = dict(training_config.pop("optimizer"))
+    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')
+    optimizer_config = OptimizerConfig(**opt_cfg,
+                                       n_iter_total=cfg.training.n_epoch,
+                                       n_iter_warmup=n_iter_warmup)
+    optimizer, lr = get_optimizer(optimizer_config)
 
 
     # Setup training functions.
@@ -85,18 +90,18 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
 
     if plotter is None and eval_and_plot_fn is None:
         plotter = make_default_plotter(
-                test_data = test_data,
-                flow = flow,
-                ais = ais,
-                log_p_x = target_log_p_x_fn,
-                n_samples_from_flow = cfg.training.plot_batch_size,
-                max_n_samples = 1000,
-                max_distance = 20.)
+                test_data=test_data,
+                flow=flow,
+                ais=ais,
+                log_p_x=target_log_p_x_fn,
+                n_samples_from_flow=cfg.training.plot_batch_size,
+                max_n_samples=1000,
+                max_distance=20.)
 
     features = train_data.features[0]
     init_fn, update_fn = build_fab_no_buffer_init_step_fns(
         flow=flow,log_p_x=target_log_p_x_fn, features=features,
-        ais=ais, optimizer=optimizer, batch_size=cfg.training.batch_size,
+        smc=ais, optimizer=optimizer, batch_size=cfg.training.batch_size,
     )
 
     if evaluation_fn is None and eval_and_plot_fn is None:

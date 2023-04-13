@@ -9,7 +9,7 @@ import matplotlib as mpl
 
 from molboil.utils.plotting import bin_samples_by_dist
 
-from train.fab_train import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
+from train.fab_train_no_buffer import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
