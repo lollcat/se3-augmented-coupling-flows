@@ -5,7 +5,7 @@ from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
 from typing import NamedTuple, Sequence, Union
 import distrax
 
-from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
+from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian, AldpTransformedInternalsAndConditionalGaussian
 from flow.conditional_dist import build_aux_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
@@ -22,8 +22,10 @@ class ConditionalAuxDistConfig(NamedTuple):
     scale_init: float = 1.0
 
 class BaseConfig(NamedTuple):
+    type = 'gaussian'
     train_x_scale: bool = True
     x_scale_init: float = 1.0
+    data_path: str = ''
     aug: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
 
 
@@ -54,16 +56,21 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         assert flow in ['nice', 'proj', 'spherical']
 
     def make_base() -> distrax.Distribution:
-        base = CentreGravitryGaussianAndCondtionalGuassian(
-            dim=config.dim,
-            n_nodes=config.nodes,
-            global_centering=config.base.aug.global_centering,
-            trainable_x_scale=config.base.train_x_scale,
-            x_scale_init=config.base.x_scale_init,
-            trainable_augmented_scale=config.base.aug.trainable_augmented_scale,
-            augmented_scale_init=config.base.aug.scale_init,
-            n_aux=config.n_aug
-        )
+        if config.base.type == 'gaussian':
+            base = CentreGravitryGaussianAndCondtionalGuassian(
+                dim=config.dim,
+                n_nodes=config.nodes,
+                global_centering=config.base.aug.global_centering,
+                trainable_x_scale=config.base.train_x_scale,
+                x_scale_init=config.base.x_scale_init,
+                trainable_augmented_scale=config.base.aug.trainable_augmented_scale,
+                augmented_scale_init=config.base.aug.scale_init,
+                n_aux=config.n_aug
+            )
+        elif config.base.type == 'internal':
+            base = AldpTransformedInternalsAndConditionalGaussian(config.base.data_path)
+        else:
+            raise NotImplementedError('This base distribution is not implemented.')
         return base
 
     def make_bijector(graph_features: chex.Array):
