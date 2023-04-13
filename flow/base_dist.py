@@ -245,6 +245,8 @@ class AldpTransformedInternals(distrax.Distribution):
                                dtype=torch.float64)
         z_torch, log_det_torch = self.transform.inverse(x_torch)
         z_np, log_det_np = z_torch.detach().numpy(), log_det_torch.detach().numpy()
+        if value.ndim == 2:
+            z_np, log_det_np = z_np[0, ...], log_det_np[0, ...]
         return self.dist_internal.log_prob(jnp.array(z_np)) + jnp.array(log_det_np)
 
     @property
@@ -275,7 +277,7 @@ class UniformGaussian(distrax.Distribution):
 
     def log_prob(self, value: Array) -> Array:
         log_prob_u = jnp.broadcast_to(-jnp.log(2 * self.scale[self.ind_uniform]),
-                                      (value.shape[0], self.ind_uniform.shape[0]))
+                                      value.shape[:-1] + self.ind_uniform.shape[:1])
         log_prob_g = - 0.5 * np.log(2 * np.pi) \
                      - jnp.log(self.scale[self.ind_gaussian]) \
                      - 0.5 * (value[:, self.ind_gaussian] / self.scale[self.ind_gaussian]) ** 2
