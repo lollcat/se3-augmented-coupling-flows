@@ -229,7 +229,7 @@ class AldpTransformedInternals(distrax.Distribution):
         bound_circ = np.pi / std_dih[ind_circ_dih]
 
         scale = jnp.ones(60)
-        scale[ind_circ] = bound_circ
+        scale = scale.at[ind_circ].set(bound_circ)
         self.dist_internal = UniformGaussian(dim=ndim, ind_uniform=ind_circ, scale=scale)
 
     def _sample_n(self, key: PRNGKey, n: int) -> Array:
