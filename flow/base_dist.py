@@ -119,10 +119,6 @@ class CentreGravityGaussian(distrax.Distribution):
 
 class AldpTransformedInternalsAndConditionalGaussian(distrax.Distribution):
     """x ~ AldpTransformedInternals, a ~ Normal(x, I)"""
-    def __init__(self, data_path: str):
-        self.aldp = AldpTransformedInternals(data_path)
-
-
     def __init__(self, data_path: str, n_aux: int,
                  global_centering: bool = False,
                  augmented_scale_init: float = 1.0,
