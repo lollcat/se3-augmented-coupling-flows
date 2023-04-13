@@ -68,7 +68,13 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 n_aux=config.n_aug
             )
         elif config.base.type == 'internal':
-            base = AldpTransformedInternalsAndConditionalGaussian(config.base.data_path)
+            base = AldpTransformedInternalsAndConditionalGaussian(
+                data_path=config.base.data_path,
+                n_aux=config.n_aug,
+                global_centering=config.base.aug.global_centering,
+                trainable_augmented_scale=config.base.aug.trainable_augmented_scale,
+                augmented_scale_init=config.base.aug.scale_init
+            )
         else:
             raise NotImplementedError('This base distribution is not implemented.')
         return base
