@@ -14,7 +14,7 @@ class SphericalFlow(distrax.Bijector):
                  inner_bijector: distrax.Bijector,
                  reference: chex.Array
                  ):
-        super().__init__(event_ndims_in=0,
+        super().__init__(event_ndims_in=1,
                          event_ndims_out=1)
         self.inner_bijector = inner_bijector
         self.reference = reference

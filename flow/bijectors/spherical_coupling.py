@@ -134,12 +134,9 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = jnp.zeros(())
         for i in range(self.n_inner_transforms):
             reference_points = reference_points_all[:, :, i]
-            sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
-            sph_x_out, logdet_inner_bijector = \
-                self._inner_bijector(bijector_feat_in, i).forward_and_log_det(sph_x_in)
-            chex.assert_equal_shape((sph_x_out, sph_x_in))
-            x2, log_det_norm_rv = self.to_cartesian_and_log_det(sph_x_out, reference_points)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
+            x2, log_det = bijector.forward_and_log_det(x2)
+            log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
         y2 = x2
@@ -157,10 +154,9 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = jnp.zeros(())
         for i in reversed(range(self.n_inner_transforms)):
             reference_points = reference_points_all[:, :, i]
-            sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
-            ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
-            y2, log_det_norm_rv = self.to_cartesian_and_log_det(ph_y_out, reference_points)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
+            y2, log_det = bijector.inverse_and_log_det(y2)
+            log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
         x2 = y2
