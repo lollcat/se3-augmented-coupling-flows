@@ -47,9 +47,8 @@ class ZeroMeanBijector(distrax.Bijector):
     def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         batch_shape = x.shape[:-3]
         assert batch_shape == ()  # This is never designed to deal with batch dim.
-        centre_of_mass_input = jnp.mean(x, axis=self.zero_mean_axis, keepdims=True)
         y, log_det = self.inner_bijector.forward_and_log_det(x)
-        y = y - jnp.mean(y, axis=self.zero_mean_axis, keepdims=True) + centre_of_mass_input
+        y = y - jnp.mean(y, axis=self.zero_mean_axis, keepdims=True)
         log_n_nodes = jnp.log(y.shape[self.zero_mean_axis])
         log_det_adjustment = jax.nn.logsumexp(-log_det, axis=self.log_det_adjust_zero_mean_axis) - log_n_nodes
         log_det_adjustment = jnp.sum(log_det_adjustment, axis=self.log_det_adjust_sum_dim)
@@ -61,9 +60,8 @@ class ZeroMeanBijector(distrax.Bijector):
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         batch_shape = y.shape[:-3]
         assert batch_shape == ()  #  This is never designed to deal with batch dim.
-        centre_of_mass_input = jnp.mean(y, axis=self.zero_mean_axis, keepdims=True)
         x, log_det = self.inner_bijector.inverse_and_log_det(y)
-        x = x - jnp.mean(x, axis=self.zero_mean_axis, keepdims=True) + centre_of_mass_input
+        x = x - jnp.mean(x, axis=self.zero_mean_axis, keepdims=True)
         log_n_nodes = jnp.log(x.shape[self.zero_mean_axis])
         log_det_adjustment = jax.nn.logsumexp(-log_det, axis=self.log_det_adjust_zero_mean_axis) - log_n_nodes
         log_det_adjustment = jnp.sum(log_det_adjustment, axis=self.log_det_adjust_sum_dim)
