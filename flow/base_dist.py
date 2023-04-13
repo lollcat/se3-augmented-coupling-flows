@@ -274,7 +274,8 @@ class UniformGaussian(distrax.Distribution):
         return z * self.scale
 
     def log_prob(self, value: Array) -> Array:
-        log_prob_u = jnp.broadcast_to(-jnp.log(2 * self.scale[self.ind_uniform]), (value.shape[0], -1))
+        log_prob_u = jnp.broadcast_to(-jnp.log(2 * self.scale[self.ind_uniform]),
+                                      (value.shape[0], self.ind_uniform.shape[0]))
         log_prob_g = - 0.5 * np.log(2 * np.pi) \
                      - jnp.log(self.scale[self.ind_gaussian]) \
                      - 0.5 * (value[:, self.ind_gaussian] / self.scale[self.ind_gaussian]) ** 2
