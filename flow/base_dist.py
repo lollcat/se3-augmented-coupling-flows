@@ -15,16 +15,23 @@ class JointBaseDistribution(DistributionWithExtra):
     def __init__(self,
                  dim,
                  n_nodes: int,
-                 n_aux: int):
+                 n_aux: int,
+                 x_scale_init: float = 1.0,
+                 trainable_x_scale: bool = False,
+                 augmented_scale_init: float = 1.0
+                 ):
+        if trainable_x_scale:
+            raise NotImplementedError
         self.n_aux = n_aux
         self.dim = dim
         self.n_nodes = n_nodes
-        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=jnp.log(x_scale_init))
+        self.augmented_log_scale = jnp.log(augmented_scale_init)
 
 
     def get_augmented_dist(self, x) -> ConditionalCentreofMassGaussian:
         dist = ConditionalCentreofMassGaussian(
-            self.dim, self.n_nodes, self.n_aux, x)
+            self.dim, self.n_nodes, self.n_aux, x, log_scale=self.augmented_log_scale)
         return dist
 
 

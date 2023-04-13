@@ -15,11 +15,12 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
                  dim: int,
                  n_nodes: int,
                  n_aux: int,
-                 x: chex.Array):
+                 x: chex.Array,
+                 log_scale: chex.Array = jnp.zeros(())):
         self.n_aux = n_aux
         self.dim = dim
         self.n_nodes = n_nodes
-        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=log_scale)
         self.x = x
 
     @property
@@ -81,10 +82,12 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
         return (self.n_nodes, self.n_aux, self.dim)
 
 
-def build_aux_dist(n_aug: int):
+def build_aux_dist(n_aug: int,
+                   augmented_scale_init: float = 1.0):
     def make_aux_target(sample: FullGraphSample):
         x = sample.positions
         n_nodes, dim = x.shape[-2:]
-        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aux=n_aug, x=x)
+        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aux=n_aug, x=x,
+                                               log_scale=jnp.log(augmented_scale_init))
         return dist
     return make_aux_target

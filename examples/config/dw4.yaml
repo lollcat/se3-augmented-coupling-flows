@@ -8,7 +8,7 @@ hydra:
 target:
   aux:
     global_centering: false
-    scale_init: 1.0
+    scale_init: 0.1
     trainable_augmented_scale: false
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options

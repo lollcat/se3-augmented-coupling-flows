@@ -58,7 +58,9 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         base = JointBaseDistribution(
             dim=config.dim,
             n_nodes=config.nodes,
-            n_aux=config.n_aug
+            n_aux=config.n_aug,
+            x_scale_init=config.base.x_scale_init,
+            augmented_scale_init=config.base.aug.scale_init,
         )
         return base
 
@@ -122,7 +124,9 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         return ChainWithExtra(bijectors)
 
     make_aug_target = build_aux_dist(
-        n_aug=config.n_aug)
+        n_aug=config.n_aug,
+        augmented_scale_init=config.target_aux_config.scale_init
+    )
 
 
     definition = AugmentedFlowRecipe(make_base=make_base,
