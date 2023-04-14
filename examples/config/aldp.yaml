@@ -40,7 +40,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-      orthogonalization_method: loewdin #  gram-schmidt or loewdin
+      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:

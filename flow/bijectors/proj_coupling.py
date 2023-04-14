@@ -18,7 +18,7 @@ BijectorParams = chex.Array
 
 
 def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True,
-                                      method: str = 'loewdin') -> chex.Array:
+                                      method: str = 'gram-schmidt') -> chex.Array:
     """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
     vectors as it's columns."""
 
