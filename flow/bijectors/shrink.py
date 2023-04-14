@@ -7,6 +7,7 @@ import jax
 
 from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra
 from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
+from flow.bijectors.batch import BatchBijector
 
 def per_particle_shift_forward(a: chex.Array, x: chex.Array, shift_interp: chex.Array) -> chex.Array:
     """
@@ -51,12 +52,8 @@ class ParticlePairShift(BijectorWithExtra):
     def forward(self, x: chex.Array) -> chex.Array:
         """Computes y = f(x)."""
         chex.assert_equal_shape((x, self.alt_coords, self._centre_shift_interp))
-        if len(x.shape) == 3:
-            y = jax.vmap(jax.vmap(per_particle_shift_forward))(x, self.alt_coords, self._centre_shift_interp)
-        elif len(x.shape) == 4:
-            y = jax.vmap(jax.vmap(jax.vmap(per_particle_shift_forward)))(x, self.alt_coords, self._centre_shift_interp)
-        else:
-            raise Exception
+        chex.assert_rank(x, 3)
+        y = jax.vmap(jax.vmap(per_particle_shift_forward))(x, self.alt_coords, self._centre_shift_interp)
         chex.assert_equal_shape((y, x))
         return y
 
@@ -71,12 +68,8 @@ class ParticlePairShift(BijectorWithExtra):
     def inverse(self, y: chex.Array) -> chex.Array:
         """Computes x = f^{-1}(y)."""
         chex.assert_equal_shape((y, self.alt_coords, self._centre_shift_interp))
-        if len(y.shape) == 3:
-            x = jax.vmap(jax.vmap(per_particle_shift_inverse))(y, self.alt_coords, self._centre_shift_interp)
-        elif len(y.shape) == 4:
-            x = jax.vmap(jax.vmap(jax.vmap(per_particle_shift_inverse)))(y, self.alt_coords, self._centre_shift_interp)
-        else:
-            raise Exception
+        chex.assert_rank(y, 3)
+        x = jax.vmap(jax.vmap(per_particle_shift_inverse))(y, self.alt_coords, self._centre_shift_interp)
         chex.assert_equal_shape((y, x))
         return x
 
@@ -91,12 +84,14 @@ class ParticlePairShift(BijectorWithExtra):
 
 def make_conditioner(get_shift_fn, n_aug: int):
     def conditioner(x):
-        shift_interp_logit = get_shift_fn()
+        chex.assert_rank(x, 3)
         assert x.shape[-2] == 1, "Currently we assume x is passed into conditioner."
+
+        shift_interp_logit = get_shift_fn()
         shrinkage_graph_centre = jnp.repeat(x, n_aug, axis=-2)
-        expand_dims = [i for i in range(len(x.shape) - 2)] + [-1, ]
+        expand_dims = [-3, -1]
         shift_interp_logit = jnp.expand_dims(shift_interp_logit, axis=expand_dims)
-        assert len(shift_interp_logit.shape) == len(x.shape)
+        chex.assert_shape(shift_interp_logit, (1, n_aug, 1))
         shift_interp_logit = jnp.ones_like(x)*shift_interp_logit
         return shift_interp_logit, shrinkage_graph_centre
 
@@ -115,15 +110,17 @@ def make_shrink_aug_layer(
 
     def bijector_fn(params):
         shift_interp_logit, alt_global_mean = params
-        return ZeroMeanBijector(ParticlePairShift(log_shift_interp=shift_interp_logit,
-                                 alt_coords=alt_global_mean))
+        inner_bijector = ParticlePairShift(log_shift_interp=shift_interp_logit,
+                                 alt_coords=alt_global_mean)
+        zero_mean_bijector = ZeroMeanBijector(inner_bijector)
+        return zero_mean_bijector
 
     get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
                                             shape=(1 if swap else n_aug,),
                                             init=jnp.zeros if identity_init else hk.initializers.Constant(1.))
 
     conditioner = make_conditioner(get_shift_fn, n_aug)
-    return SplitCouplingWithExtra(
+    split_coupling_bijector = SplitCouplingWithExtra(
         split_index=1,
         event_ndims=3,  # [nodes, n_aug, dim]
         conditioner=conditioner,
@@ -131,3 +128,4 @@ def make_shrink_aug_layer(
         swap=swap,
         split_axis=-2
     )
+    return BatchBijector(split_coupling_bijector)

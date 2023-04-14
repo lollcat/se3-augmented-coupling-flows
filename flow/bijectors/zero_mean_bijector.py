@@ -22,7 +22,7 @@ class ZeroMeanBijector(distrax.Bijector):
             block_dim: Dimensions with which to block over. Must be equal to 3 - inner_bijector_event_ndims_in.
                 By block I mean consider as joint event_dimension (see distrax.Block).
         """
-        super().__init__(event_ndims_in=inner_bijector.event_ndims_in,
+        super().__init__(event_ndims_in=3,
                          event_ndims_out=3)
         assert inner_bijector.event_ndims_in < 3  # Node dimension must not yet be joint/block.
         assert (3 - inner_bijector.event_ndims_in) == len(block_dim)
