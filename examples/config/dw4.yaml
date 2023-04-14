@@ -21,7 +21,7 @@ flow:
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: true
+      trainable_augmented_scale: false
   dim: 2
   nodes: 4
   n_aug: 5
@@ -30,13 +30,14 @@ flow:
   identity_init: true
   type: proj #  nice proj spherical
   kwargs:
+    n_inner_transforms: 2
     spherical:
-      n_inner_transforms: 1
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: real_nvp # spline or real_nvp
-      n_inner_transforms: 1
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
       lower: -2.
