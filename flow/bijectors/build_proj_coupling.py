@@ -18,6 +18,8 @@ def make_proj_coupling_layer(
         identity_init: bool = True,
         origin_on_coupled_pair: bool = True,
         add_small_identity: bool = True,
+        orthogonalization_method: str = 'gram-schmidt',
+        additional_basis_vector: bool = False,
         transform_type: str = 'real_nvp',
         num_bins: int = 10,
         lower: float = -10.,
@@ -30,6 +32,7 @@ def make_proj_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
+    n_heads = n_heads + 1 if additional_basis_vector else n_heads
     if transform_type == "real_nvp":
         params_per_dim_channel = dim * 2
         n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split
@@ -101,5 +104,6 @@ def make_proj_coupling_layer(
         swap=swap,
         split_axis=-2,
         add_small_identity=add_small_identity,
+        orthogonalization_method=orthogonalization_method,
         n_inner_transforms=n_inner_transforms
     )
