@@ -46,15 +46,17 @@ class ProjFlow(distrax.Bijector):
         chex.assert_equal_shape((x_proj, x_proj_out))
         x_out = self.to_equivariant_space(x_proj_out)
 
-        chex.assert_equal_shape(x_out, log_det)
-        return x, log_det
+        chex.assert_equal_shape((x_out, x))
+        chex.assert_equal_shape((x_out, log_det))
+        return x_out, log_det
 
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         chex.assert_rank(y, 3)
         n_nodes, multiplicity, dim = y.shape
         y_proj = self.to_invariant_space(y)
         y_proj_new, log_det = self.inner_bijector.inverse_and_log_det(y_proj)
-        y, log_det_norm_rv = self.to_equivariant_space(y_proj_new)
+        y_new = self.to_equivariant_space(y_proj_new)
 
-        chex.assert_equal_shape(y, log_det)
-        return y, log_det
+        chex.assert_equal_shape((y_new, y))
+        chex.assert_equal_shape((y_proj_new, log_det))
+        return y_new, log_det
