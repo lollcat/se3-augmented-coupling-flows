@@ -43,7 +43,7 @@ def tesst_zero_mean_bijector(n_nodes: int = 5, dim: int = 2, n_aug: int = 3):
     # Manually transform.
     y_, log_det_, eigen_values = jax.vmap(manual_forward, in_axes=(1, None), out_axes=(1, 0, 1))(x, scales)
 
-    # Check zero mean bijector against manual caclulation.
+    # Check zero mean bijector against manual calculation.
     assert_mean_zero(y_, node_axis=0)
     print("manual log det calculation", log_det_)
     print("log det automatic", log_det_)
