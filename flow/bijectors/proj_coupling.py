@@ -10,22 +10,10 @@ from molboil.utils.numerical import rotate_2d
 from utils.numerical import vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
 from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
-
+from flow.bijectors.proj_flow_layer import ProjFlow
 
 BijectorParams = chex.Array
 
-
-def project(x, origin, change_of_basis_matrix):
-    chex.assert_rank(x, 1)
-    chex.assert_rank(change_of_basis_matrix, 2)
-    chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
-    return change_of_basis_matrix.T @ (x - origin)
-
-def unproject(x, origin, change_of_basis_matrix):
-    chex.assert_rank(x, 1)
-    chex.assert_rank(change_of_basis_matrix, 2)
-    chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
-    return change_of_basis_matrix @ x + origin
 
 
 
@@ -114,10 +102,13 @@ class ProjSplitCoupling(BijectorWithExtra):
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams, transform_index: int) -> \
+    def _inner_bijector(self, params: BijectorParams, transform_index: int,
+                        origin: chex.Array, change_of_basis_matrix: chex.Array) -> \
             Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
-      bijector = self._bijector(params, transform_index)
+      inner_inner_bijector = self._bijector(params, transform_index)  # e.g. spline or rnvp
+      bijector = ProjFlow(inner_bijector=inner_inner_bijector, origin=origin,
+                          change_of_basis_matrix=change_of_basis_matrix)
       bijector = ZeroMeanBijector(bijector)
       return bijector
 
@@ -186,6 +177,10 @@ class ProjSplitCoupling(BijectorWithExtra):
 
     def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
+        chex.assert_rank(x, 3)
+        dim = x.shape[-1]
+        x = x - jnp.mean(x, axis=-3)  # Zero mean so that reference makes sense.
+
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
@@ -196,12 +191,9 @@ class ProjSplitCoupling(BijectorWithExtra):
         for i in range(self.n_inner_transforms):
             origin = origins[:, :, i]
             change_of_basis_matrix = change_of_basis_matrices[:, :, i]
-            x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
-            x2, logdet = self._inner_bijector(bijector_feat_in, i).forward_and_log_det(x2_proj)
-            # inner_bijector = self._inner_bijector(bijector_feat_in); inner_bijector._bijector._x_pos
-            # inner_bijector.forward_and_log_det(jnp.ones_like(x2_proj)*20)
-            x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-            log_det_total = log_det_total + logdet
+            inner_bijector = self._inner_bijector(bijector_feat_in, i, origin, change_of_basis_matrix)
+            x2, log_det_inner = inner_bijector.forward_and_log_det(x2)
+            log_det_total = log_det_total + log_det_inner
 
         y2 = x2
         return self._recombine(x1, y2), log_det_total, extra
@@ -209,6 +201,10 @@ class ProjSplitCoupling(BijectorWithExtra):
     def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
+        chex.assert_rank(y, 3)
+        dim = y.shape[-1]
+        y = y - jnp.mean(y, axis=-3)  # Zero mean so that reference makes sense.
+
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
@@ -218,10 +214,9 @@ class ProjSplitCoupling(BijectorWithExtra):
         for i in reversed(range(self.n_inner_transforms)):
             origin = origins[:, :, i]
             change_of_basis_matrix = change_of_basis_matrices[:, :, i]
-            y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
-            y2, logdet = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(y2_proj)
-            y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-            log_det_total = log_det_total + logdet
+            inner_bijector = self._inner_bijector(bijector_feat_in, i, origin, change_of_basis_matrix)
+            y2, log_det_inner = inner_bijector.inverse_and_log_det(y2)
+            log_det_total = log_det_total + log_det_inner
 
         x2 = y2
         return self._recombine(y1, x2), log_det_total, extra
