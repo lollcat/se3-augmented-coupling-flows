@@ -10,7 +10,7 @@ target:
     train: target/data/aldp_500K_train_mini.h5
     val: target/data/aldp_500K_test_mini.h5
   aux:
-    global_centering: false
+    conditioned_on_x: true
     scale_init: 0.1
     trainable_augmented_scale: false
 
@@ -20,7 +20,7 @@ flow:
   base:
     train_x_scale: false
     aux:
-      global_centering: false
+      conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: false
   dim: 3

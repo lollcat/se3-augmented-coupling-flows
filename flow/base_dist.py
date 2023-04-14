@@ -19,7 +19,8 @@ class JointBaseDistribution(DistributionWithExtra):
                  x_scale_init: float = 1.0,
                  trainable_x_scale: bool = False,
                  augmented_scale_init: float = 1.0,
-                 trainable_augmented_scale: bool = False
+                 trainable_augmented_scale: bool = False,
+                 augmented_conditioned: bool = True,
                  ):
         if trainable_x_scale or trainable_augmented_scale:
             raise NotImplementedError
@@ -29,11 +30,14 @@ class JointBaseDistribution(DistributionWithExtra):
         self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=jnp.log(x_scale_init))
         self.augmented_log_scale = jnp.log(jnp.ones(self.n_aux)*augmented_scale_init)
         self.trainable_augmented_scale = trainable_augmented_scale
+        self.augmented_conditioned = augmented_conditioned
 
 
     def get_augmented_dist(self, x) -> ConditionalCentreofMassGaussian:
         dist = ConditionalCentreofMassGaussian(
-            self.dim, self.n_nodes, self.n_aux, x, log_scale=self.augmented_log_scale)
+            self.dim, self.n_nodes, self.n_aux, x, log_scale=self.augmented_log_scale,
+            conditioned=self.augmented_conditioned
+        )
         return dist
 
 

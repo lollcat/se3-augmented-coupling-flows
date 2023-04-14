@@ -7,7 +7,7 @@ hydra:
 
 target:
   aux:
-    global_centering: false
+    conditioned_on_x: true
     scale_init: 1.0
     trainable_augmented_scale: false
 
@@ -18,7 +18,7 @@ flow:
     train_x_scale: true
     x_scale_init: 1.0
     aux:
-      global_centering: false
+      conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: true
   dim: 3

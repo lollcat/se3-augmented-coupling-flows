@@ -12,13 +12,20 @@ from flow.centre_of_mass_gaussian import CentreGravityGaussian
 
 
 class ConditionalCentreofMassGaussian(DistributionWithExtra):
-    """a ~ x + CentreGravityGaussian"""
+    """
+    Either:
+        a ~ x + CentreGravityGaussian
+    or
+        a ~ CentreGravityGaussian
+    depending on whether `conditioned` is True.
+    """
     def __init__(self,
                  dim: int,
                  n_nodes: int,
                  n_aug: int,
                  x: chex.Array,
                  log_scale: Optional[chex.Array] = None,
+                 conditioned: bool = True
                  ):
         self.n_aux = n_aug
         self.dim = dim
@@ -30,6 +37,7 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
             log_scale = jnp.zeros(n_aug)
         self.log_scale = log_scale
         self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.conditioned = conditioned
 
     @property
     def event_shape(self) -> Tuple[int, ...]:
@@ -58,7 +66,11 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
         else:
             momentum = jax.vmap(jax.vmap(self.scaling_bijector().forward))(momentum)
 
-        augmented_coords = jnp.expand_dims(self.x, -2) + momentum
+        if self.conditioned:
+            augmented_coords = jnp.expand_dims(self.x, -2) + momentum
+        else:
+            augmented_coords = momentum
+
         chex.assert_shape(augmented_coords, (*leading_shape, self.n_nodes, self.n_aux, self.dim))
 
         return augmented_coords
@@ -72,7 +84,10 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
         chex.assert_rank(x, 2)  #  [n_nodes, dim]
         chex.assert_rank(augmented_coords, 3)  # [n_nodes, n_aux, dim]
 
-        momentum = augmented_coords - jnp.expand_dims(x, -2)
+        if self.conditioned:
+            momentum = augmented_coords - jnp.expand_dims(x, -2)
+        else:
+            momentum = augmented_coords
         momentum, log_det_scaling = self.scaling_bijector().inverse_and_log_det(momentum)
         chex.assert_shape(log_det_scaling, ())
 
@@ -117,6 +132,7 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
 def build_aux_dist(n_aug: int,
                    augmented_scale_init: float = 1.0,
                    trainable_scale: bool = False,
+                   conditioned: bool = True,
                    name: str = 'aux_dist'):
 
     def make_aux_target(sample: FullGraphSample):
@@ -130,6 +146,6 @@ def build_aux_dist(n_aug: int,
             log_scale = jnp.log(scale)
 
         dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aug=n_aug, x=x,
-                                               log_scale=log_scale)
+                                               log_scale=log_scale, conditioned=conditioned)
         return dist
     return make_aux_target

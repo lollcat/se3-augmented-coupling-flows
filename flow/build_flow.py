@@ -18,8 +18,8 @@ from flow.distrax_with_extra import ChainWithExtra
 
 
 class ConditionalAuxDistConfig(NamedTuple):
-    global_centering: bool = False
-    trainable_augmented_scale: bool = True
+    conditioned_on_x: bool = False
+    trainable_augmented_scale: bool = False
     scale_init: float = 1.0
 
 class BaseConfig(NamedTuple):
@@ -40,7 +40,7 @@ class FlowDistConfig(NamedTuple):
     act_norm: bool = False
     kwargs: dict = {}
     base: BaseConfig = BaseConfig()
-    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig(trainable_augmented_scale=False)
+    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
 
 
 def build_flow(config: FlowDistConfig) -> AugmentedFlow:
@@ -61,6 +61,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             n_aux=config.n_aug,
             x_scale_init=config.base.x_scale_init,
             augmented_scale_init=config.base.aug.scale_init,
+            augmented_conditioned=config.base.aug.conditioned_on_x
         )
         return base
 
@@ -126,7 +127,8 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         n_aug=config.n_aug,
         augmented_scale_init=config.target_aux_config.scale_init,
         trainable_scale=config.target_aux_config.trainable_augmented_scale,
-        name='aug_target_dist'
+        name='aug_target_dist',
+        conditioned=config.target_aux_config.conditioned_on_x
     )
 
     definition = AugmentedFlowRecipe(make_base=make_base,
