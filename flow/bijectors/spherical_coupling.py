@@ -125,7 +125,9 @@ class SphericalSplitCoupling(BijectorWithExtra):
     def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         self._check_forward_input_shape(x)
+        chex.assert_rank(x, 3)
         dim = x.shape[-1]
+        x = x - jnp.mean(x, axis=-3)  # Zero mean so that reference makes sense.
         x1, x2 = self._split(x)
         reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
@@ -146,6 +148,8 @@ class SphericalSplitCoupling(BijectorWithExtra):
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
         dim = y.shape[-1]
+        chex.assert_rank(y, 3)
+        y = y - jnp.mean(y, axis=-3)  # Zero mean so that reference makes sense.
         y1, y2 = self._split(y)
         reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
