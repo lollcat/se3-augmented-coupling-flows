@@ -11,32 +11,23 @@ import distrax
 class CentreGravityGaussian(distrax.Distribution):
     """Guassian distribution over nodes in space, with a zero centre of gravity.
     See https://arxiv.org/pdf/2105.09016.pdf."""
-    def __init__(self, dim: int, n_nodes: int, log_scale: chex.Array = jnp.zeros(())):
+    def __init__(self, dim: int, n_nodes: int):
 
         self.dim = dim
         self.n_nodes = n_nodes
-        self.log_scale = log_scale
-
-    @property
-    def scale(self):
-        return jnp.exp(self.log_scale)
 
     def _sample_n(self, key: PRNGKey, n: int) -> Array:
         shape = (n, self.n_nodes, self.dim)
-        return sample_center_gravity_zero_gaussian(key, shape)*self.scale
+        return sample_center_gravity_zero_gaussian(key, shape)
 
     def log_prob(self, value: Array) -> Array:
         value = remove_mean(value)
-        value = value / self.scale
-        inv_log_det = - self.log_scale*np.prod(self.event_shape)
         base_log_prob = center_gravity_zero_gaussian_log_likelihood(value)
-        return base_log_prob + inv_log_det
+        return base_log_prob
 
     @property
     def event_shape(self) -> Tuple[int, ...]:
         return (self.n_nodes, self.dim)
-
-
 
 
 

@@ -7,7 +7,7 @@ hydra:
 
 target:
   aux:
-    conditioned_on_x: false
+    conditioned_on_x: true
     scale_init: 1.
     trainable_augmented_scale: false
 

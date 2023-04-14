@@ -9,6 +9,7 @@ import haiku as hk
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 from flow.aug_flow_dist import FullGraphSample
 from flow.centre_of_mass_gaussian import CentreGravityGaussian
+from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 
 
 class ConditionalCentreofMassGaussian(DistributionWithExtra):
@@ -78,7 +79,7 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
     def scaling_bijector(self):
         log_scale = jnp.ones((self.n_nodes, self.n_aux, self.dim)) * self.log_scale[None, :, None]
         affine_bijector = distrax.ScalarAffine(shift=jnp.zeros_like(log_scale), log_scale=log_scale)
-        return distrax.Block(affine_bijector, ndims=3)
+        return ZeroMeanBijector(affine_bijector)
 
     def log_prob_single_sample(self, x: chex.Array, augmented_coords: chex.Array) -> chex.Array:
         chex.assert_rank(x, 2)  #  [n_nodes, dim]

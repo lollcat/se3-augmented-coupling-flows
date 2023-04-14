@@ -6,6 +6,7 @@ import chex
 import jax
 
 from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra
+from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 
 def per_particle_shift_forward(a: chex.Array, x: chex.Array, shift_interp: chex.Array) -> chex.Array:
     """
@@ -34,7 +35,7 @@ class ParticlePairShift(BijectorWithExtra):
                  log_shift_interp: chex.Array,
                  alt_coords: chex.Array,
                  activation: Callable = jax.nn.softplus):
-        super().__init__(event_ndims_in=1, is_constant_jacobian=True)
+        super().__init__(event_ndims_in=0, is_constant_jacobian=True)
         self.alt_coords = alt_coords
         if activation == jnp.exp:
             self._centre_shift_interp = jnp.exp(log_shift_interp)
@@ -61,7 +62,7 @@ class ParticlePairShift(BijectorWithExtra):
 
     def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
         """Computes log|det J(f)(x)|."""
-        return jnp.sum(self._log_scale, axis=-1)
+        return self._log_scale
 
     def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
@@ -81,7 +82,7 @@ class ParticlePairShift(BijectorWithExtra):
 
     def inverse_log_det_jacobian(self, y: chex.Array) -> chex.Array:
         """Computes log|det J(f^{-1})(y)|."""
-        return jnp.sum(jnp.negative(self._log_scale), -1)
+        return jnp.negative(self._log_scale)
 
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
@@ -114,8 +115,8 @@ def make_shrink_aug_layer(
 
     def bijector_fn(params):
         shift_interp_logit, alt_global_mean = params
-        return ParticlePairShift(log_shift_interp=shift_interp_logit,
-                                 alt_coords=alt_global_mean)
+        return ZeroMeanBijector(ParticlePairShift(log_shift_interp=shift_interp_logit,
+                                 alt_coords=alt_global_mean))
 
     get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
                                             shape=(1 if swap else n_aug,),

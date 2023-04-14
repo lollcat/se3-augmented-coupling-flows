@@ -24,10 +24,12 @@ class JointBaseDistribution(DistributionWithExtra):
                  ):
         if trainable_x_scale or trainable_augmented_scale:
             raise NotImplementedError
+        if x_scale_init != 1.:
+            raise NotImplementedError
         self.n_aux = n_aux
         self.dim = dim
         self.n_nodes = n_nodes
-        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=jnp.log(x_scale_init))
+        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
         self.augmented_log_scale = jnp.log(jnp.ones(self.n_aux)*augmented_scale_init)
         self.trainable_augmented_scale = trainable_augmented_scale
         self.augmented_conditioned = augmented_conditioned
