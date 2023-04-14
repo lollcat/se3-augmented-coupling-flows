@@ -176,7 +176,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         chex.assert_rank(basis_vectors, 2)
         n_vectors, dim = basis_vectors.shape
         assert dim == 3
-        assert n_vectors == 2
+        assert n_vectors == 2 or n_vectors == 3
         basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
         vec1 = basis_vectors[0]
         vec2 = basis_vectors[1]
