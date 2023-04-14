@@ -13,7 +13,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: false
+  act_norm: true
   base:
     train_x_scale: false
     x_scale_init: 1.0

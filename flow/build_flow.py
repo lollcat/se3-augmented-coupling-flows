@@ -70,7 +70,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         layer_number = 0
 
         if config.act_norm:
-            raise NotImplementedError
             bijector = make_act_norm(
                 layer_number=layer_number,
                 graph_features=graph_features,
