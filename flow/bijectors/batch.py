@@ -42,13 +42,17 @@ class BatchBijector(BijectorWithExtra):
     # will greatly simplify all the auto-batch detection code.
     def forward_and_log_det_with_extra(self, x: chex.Array) -> Tuple[chex.Array, chex.Array, Extra]:
         if isinstance(self.inner_bijector, BijectorWithExtra):
-            return self.forward_and_log_det(x), Extra()
+            y, log_det = self.forward_and_log_det(x)
         else:
-            return self.forward_and_log_det(x), Extra()
+            y, log_det = self.forward_and_log_det(x)
+        extra = Extra()
+        return y, log_det, extra
 
     def inverse_and_log_det_with_extra(self, y: chex.Array) -> Tuple[chex.Array, chex.Array, Extra]:
         if isinstance(self.inner_bijector, BijectorWithExtra):
-            return self.forward_and_log_det(y), Extra()
+            x, log_det = self.forward_and_log_det(y)
         else:
-            return self.forward_and_log_det(y), Extra()
+            x, log_det = self.forward_and_log_det(y)
+        extra = Extra()
+        return x, log_det, extra
 
