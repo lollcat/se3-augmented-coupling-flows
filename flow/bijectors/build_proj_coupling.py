@@ -18,7 +18,7 @@ def make_proj_coupling_layer(
         identity_init: bool = True,
         origin_on_coupled_pair: bool = False,
         add_small_identity: bool = True,
-        orthogonalization_method: str = 'gram-schmidt',
+        orthogonalization_method: str = 'loewdin',
         additional_basis_vector: bool = False,
         transform_type: str = 'real_nvp',
         num_bins: int = 10,

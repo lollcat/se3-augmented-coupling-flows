@@ -26,7 +26,7 @@ flow:
   nodes: 4
   n_aug: 5
   n_layers: 4
-  act_norm: true
+  act_norm: false
   identity_init: true
   type: proj #  nice proj spherical
   kwargs:
@@ -41,6 +41,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
+      orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:

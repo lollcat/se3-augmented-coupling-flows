@@ -18,7 +18,7 @@ BijectorParams = chex.Array
 
 
 def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True,
-                                      method: str = 'gram-schmidt') -> chex.Array:
+                                      method: str = 'loewdin') -> chex.Array:
     """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
     vectors as it's columns."""
 
@@ -74,7 +74,7 @@ class ProjSplitCoupling(BijectorWithExtra):
                  swap: bool = False,
                  split_axis: int = -1,
                  add_small_identity: bool = True,
-                 orthogonalization_method: str = 'gram-schmidt',
+                 orthogonalization_method: str = 'loewdin',
                  n_inner_transforms: int = 1,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)

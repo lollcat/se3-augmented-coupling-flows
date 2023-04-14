@@ -16,7 +16,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     train_x_scale: false
     aux:
@@ -40,6 +40,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
+      orthogonalization_method: loewdin #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
