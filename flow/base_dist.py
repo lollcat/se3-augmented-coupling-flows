@@ -18,15 +18,17 @@ class JointBaseDistribution(DistributionWithExtra):
                  n_aux: int,
                  x_scale_init: float = 1.0,
                  trainable_x_scale: bool = False,
-                 augmented_scale_init: float = 1.0
+                 augmented_scale_init: float = 1.0,
+                 trainable_augmented_scale: bool = False
                  ):
-        if trainable_x_scale:
+        if trainable_x_scale or trainable_augmented_scale:
             raise NotImplementedError
         self.n_aux = n_aux
         self.dim = dim
         self.n_nodes = n_nodes
         self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=jnp.log(x_scale_init))
-        self.augmented_log_scale = jnp.log(augmented_scale_init)
+        self.augmented_log_scale = jnp.log(jnp.ones(self.n_aux)*augmented_scale_init)
+        self.trainable_augmented_scale = trainable_augmented_scale
 
 
     def get_augmented_dist(self, x) -> ConditionalCentreofMassGaussian:
@@ -59,7 +61,12 @@ class JointBaseDistribution(DistributionWithExtra):
         return log_p_x + log_prob_augmented
 
     def get_extra(self) -> Extra:
-        return Extra()
+        extra = Extra()
+        if self.trainable_augmented_scale:
+            for i in range(self.n_aux):
+                extra.aux_info[f"base_a{i}_scale"] = jnp.exp(self.augmented_log_scale[i])
+                extra.info_aggregator[f"base_a{i}_scale"] = jnp.mean
+        return extra
 
     def log_prob_with_extra(self, value: Array) -> Tuple[Array, Extra]:
         extra = self.get_extra()

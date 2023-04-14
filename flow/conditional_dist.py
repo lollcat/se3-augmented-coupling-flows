@@ -1,8 +1,10 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import chex
+import distrax
 import jax.numpy as jnp
 import jax
+import haiku as hk
 
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 from flow.aug_flow_dist import FullGraphSample
@@ -14,14 +16,20 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
     def __init__(self,
                  dim: int,
                  n_nodes: int,
-                 n_aux: int,
+                 n_aug: int,
                  x: chex.Array,
-                 log_scale: chex.Array = jnp.zeros(())):
-        self.n_aux = n_aux
+                 log_scale: Optional[chex.Array] = None,
+                 ):
+        self.n_aux = n_aug
         self.dim = dim
         self.n_nodes = n_nodes
-        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes, log_scale=log_scale)
         self.x = x
+        if log_scale is not None:
+            assert log_scale.shape == (n_aug,)
+        else:
+            log_scale = jnp.zeros(n_aug)
+        self.log_scale = log_scale
+        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
 
     @property
     def event_shape(self) -> Tuple[int, ...]:
@@ -37,27 +45,51 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
             leading_x_shape = (n_x,)
         leading_shape = (n, *leading_x_shape)
         momentum = self.centre_gravity_gaussian._sample_n(key, n_x*n*self.n_aux)
+
         if self.x.ndim == 3:
             momentum = jnp.expand_dims(momentum, 0)
         momentum = jnp.expand_dims(momentum, -3)  # expand for n_aux
         momentum = jnp.reshape(momentum, (*leading_shape, self.n_aux, self.n_nodes, self.dim))
         momentum = jnp.swapaxes(momentum, -2, -3)  # swap n_aux and n_nodes axes.
+
+        # Apply scaling
+        if self.x.ndim == 2:
+            momentum = jax.vmap(self.scaling_bijector().forward)(momentum)
+        else:
+            momentum = jax.vmap(jax.vmap(self.scaling_bijector().forward))(momentum)
+
         augmented_coords = jnp.expand_dims(self.x, -2) + momentum
         chex.assert_shape(augmented_coords, (*leading_shape, self.n_nodes, self.n_aux, self.dim))
+
         return augmented_coords
+
+    def scaling_bijector(self):
+        log_scale = jnp.ones((self.n_nodes, self.n_aux, self.dim)) * self.log_scale[None, :, None]
+        affine_bijector = distrax.ScalarAffine(shift=jnp.zeros_like(log_scale), log_scale=log_scale)
+        return distrax.Block(affine_bijector, ndims=3)
+
+    def log_prob_single_sample(self, x: chex.Array, augmented_coords: chex.Array) -> chex.Array:
+        chex.assert_rank(x, 2)  #  [n_nodes, dim]
+        chex.assert_rank(augmented_coords, 3)  # [n_nodes, n_aux, dim]
+
+        momentum = augmented_coords - jnp.expand_dims(x, -2)
+        momentum, log_det_scaling = self.scaling_bijector().inverse_and_log_det(momentum)
+        chex.assert_shape(log_det_scaling, ())
+
+        log_prob_momentum_unit_scale = jax.vmap(self.centre_gravity_gaussian.log_prob,
+                                                in_axes=-2, out_axes=-1)(momentum)
+        chex.assert_shape(log_prob_momentum_unit_scale, (self.n_aux,))
+        log_prob_momentum_unit_scale = jnp.sum(log_prob_momentum_unit_scale, axis=-1)
+
+        return log_prob_momentum_unit_scale + log_det_scaling
 
 
     def log_prob(self, value: chex.Array) -> chex.Array:
-        augmented_coords = value
-        batch_shape = value.shape[:-3]
-        assert value.shape[-3:] == (self.n_nodes, self.n_aux, self.dim)
-        momentum = augmented_coords - jnp.expand_dims(self.x, -2)
-
-        log_prob_momentum = jax.vmap(self.centre_gravity_gaussian.log_prob, in_axes=-2, out_axes=-1)(momentum)
-        chex.assert_shape(log_prob_momentum, (*batch_shape, self.n_aux))
-        log_prob_momentum = jnp.sum(log_prob_momentum, axis=-1)
-
-        return log_prob_momentum
+        if self.x.ndim == 3:
+            return jax.vmap(self.log_prob_single_sample)(self.x, value)
+        else:
+            assert self.x.ndim == 2
+            return self.log_prob_single_sample(self.x, value)
 
     def get_extra(self) -> Extra:
         return Extra()
@@ -83,11 +115,21 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
 
 
 def build_aux_dist(n_aug: int,
-                   augmented_scale_init: float = 1.0):
+                   augmented_scale_init: float = 1.0,
+                   trainable_scale: bool = False,
+                   name: str = 'aux_dist'):
+
     def make_aux_target(sample: FullGraphSample):
         x = sample.positions
         n_nodes, dim = x.shape[-2:]
-        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aux=n_aug, x=x,
-                                               log_scale=jnp.log(augmented_scale_init))
+        if trainable_scale:
+            log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(n_aug,),
+                                         init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
+        else:
+            scale = jnp.ones(n_aug) * augmented_scale_init
+            log_scale = jnp.log(scale)
+
+        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aug=n_aug, x=x,
+                                               log_scale=log_scale)
         return dist
     return make_aux_target

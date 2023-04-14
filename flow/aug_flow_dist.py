@@ -68,7 +68,7 @@ def get_base_and_target_info(params: AugmentedFlowParams) -> dict:
             for i in range(scale.shape[0]):
                 info.update({f"base_augmented_scale{i}": scale[i]})
     if params.aux_target:
-        target_scale = jnp.exp(params.aux_target['~']['target_augmented_scale_logit'])
+        target_scale = jnp.exp(params.aux_target['~']['aug_target_dist_augmented_scale_logit'])
         for i in range(target_scale.shape[0]):
             info.update({f"target_augmented_scale{i}": target_scale[i]})
     return info

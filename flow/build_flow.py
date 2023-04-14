@@ -124,9 +124,10 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
     make_aug_target = build_aux_dist(
         n_aug=config.n_aug,
-        augmented_scale_init=config.target_aux_config.scale_init
+        augmented_scale_init=config.target_aux_config.scale_init,
+        trainable_scale=config.target_aux_config.trainable_augmented_scale,
+        name='aug_target_dist'
     )
-
 
     definition = AugmentedFlowRecipe(make_base=make_base,
                                      make_bijector=make_bijector,

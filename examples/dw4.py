@@ -43,10 +43,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 2
 
-    cfg.target.aux.trainable_augmented_scale = False
-    cfg.flow.base.aux.trainable_augmented_scale = False
-    cfg.flow.base.train_x_scale = False
-
 
     # Configure NNs
     cfg.flow.nets.mlp_head_config.mlp_units = (16,)
