@@ -87,10 +87,16 @@ class AugmentedFlow(NamedTuple):
     aux_target_sample_n_apply: Callable[[Params, FullGraphSample, chex.PRNGKey, Optional[int]], Positions]
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
+
+    # Also add access to the bijector forward and inverse. As these are useful for debugging.
+    bijector_forward_and_log_det_with_extra_apply: Callable[[AugmentedFlowParams, FullGraphSample],
+                    Tuple[FullGraphSample, LogDet, Extra]]
+    bijector_inverse_and_log_det_with_extra_apply: Callable[[AugmentedFlowParams, FullGraphSample],
+                    Tuple[FullGraphSample, LogDet, Extra]]
+
     separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample] = separate_samples_to_full_joint
     joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]] = joint_to_separate_samples
     get_base_and_target_info: Callable[[AugmentedFlowParams], dict] = get_base_and_target_info
-
 
 
 def create_flow(recipe: AugmentedFlowRecipe):
@@ -106,9 +112,6 @@ def create_flow(recipe: AugmentedFlowRecipe):
     @hk.without_apply_rng
     @hk.transform
     def base_sample_fn(graph_features: GraphFeatures, seed: chex.PRNGKey, sample_shape: chex.Shape) -> FullGraphSample:
-        # Currently the base does not condition on the graph features.
-        # TODO: add this conditioning, could be simple linear layer for scaling.
-        #  The base will then take in the graph features.
         positions = recipe.make_base().sample(seed=seed, sample_shape=sample_shape)
         graph_features = jnp.expand_dims(graph_features, axis=-2)  # add multiplicity
         assert len(sample_shape) in (0, 1)
@@ -125,19 +128,19 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
     @hk.without_apply_rng
     @hk.transform
-    def bijector_forward_and_log_det(x: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
+    def bijector_forward_and_log_det_single(x: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
         y, logdet = recipe.make_bijector(x.features).forward_and_log_det(x.positions)
         return FullGraphSample(positions=y, features=x.features), logdet
 
     @hk.without_apply_rng
     @hk.transform
-    def bijector_inverse_and_log_det(y: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
+    def bijector_inverse_and_log_det_single(y: FullGraphSample) -> Tuple[FullGraphSample, LogDet]:
         x, logdet = recipe.make_bijector(y.features).inverse_and_log_det(y.positions)
         return FullGraphSample(positions=x, features=y.features), logdet
 
     @hk.without_apply_rng
     @hk.transform
-    def bijector_forward_and_log_det_with_extra(x: FullGraphSample) -> \
+    def bijector_forward_and_log_det_with_extra_single(x: FullGraphSample) -> \
             Tuple[FullGraphSample, LogDet, Extra]:
         bijector = recipe.make_bijector(x.features)
         if isinstance(bijector, BijectorWithExtra):
@@ -152,7 +155,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
     @hk.without_apply_rng
     @hk.transform
-    def bijector_inverse_and_log_det_with_extra(y: FullGraphSample) -> \
+    def bijector_inverse_and_log_det_with_extra_single(y: FullGraphSample) -> \
             Tuple[FullGraphSample, LogDet, Extra]:
         bijector = recipe.make_bijector(y.features)
         if isinstance(bijector, BijectorWithExtra):
@@ -165,10 +168,53 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return FullGraphSample(positions=x, features=y.features), log_det, extra
 
 
+    def bijector_forward_and_log_det_with_extra_apply(
+            params: AugmentedFlowParams,
+            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+        def scan_fn(carry, bijector_params):
+            x, log_det_prev = carry
+            y, log_det, extra = bijector_forward_and_log_det_with_extra_single.apply(bijector_params, x)
+            chex.assert_equal_shape((log_det_prev, log_det))
+            return (y, log_det_prev + log_det), extra
+
+        (y, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(sample.positions.shape[:-3])),
+                                           xs=params.bijector,
+                                           unroll=recipe.compile_n_unroll)
+        info = {}
+        aggregators = {}
+        for i in range(recipe.n_layers):
+          info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
+          aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+        extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
+        return y, log_det, extra
+
+    def bijector_inverse_and_log_det_with_extra_apply(
+            params: AugmentedFlowParams,
+            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+        def scan_fn(carry, bijector_params):
+            y, log_det_prev = carry
+            x, log_det, extra = bijector_inverse_and_log_det_with_extra_single.apply(bijector_params, y)
+            chex.assert_equal_shape((log_det_prev, log_det))
+            return (x, log_det_prev + log_det), extra
+
+        log_prob_shape = sample.positions.shape[:-3]
+        (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
+                                           xs=params.bijector,
+                                           reverse=True, unroll=recipe.compile_n_unroll)
+
+        info = {}
+        aggregators = {}
+        for i in reversed(range(recipe.n_layers)):
+          info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
+          aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
+        extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
+        return x, log_det, extra
+
+
     def log_prob_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> LogProb:
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
-            x, log_det = bijector_inverse_and_log_det.apply(bijector_params, y)
+            x, log_det = bijector_inverse_and_log_det_single.apply(bijector_params, y)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), None
 
@@ -181,28 +227,12 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return base_log_prob + log_det
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
-        def scan_fn(carry, bijector_params):
-            y, log_det_prev = carry
-            x, log_det, extra = bijector_inverse_and_log_det_with_extra.apply(bijector_params, y)
-            chex.assert_equal_shape((log_det_prev, log_det))
-            return (x, log_det_prev + log_det), extra
-
-        log_prob_shape = sample.positions.shape[:-3]
-        (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
-                                           xs=params.bijector,
-                                           reverse=True, unroll=recipe.compile_n_unroll)
+        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(params, sample)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         chex.assert_equal_shape((base_log_prob, log_det))
 
-        info = {}
-        aggregators = {}
-        for i in reversed(range(recipe.n_layers)):
-          info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
-          aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
-
-        info.update(mean_base_log_prob=jnp.mean(base_log_prob))
-        aggregators.update(mean_base_log_prob=jnp.mean)
-        extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
+        extra.aux_info.update(mean_base_log_prob=jnp.mean(base_log_prob))
+        extra.info_aggregator.update(mean_base_log_prob=jnp.mean)
 
         return base_log_prob + log_det, extra
 
@@ -210,7 +240,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
                                   key: chex.PRNGKey, shape: chex.Shape) -> Tuple[Positions, LogProb]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
-            y, log_det = bijector_forward_and_log_det.apply(bijector_params, x)
+            y, log_det = bijector_forward_and_log_det_single.apply(bijector_params, x)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (y, log_det_prev + log_det), None
 
@@ -227,28 +257,16 @@ def create_flow(recipe: AugmentedFlowRecipe):
                                              features: GraphFeatures,
                                              key: chex.PRNGKey,
                                              shape: chex.Shape) -> Tuple[Positions, LogProb, Extra]:
-        def scan_fn(carry, bijector_params):
-            x, log_det_prev = carry
-            y, log_det, extra = bijector_forward_and_log_det_with_extra.apply(bijector_params, x)
-            chex.assert_equal_shape((log_det_prev, log_det))
-            return (y, log_det_prev + log_det), extra
 
         x = base_sample_fn.apply(params.base, features, key, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        (y, log_det), extra = jax.lax.scan(scan_fn, init=(x, jnp.zeros(x.positions.shape[:-3])), xs=params.bijector,
-                                           unroll=recipe.compile_n_unroll)
-        chex.assert_equal_shape((base_log_prob, log_det))
+        y, log_det, extra = bijector_forward_and_log_det_with_extra_apply(params, x)
         log_prob = base_log_prob - log_det
 
-        info = {}
-        aggregators = {}
-        for i in range(recipe.n_layers):
-          info.update({f"block{i}_" + key: val[i] for key, val in extra.aux_info.items()})
-          aggregators.update({f"block{i}_" + key: val for key, val in extra.info_aggregator.items()})
-        info.update(mean_base_log_prob=jnp.mean(base_log_prob))
-        aggregators.update(mean_base_log_prob=jnp.mean)
-        extra = Extra(aux_loss=extra.aux_loss, aux_info=info, info_aggregator=aggregators)
-        return y, log_prob, extra
+        extra.aux_info.update(mean_base_log_prob=jnp.mean(base_log_prob))
+        extra.info_aggregator.update(mean_base_log_prob=jnp.mean)
+
+        return y.positions, log_prob, extra
 
     @hk.without_apply_rng
     @hk.transform
@@ -306,7 +324,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         sample_joint = separate_samples_to_full_joint(sample.features,
                                                       sample.positions, sample_a)
         params_base = base_log_prob_fn.init(key3, sample_joint)
-        params_bijector_single = bijector_inverse_and_log_det.init(key4, sample_joint)
+        params_bijector_single = bijector_inverse_and_log_det_single.init(key4, sample_joint)
         params_bijectors = jax.tree_map(lambda x: jnp.repeat(x[None, ...], recipe.n_layers, axis=0),
                                         params_bijector_single)
         return AugmentedFlowParams(base=params_base, bijector=params_bijectors, aux_target=params_aux_target)
@@ -323,6 +341,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         sample_and_log_prob_apply=sample_and_log_prob_apply,
         log_prob_with_extra_apply=log_prob_with_extra_apply,
         sample_and_log_prob_with_extra_apply=sample_and_log_prob_with_extra_apply,
+        bijector_forward_and_log_det_with_extra_apply=bijector_forward_and_log_det_with_extra_apply,
+        bijector_inverse_and_log_det_with_extra_apply=bijector_inverse_and_log_det_with_extra_apply,
         sample_apply=sample_apply,
         config=recipe.config,
         aux_target_log_prob_apply=aux_target_log_prob.apply,

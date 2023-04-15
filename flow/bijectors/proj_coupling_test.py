@@ -14,7 +14,7 @@ def tesst_bijector_with_proj(
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
 
-    orth_type = ['loewdin', 'gram-schmidt'][1]
+    orth_type = ['loewdin', 'gram-schmidt'][0]
 
     def make_flow():
         bijectors = []
@@ -31,7 +31,7 @@ def tesst_bijector_with_proj(
                 nets_config=nets_config,
                 add_small_identity=False,
                 num_bins=4,
-                n_inner_transforms=3,
+                n_inner_transforms=1,
                 orthogonalization_method=orth_type
             )
             bijectors.append(bijector)

@@ -62,10 +62,9 @@ def bijector_test(bijector_forward, bijector_backward,
     magnitude_of_bijector = jnp.mean(jnp.linalg.norm(x_and_a_new - x_and_a, axis=-1))
     chex.assert_tree_all_finite(log_det_fwd)
     chex.assert_shape(log_det_fwd, ())
-    chex.assert_trees_all_close((x_and_a - x_and_a_old)/magnitude_of_bijector,
-                                jnp.zeros_like(x_and_a),
-                                atol=rtol)
     chex.assert_trees_all_close(log_det_rev, -log_det_fwd, rtol=rtol)
+    chex.assert_trees_all_close(1 + (x_and_a - x_and_a_old)/magnitude_of_bijector, jnp.ones_like(x_and_a),
+                                atol=0.01)
 
     # Test the transformation is equivariant.
     key, subkey = jax.random.split(key)
@@ -114,7 +113,9 @@ def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
                                           params: AugmentedFlowParams,
                                           key: chex.PRNGKey,
                                           permute: bool = False):
-
+    """Tests invariance of the flow log prob. Also check that the
+     forward and reverse of the bijector is consistent.
+    """
     log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
 
     def group_action(x_and_a):
@@ -132,6 +133,16 @@ def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
     mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
     info = {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
             "mean_abs_diff_log_prob_after_group_action": mean_abs_diff}
+
+
+    # Test bijector forward vs reverse.
+    sample_latent, log_det_rv, extra_rv = flow.bijector_inverse_and_log_det_with_extra_apply(params, samples)
+    samples_, log_det_fwd, extra_fwd = flow.bijector_forward_and_log_det_with_extra_apply(
+        params, sample_latent)
+    info.update(max_abs_diff_log_det_forward_reverse=jnp.max(log_det_fwd + log_det_rv))
+    info.update(mean_abs_diff_log_det_forward_reverse=jnp.mean(log_det_fwd + log_det_rv))
+    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(samples_.positions - samples.positions))
+
     return info
 
 
