@@ -88,11 +88,13 @@ class AugmentedFlow(NamedTuple):
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
 
-    # Also add access to the bijector forward and inverse. As these are useful for debugging.
-    bijector_forward_and_log_det_with_extra_apply: Callable[[AugmentedFlowParams, FullGraphSample],
+    # Also add access to the bijector forward and inverse, and base sample and log prob. These are useful for debugging.
+    bijector_forward_and_log_det_with_extra_apply: Callable[[Params, FullGraphSample],
                     Tuple[FullGraphSample, LogDet, Extra]]
-    bijector_inverse_and_log_det_with_extra_apply: Callable[[AugmentedFlowParams, FullGraphSample],
+    bijector_inverse_and_log_det_with_extra_apply: Callable[[Params, FullGraphSample],
                     Tuple[FullGraphSample, LogDet, Extra]]
+    base_sample: Callable[[Params, GraphFeatures, chex.PRNGKey, chex.Shape], FullGraphSample]
+    base_log_prob: Callable[[Params, FullGraphSample], LogProb]
 
     separate_samples_to_joint: Callable[[GraphFeatures, Positions, Positions], FullGraphSample] = separate_samples_to_full_joint
     joint_to_separate_samples: Callable[[FullGraphSample], Tuple[GraphFeatures, Positions, Positions]] = joint_to_separate_samples
@@ -169,7 +171,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
 
     def bijector_forward_and_log_det_with_extra_apply(
-            params: AugmentedFlowParams,
+            params: Params,
             sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
@@ -178,7 +180,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
             return (y, log_det_prev + log_det), extra
 
         (y, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(sample.positions.shape[:-3])),
-                                           xs=params.bijector,
+                                           xs=params,
                                            unroll=recipe.compile_n_unroll)
         info = {}
         aggregators = {}
@@ -189,7 +191,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return y, log_det, extra
 
     def bijector_inverse_and_log_det_with_extra_apply(
-            params: AugmentedFlowParams,
+            params: Params,
             sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
@@ -199,7 +201,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
         log_prob_shape = sample.positions.shape[:-3]
         (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
-                                           xs=params.bijector,
+                                           xs=params,
                                            reverse=True, unroll=recipe.compile_n_unroll)
 
         info = {}
@@ -227,7 +229,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return base_log_prob + log_det
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
-        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(params, sample)
+        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(params.bijector, sample)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         chex.assert_equal_shape((base_log_prob, log_det))
 
@@ -260,7 +262,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
         x = base_sample_fn.apply(params.base, features, key, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
-        y, log_det, extra = bijector_forward_and_log_det_with_extra_apply(params, x)
+        y, log_det, extra = bijector_forward_and_log_det_with_extra_apply(params.bijector, x)
         log_prob = base_log_prob - log_det
 
         extra.aux_info.update(mean_base_log_prob=jnp.mean(base_log_prob))
@@ -343,6 +345,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         sample_and_log_prob_with_extra_apply=sample_and_log_prob_with_extra_apply,
         bijector_forward_and_log_det_with_extra_apply=bijector_forward_and_log_det_with_extra_apply,
         bijector_inverse_and_log_det_with_extra_apply=bijector_inverse_and_log_det_with_extra_apply,
+        base_sample=base_sample_fn.apply,
+        base_log_prob=base_log_prob_fn.apply,
         sample_apply=sample_apply,
         config=recipe.config,
         aux_target_log_prob_apply=aux_target_log_prob.apply,
