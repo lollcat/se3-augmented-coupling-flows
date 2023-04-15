@@ -40,7 +40,7 @@ def bijector_test(bijector_forward, bijector_backward,
     key, subkey = jax.random.split(key)
 
     x_and_a = jax.random.normal(subkey, shape=event_shape) * 0.1
-    x_and_a = x_and_a - jnp.mean(x_and_a, axis=-3, keepdims=True)
+    x_and_a = x_and_a - jnp.mean(x_and_a[:, 0], axis=0, keepdims=True)[:, None]
 
     if x_and_a.dtype == jnp.float64:
         rtol = 1e-4
@@ -53,9 +53,12 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
-    centre_of_mass = jnp.mean(x_and_a_new, axis=-3)
+    centre_of_mass = jnp.mean(x_and_a_new[:, 0], axis=0)
     chex.assert_trees_all_close(1 + centre_of_mass, 1 + jnp.zeros_like(centre_of_mass),
                                 rtol=rtol)  # Check subspace restriction.
+    centre_of_mass_aug = jnp.mean(x_and_a_new[:, 1:], axis=0)
+    assert (jnp.abs(centre_of_mass_aug) > 0.001).all()
+
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
 
     # Check inverse gives original `x_and_a`
@@ -84,9 +87,11 @@ def bijector_test(bijector_forward, bijector_backward,
     x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
     x_and_a = x_and_a - jnp.mean(x_and_a, axis=-3, keepdims=True)
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
-    centre_of_mass = jnp.mean(x_and_a_new, axis=-3)
+    centre_of_mass = jnp.mean(x_and_a_new[:, :, 0], axis=1)
     chex.assert_trees_all_close(1 + centre_of_mass, 1 + jnp.zeros_like(centre_of_mass),
                                 rtol=rtol)  # Check subspace restriction.
+    centre_of_mass_aug = jnp.mean(x_and_a_new[:, :, 1:], axis=0)
+    assert (jnp.abs(centre_of_mass_aug) > 0.001).all()
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
