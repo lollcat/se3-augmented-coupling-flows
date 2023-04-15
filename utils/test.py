@@ -143,7 +143,7 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     info.update(mean_abs_diff_log_det_forward_reverse=jnp.mean(log_det_fwd + log_det_rv))
     info.update(latent_mean_abs_global_mean=jnp.mean(jnp.abs(jnp.mean(sample_latent.positions, axis=-3))))
     centred_pos = samples.positions - jnp.mean(samples.positions, axis=-3, keepdims=True)
-    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(samples_.positions - centred_pos))
+    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - centred_pos)))
 
     return info
 
