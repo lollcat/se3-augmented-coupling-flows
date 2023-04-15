@@ -191,7 +191,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         """Computes y = f(x) and log|det J(f)(x)|."""
         chex.assert_rank(x, 3)
         dim = x.shape[-1]
-        x = x - jnp.mean(x, axis=-3)  # Zero mean so that reference makes sense.
+        x = x - jnp.mean(x, axis=-3, keepdims=True)  # Zero mean so that reference makes sense.
 
         self._check_forward_input_shape(x)
         x1, x2 = self._split(x)
@@ -215,7 +215,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         self._check_inverse_input_shape(y)
         chex.assert_rank(y, 3)
         dim = y.shape[-1]
-        y = y - jnp.mean(y, axis=-3)  # Zero mean so that reference makes sense.
+        y = y - jnp.mean(y, axis=-3, keepdims=True)  # Zero mean so that reference makes sense.
 
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
