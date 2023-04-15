@@ -4,7 +4,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from utils.test import get_max_diff_log_prob_invariance_test
+from utils.test import get_checks_for_flow_properties
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
 
@@ -81,7 +81,7 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
 
     if test_invariances:
         key, subkey = jax.random.split(key)
-        invariances_info = get_max_diff_log_prob_invariance_test(joint_sample[0], flow=flow, params=params, key=subkey)
+        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey)
         info.update(invariances_info)
     return info
 

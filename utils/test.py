@@ -108,11 +108,11 @@ def bijector_test(bijector_forward, bijector_backward,
     assert optax.global_norm(grad) != 0.0
 
 
-def get_max_diff_log_prob_invariance_test(samples: FullGraphSample,
-                                          flow: AugmentedFlow,
-                                          params: AugmentedFlowParams,
-                                          key: chex.PRNGKey,
-                                          permute: bool = False):
+def get_checks_for_flow_properties(samples: FullGraphSample,
+                                   flow: AugmentedFlow,
+                                   params: AugmentedFlowParams,
+                                   key: chex.PRNGKey,
+                                   permute: bool = False):
     """Tests invariance of the flow log prob. Also check that the
      forward and reverse of the bijector is consistent.
     """
