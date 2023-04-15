@@ -12,7 +12,7 @@ target:
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
+  n_aug: 1
   act_norm: false
   base:
     train_x_scale: false
@@ -27,7 +27,7 @@ flow:
   identity_init: true
   type: proj #  nice proj spherical
   kwargs:
-    n_inner_transforms: 2
+    n_inner_transforms: 1
     spherical:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -96,7 +96,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: loewdin_qm9pos_${flow.type}_${flow.nets.type}_TrainableTarget${target.aux.trainable_augmented_scale}_AugConditioned${target.aux.conditioned_on_x}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
+    name: qm9pos_${flow.type}_${flow.nets.type}_TrainableTarget${target.aux.trainable_augmented_scale}_AugConditioned${target.aux.conditioned_on_x}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]
