@@ -118,8 +118,10 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     """
     log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
 
+    key1, key2 = jax.random.split(key)
+
     def group_action(x_and_a):
-        return random_rotate_translate_perumute(x_and_a, key, permute=permute, translate=True)
+        return random_rotate_translate_perumute(x_and_a, key1, permute=permute, translate=True)
 
 
     positions_rot = group_action(samples.positions)
@@ -142,10 +144,9 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     info.update(max_abs_diff_log_det_forward_reverse=jnp.max(log_det_fwd + log_det_rv))
     info.update(mean_abs_diff_log_det_forward_reverse=jnp.mean(log_det_fwd + log_det_rv))
     info.update(latent_mean_abs_global_mean=jnp.mean(jnp.abs(jnp.mean(sample_latent.positions, axis=-3))))
-    centred_pos = samples.positions - jnp.mean(samples.positions, axis=-3, keepdims=True)
-    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - centred_pos)))
+    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - samples.positions)))
 
+    # Test 0 mean subspace restriction.
+    samples = flow.sample_apply(params, samples.features[0, :, 0], key2, samples.positions.shape[0:1])
+    info.update(mean_abs_x_centre_of_mass=jnp.mean(jnp.abs(jnp.mean(samples.positions[:, :, 0], axis=1))))
     return info
-
-
-
