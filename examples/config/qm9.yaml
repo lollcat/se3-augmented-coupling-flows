@@ -66,9 +66,11 @@ training:
     optimizer_name: adam
     use_schedule: true
     peak_lr: 3e-4
-    end_lr: 1e-4 # can be null
+    end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 5000.0
+    max_global_norm: null
+    max_param_grad: null
+    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
   batch_size: 32

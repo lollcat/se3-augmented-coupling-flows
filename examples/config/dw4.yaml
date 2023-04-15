@@ -65,6 +65,8 @@ training:
     end_lr: 1e-5 # can be null
     warmup_n_epoch: 2. # can be null
     max_global_norm: null
+    max_param_grad: null
+    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 50
   batch_size: 200
