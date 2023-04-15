@@ -6,7 +6,6 @@ import chex
 import jax
 
 from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra
-from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 from flow.bijectors.batch import BatchBijector
 
 def per_particle_shift_forward(a: chex.Array, x: chex.Array, shift_interp: chex.Array) -> chex.Array:
@@ -112,8 +111,7 @@ def make_shrink_aug_layer(
         shift_interp_logit, alt_global_mean = params
         inner_bijector = ParticlePairShift(log_shift_interp=shift_interp_logit,
                                  alt_coords=alt_global_mean)
-        zero_mean_bijector = ZeroMeanBijector(inner_bijector)
-        return zero_mean_bijector
+        return inner_bijector
 
     get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
                                             shape=(1 if swap else n_aug,),

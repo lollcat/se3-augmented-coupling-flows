@@ -3,6 +3,7 @@ from typing import Tuple
 import chex
 import distrax
 import jax
+import jax.numpy as jnp
 
 
 def project(x: chex.Array, origin: chex.Array, change_of_basis_matrix: chex.Array) -> chex.Array:
@@ -48,7 +49,7 @@ class ProjFlow(distrax.Bijector):
 
         chex.assert_equal_shape((x_out, x))
         chex.assert_equal_shape((x_out, log_det))
-        return x_out, log_det
+        return x_out, jnp.sum(log_det)
 
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         chex.assert_rank(y, 3)
@@ -59,4 +60,4 @@ class ProjFlow(distrax.Bijector):
 
         chex.assert_equal_shape((y_new, y))
         chex.assert_equal_shape((y_proj_new, log_det))
-        return y_new, log_det
+        return y_new, jnp.sum(log_det)

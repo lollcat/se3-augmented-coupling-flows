@@ -9,7 +9,6 @@ from molboil.utils.numerical import rotate_2d
 
 from utils.numerical import vector_rejection, safe_norm
 from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
-from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 from flow.bijectors.proj_flow_layer import ProjFlow
 
 BijectorParams = chex.Array
@@ -103,13 +102,33 @@ class ProjSplitCoupling(BijectorWithExtra):
         self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
-    def _split(self, x: Array) -> Tuple[Array, Array]:
+    def adjust_centering_pre_proj(self, x: chex.Array) -> chex.Array:
+        """x[:, 0, :] is constrained to ZeroMean Gaussian. But if `self._swap` is True, then we
+        change this constraint to be with respect to x2[:, 0, :] instead."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+    def adjust_centering_post_proj(self, x: chex.Array) -> chex.Array:
+        """Move centre of mass to be on the first multiplicity again."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+
+    def _split(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
         if self._swap:
-          x1, x2 = x2, x1
+            x1, x2 = x2, x1
         return x1, x2
 
-    def _recombine(self, x1: Array, x2: Array) -> Array:
+    def _recombine(self, x1: chex.Array, x2: chex.Array) -> chex.Array:
         if self._swap:
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
@@ -121,7 +140,6 @@ class ProjSplitCoupling(BijectorWithExtra):
       inner_inner_bijector = self._bijector(params, transform_index)  # e.g. spline or rnvp
       bijector = ProjFlow(inner_bijector=inner_inner_bijector, origin=origin,
                           change_of_basis_matrix=change_of_basis_matrix)
-      bijector = ZeroMeanBijector(bijector)
       return bijector
 
     def get_basis_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
@@ -191,9 +209,9 @@ class ProjSplitCoupling(BijectorWithExtra):
         """Computes y = f(x) and log|det J(f)(x)|."""
         chex.assert_rank(x, 3)
         dim = x.shape[-1]
-        x = x - jnp.mean(x, axis=-3, keepdims=True)  # Zero mean so that reference makes sense.
 
         self._check_forward_input_shape(x)
+        x = self.adjust_centering_pre_proj(x)
         x1, x2 = self._split(x)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
@@ -208,15 +226,17 @@ class ProjSplitCoupling(BijectorWithExtra):
             log_det_total = log_det_total + log_det_inner
 
         y2 = x2
-        return self._recombine(x1, y2), log_det_total, extra
+        y = self._recombine(x1, y2)
+        y = self.adjust_centering_post_proj(y)
+        return y, log_det_total, extra
 
     def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
         chex.assert_rank(y, 3)
         dim = y.shape[-1]
-        y = y - jnp.mean(y, axis=-3, keepdims=True)  # Zero mean so that reference makes sense.
 
+        y = self.adjust_centering_post_proj(y)
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
@@ -231,7 +251,9 @@ class ProjSplitCoupling(BijectorWithExtra):
             log_det_total = log_det_total + log_det_inner
 
         x2 = y2
-        return self._recombine(y1, x2), log_det_total, extra
+        x = self._recombine(y1, x2)
+        x = self.adjust_centering_post_proj(x)
+        return x, log_det_total, extra
 
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         return self.forward_and_log_det_with_extra_single(x, graph_features)[:2]

@@ -44,7 +44,7 @@ class SphericalFlow(distrax.Bijector):
         log_det = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det, (n_nodes, multiplicity))
 
-        return x, log_det
+        return x, jnp.sum(log_det)
 
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
         n_nodes, multiplicity, dim = y.shape
@@ -58,4 +58,4 @@ class SphericalFlow(distrax.Bijector):
         log_det = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det, (n_nodes, multiplicity))
 
-        return y, log_det
+        return y, jnp.sum(log_det)

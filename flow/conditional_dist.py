@@ -8,16 +8,14 @@ import haiku as hk
 
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 from flow.aug_flow_dist import FullGraphSample
-from flow.centre_of_mass_gaussian import CentreGravityGaussian
-from flow.bijectors.zero_mean_bijector import ZeroMeanBijector
 
 
 class ConditionalCentreofMassGaussian(DistributionWithExtra):
     """
     Either:
-        a ~ x + CentreGravityGaussian
-    or
-        a ~ CentreGravityGaussian
+        a ~ x + Normal
+        or
+        a ~ Normal
     depending on whether `conditioned` is True.
     """
     def __init__(self,
@@ -37,7 +35,9 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
         else:
             log_scale = jnp.zeros(n_aug)
         self.log_scale = log_scale
-        self.centre_gravity_gaussian = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.unit_gaussian = distrax.Independent(distrax.Normal(
+            loc=jnp.zeros((n_nodes, n_aug, dim)), scale=jnp.ones((n_nodes, n_aug, dim))),
+            reinterpreted_batch_ndims=3)
         self.conditioned = conditioned
 
     @property
@@ -53,13 +53,7 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
             n_x = self.x.shape[0]
             leading_x_shape = (n_x,)
         leading_shape = (n, *leading_x_shape)
-        momentum = self.centre_gravity_gaussian._sample_n(key, n_x*n*self.n_aux)
-
-        if self.x.ndim == 3:
-            momentum = jnp.expand_dims(momentum, 0)
-        momentum = jnp.expand_dims(momentum, -3)  # expand for n_aux
-        momentum = jnp.reshape(momentum, (*leading_shape, self.n_aux, self.n_nodes, self.dim))
-        momentum = jnp.swapaxes(momentum, -2, -3)  # swap n_aux and n_nodes axes.
+        momentum = self.unit_gaussian.sample(seed=key, sample_shape=leading_shape)
 
         # Apply scaling
         if self.x.ndim == 2:
@@ -79,7 +73,7 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
     def scaling_bijector(self):
         log_scale = jnp.ones((self.n_nodes, self.n_aux, self.dim)) * self.log_scale[None, :, None]
         affine_bijector = distrax.ScalarAffine(shift=jnp.zeros_like(log_scale), log_scale=log_scale)
-        return ZeroMeanBijector(affine_bijector)
+        return distrax.Block(affine_bijector, ndims=3)
 
     def log_prob_single_sample(self, x: chex.Array, augmented_coords: chex.Array) -> chex.Array:
         chex.assert_rank(x, 2)  #  [n_nodes, dim]
@@ -92,10 +86,8 @@ class ConditionalCentreofMassGaussian(DistributionWithExtra):
         momentum, log_det_scaling = self.scaling_bijector().inverse_and_log_det(momentum)
         chex.assert_shape(log_det_scaling, ())
 
-        log_prob_momentum_unit_scale = jax.vmap(self.centre_gravity_gaussian.log_prob,
-                                                in_axes=-2, out_axes=-1)(momentum)
-        chex.assert_shape(log_prob_momentum_unit_scale, (self.n_aux,))
-        log_prob_momentum_unit_scale = jnp.sum(log_prob_momentum_unit_scale, axis=-1)
+        log_prob_momentum_unit_scale = self.unit_gaussian.log_prob(momentum)
+        chex.assert_shape(log_prob_momentum_unit_scale, ())
 
         return log_prob_momentum_unit_scale + log_det_scaling
 
