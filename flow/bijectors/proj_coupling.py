@@ -148,7 +148,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         extra = self.get_extra(vectors)
 
         chex.assert_shape(origin, (n_nodes, multiplicity, self.n_inner_transforms, dim))
-        #chex.assert_shape(vectors, (n_nodes, multiplicity, self.n_inner_transforms, dim-1, dim))
+        chex.assert_shape(change_of_basis_matrices, (n_nodes, multiplicity, self.n_inner_transforms, dim, dim))
         return origin, change_of_basis_matrices, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:

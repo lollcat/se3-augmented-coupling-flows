@@ -8,6 +8,9 @@ from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.proj_coupling import ProjSplitCoupling
 
+
+_N_ADDITIONAL_BASIS_VECTORS_LOEWDIM = 1
+
 def make_proj_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
@@ -18,8 +21,7 @@ def make_proj_coupling_layer(
         identity_init: bool = True,
         origin_on_coupled_pair: bool = False,
         add_small_identity: bool = True,
-        orthogonalization_method: str = 'gram-schmidt',
-        additional_basis_vector: bool = False,
+        orthogonalization_method: str = 'gram-schmidt',  # or loewdin
         transform_type: str = 'real_nvp',
         num_bins: int = 10,
         lower: float = -10.,
@@ -32,7 +34,7 @@ def make_proj_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
-    n_heads = n_heads + 1 if additional_basis_vector else n_heads
+    n_heads = n_heads + _N_ADDITIONAL_BASIS_VECTORS_LOEWDIM if orthogonalization_method == 'loewdin' else n_heads
     if transform_type == "real_nvp":
         params_per_dim_channel = dim * 2
         n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split
