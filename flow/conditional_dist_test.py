@@ -2,7 +2,8 @@ import chex
 import jax.numpy as jnp
 import jax
 
-from utils.test import rotate_translate_x_and_a_2d, rotate_translate_x_and_a_3d
+from molboil.utils.numerical import rotate_translate_permute_general
+
 from flow.aug_flow_dist import FullGraphSample
 from flow.conditional_dist import build_aux_dist
 
@@ -36,11 +37,7 @@ def test_conditional_dist(dim: int = 3, n_aug: int = 3):
     phi = jax.random.uniform(key3, shape=(batch_size,)) * 2 * jnp.pi
 
     def group_action(x_and_a):
-        if dim == 2:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_2d)(x_and_a, theta, translation)
-        else:  # dim == 3:
-            x_and_a_rot = jax.vmap(rotate_translate_x_and_a_3d)(x_and_a, theta, phi, translation)
-        return x_and_a_rot
+        return jax.vmap(jax.vmap(rotate_translate_permute_general, (1, None, None, None), 1))(x_and_a, translation, theta, phi)
 
     positions_rot = jnp.squeeze(group_action(jnp.expand_dims(dummy_samples.positions, axis=-2)), axis=-2)
     aug_samples_rot = group_action(aug_samples)
@@ -52,4 +49,4 @@ def test_conditional_dist(dim: int = 3, n_aug: int = 3):
 
 
 if __name__ == '__main__':
-    test_conditional_dist(dim=2)
+    test_conditional_dist(dim=3)
