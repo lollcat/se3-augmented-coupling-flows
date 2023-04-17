@@ -70,5 +70,6 @@ def training_step(
             }
         )
     if isinstance(opt_state, IgnoreNanOptState):
-        info.update(ignored_grad_count=opt_state.ignored_grads_count)
+        info.update(ignored_grad_count=opt_state.ignored_grads_count,
+                    total_optimizer_steps=opt_state.total_steps)
     return new_params, new_opt_state, info
