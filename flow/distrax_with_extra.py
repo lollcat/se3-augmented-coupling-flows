@@ -106,68 +106,6 @@ class BlockWithExtra(distrax.Block, BijectorWithExtra):
         return x, math.sum_last(log_det, self._ndims), extra
 
 
-from distrax._src.bijectors.split_coupling import BijectorParams
-
-
-class SplitCouplingWithExtra(distrax.SplitCoupling, BijectorWithExtra):
-    # TODO: make more clear that conditional can optionall take in whether or not we want info from it.
-    def __init__(self,
-                 split_index: int,
-                 event_ndims: int,
-                 conditioner: Callable[[Array, Optional[bool]], BijectorParams],
-                 bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
-                 swap: bool = False,
-                 split_axis: int = -1):
-        super().__init__(split_index, event_ndims, conditioner, bijector, swap, split_axis)
-
-    def _inner_bijector(self, params: BijectorParams) -> Union[BijectorWithExtra, distrax.Bijector]:
-        """Returns an inner bijector for the passed params."""
-        bijector = self._bijector(params)
-        if bijector.event_ndims_in != bijector.event_ndims_out:
-            raise ValueError(
-                f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
-                f'Instead, it has `event_ndims_in=={bijector.event_ndims_in}` and '
-                f'`event_ndims_out=={bijector.event_ndims_out}`.')
-        extra_ndims = self.event_ndims_in - bijector.event_ndims_in
-        if extra_ndims < 0:
-            raise ValueError(
-                f'The inner bijector can\'t have more event dimensions than the '
-                f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
-                f'bijector and {self.event_ndims_in} for the coupling bijector.')
-        elif extra_ndims > 0:
-            if isinstance(bijector, BijectorWithExtra):
-                bijector = BlockWithExtra(bijector, extra_ndims)
-            else:
-                bijector = distrax.Block(bijector, extra_ndims)
-        return bijector
-
-    def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
-        """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
-        self._check_forward_input_shape(x)
-        x1, x2 = self._split(x)
-        params = self._conditioner(x1)
-        inner_bijector = self._inner_bijector(params)
-        if isinstance(inner_bijector, BijectorWithExtra):
-            y2, logdet, extra = inner_bijector.forward_and_log_det_with_extra(x2)
-        else:
-            y2, logdet = inner_bijector.forward_and_log_det(x2)
-            extra = Extra()
-        return self._recombine(x1, y2), logdet, extra
-
-    def inverse_and_log_det_with_extra(self, y: Array) -> Tuple[Array, Array, Extra]:
-        """Like inverse_and_log det, but with additional extra. Defaults to just returning an empty dict for extra."""
-        self._check_inverse_input_shape(y)
-        y1, y2 = self._split(y)
-        params = self._conditioner(y1)
-        inner_bijector = self._inner_bijector(params)
-        if isinstance(inner_bijector, BijectorWithExtra):
-            x2, logdet, extra = inner_bijector.inverse_and_log_det_with_extra(y2)
-        else:
-            x2, logdet = inner_bijector.inverse_and_log_det(y2)
-            extra = Extra()
-        return self._recombine(y1, x2), logdet, extra
-
-
 class DistributionWithExtra(distrax.Distribution):
 
     def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:

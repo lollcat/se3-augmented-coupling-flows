@@ -43,7 +43,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.type = ['nice']
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 2
-    cfg.flow.act_norm = False
+    cfg.flow.act_norm = True
 
 
     # Configure NNs

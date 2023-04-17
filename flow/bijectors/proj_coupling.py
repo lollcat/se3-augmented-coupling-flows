@@ -65,18 +65,22 @@ def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: b
 class ProjSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
-                 event_ndims: int,
                  graph_features: chex.Array,
                  get_basis_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams, int], Union[BijectorWithExtra, distrax.Bijector]],
                  origin_on_coupled_pair: bool = True,
                  swap: bool = False,
-                 split_axis: int = -1,
                  add_small_identity: bool = True,
                  orthogonalization_method: str = 'loewdin',
                  n_inner_transforms: int = 1,
+                 event_ndims: int = 3,
+                 split_axis: int = -2,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
+        if event_ndims != 3:
+            raise NotImplementedError("Only implemented for 3 event ndims")
+        if split_axis != -2:
+            raise NotImplementedError("Only implemented for split axis on the multiplicity axis (-2")
         if split_index < 0:
           raise ValueError(
               f'The split index must be non-negative; got {split_index}.')

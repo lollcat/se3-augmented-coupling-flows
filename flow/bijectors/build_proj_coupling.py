@@ -98,14 +98,14 @@ def make_proj_coupling_layer(
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
-        event_ndims=3,  # [nodes, n_aug+1, dim]
         origin_on_coupled_pair=origin_on_coupled_pair,
         get_basis_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-2,
         add_small_identity=add_small_identity,
         orthogonalization_method=orthogonalization_method,
-        n_inner_transforms=n_inner_transforms
+        n_inner_transforms=n_inner_transforms,
+        event_ndims=3,  # [nodes, n_aug+1, dim]
+        split_axis=-2,
     )

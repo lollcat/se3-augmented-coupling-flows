@@ -15,15 +15,19 @@ BijectorParams = chex.Array
 class SphericalSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
-                 event_ndims: int,
                  graph_features: chex.Array,
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
-                 split_axis: int = -2,
                  use_aux_loss: bool = True,
                  n_inner_transforms: int = 1,
+                 event_ndims: int = 3,
+                 split_axis: int = -2,
                  ):
+        if event_ndims != 3:
+            raise NotImplementedError("Only implemented for 3 event ndims")
+        if split_axis != -2:
+            raise NotImplementedError("Only implemented for split axis on the multiplicity axis (-2")
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
           raise ValueError(

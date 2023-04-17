@@ -145,17 +145,17 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     # Test bijector forward vs reverse.
     # Recent test samples.
     samples = samples._replace(
-        positions=samples.positions - jnp.mean(samples.positions[:, :, 0], axis=1, keepdims=True)[:, :, None])
+        positions=samples.positions - jnp.mean(samples.positions[:, :, 0, :], axis=1, keepdims=True)[:, :, None])
     sample_latent, log_det_rv, extra_rv = flow.bijector_inverse_and_log_det_with_extra_apply(params.bijector, samples)
     samples_, log_det_fwd, extra_fwd = flow.bijector_forward_and_log_det_with_extra_apply(
         params.bijector, sample_latent)
     info.update(max_abs_diff_log_det_forward_reverse=jnp.max(log_det_fwd + log_det_rv))
     info.update(mean_abs_diff_log_det_forward_reverse=jnp.mean(log_det_fwd + log_det_rv))
-    info.update(latent_mean_abs_global_mean=jnp.mean(jnp.abs(jnp.mean(sample_latent.positions, axis=-3))))
-
     info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - samples.positions)))
 
     # Test 0 mean subspace restriction.
     samples = flow.sample_apply(params, samples.features[0, :, 0], key2, samples.positions.shape[0:1])
     info.update(mean_abs_x_centre_of_mass=jnp.mean(jnp.abs(jnp.mean(samples.positions[:, :, 0], axis=1))))
+    info.update(latent_x_mean_abs_centre_of_mass=
+                jnp.mean(jnp.abs(jnp.mean(sample_latent.positions[:, :, 0, :], axis=1))))
     return info
