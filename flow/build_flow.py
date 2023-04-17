@@ -54,7 +54,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     for flow in flow_type:
         assert flow in ['nice', 'proj', 'spherical']
 
-    if config.target_aux_config.trainable_augmented_scale or config.base.aug.trainable_augmented_scale:
+    if config.target_aux_config.trainable_augmented_scale: #  or config.base.aug.trainable_augmented_scale:
         raise NotImplementedError("I have not got these working nicely yet, do not use these options.")
 
     def make_base() -> distrax.Distribution:
