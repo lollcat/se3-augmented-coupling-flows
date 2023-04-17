@@ -3,20 +3,19 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from utils.test import test_fn_is_invariant
-from utils.test import get_minimal_nets_config
+from utils.test import test_fn_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
 
-_N_FLOW_LAYERS = 2
-_N_AUG=1
+_N_FLOW_LAYERS = 1
+_N_AUG = 1
 _N_NODES = 3
 _FLOW_TYPE = "nice"
-_FAST_COMPILE_FLOW = False
 _IDENTITY_INIT = False
 _FEATURE_DIM = 2
+_ACT_NORM = True
 
 
 def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
@@ -43,7 +42,8 @@ def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
         nets_config=get_minimal_nets_config('egnn'),
         base=base_aux_config,
         target_aux_config=target_aux_config,
-        n_aug=n_aug
+        n_aug=n_aug,
+        act_norm=_ACT_NORM
     )
 
     flow = build_flow(config)
@@ -58,6 +58,13 @@ def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
 
+
+    # Get some info manually - useful for direct inspection.
+    dummy_samples_full = FullGraphSample(
+        positions=jax.random.normal(subkey, (batch_size, n_nodes, n_aug+1, dim)),
+        features=jnp.zeros((batch_size, n_nodes, 1, _FEATURE_DIM)))
+    info_test = get_checks_for_flow_properties(dummy_samples_full, flow, params, subkey)
+    assert info_test['mean_abs_diff_log_det_forward_reverse'] < 0.001
     info = flow.get_base_and_target_info(params)
 
     # Test aux-target distribution.

@@ -50,9 +50,9 @@ class BatchBijector(BijectorWithExtra):
 
     def inverse_and_log_det_with_extra(self, y: chex.Array) -> Tuple[chex.Array, chex.Array, Extra]:
         if isinstance(self.inner_bijector, BijectorWithExtra):
-            x, log_det = self.forward_and_log_det(y)
+            x, log_det = self.inverse_and_log_det(y)
         else:
-            x, log_det = self.forward_and_log_det(y)
+            x, log_det = self.inverse_and_log_det(y)
         extra = Extra()
         return x, log_det, extra
 
