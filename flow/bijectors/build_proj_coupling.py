@@ -3,10 +3,12 @@ from typing import Tuple
 import chex
 import distrax
 import jax.numpy as jnp
+import jax
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.proj_coupling import ProjSplitCoupling
+from utils.numerical import inverse_softplus
 
 
 _N_ADDITIONAL_BASIS_VECTORS_LOEWDIM = 1
@@ -61,7 +63,12 @@ def make_proj_coupling_layer(
             # reshape
             params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim*2))
             log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-            return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+
+            # If log_scale is initialised to 0 then this initialises the flow to the identity.
+            log_scale = log_scale + inverse_softplus(jnp.array(1.))
+            scale = jax.nn.softplus(log_scale)
+
+            return distrax.ScalarAffine(scale=scale, shift=shift)
         else:
             params = jnp.reshape(params,
                                  (n_nodes, multiplicity_within_coupling_split, dim, params_per_dim_per_var_group))

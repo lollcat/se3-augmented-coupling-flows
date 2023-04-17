@@ -2,11 +2,13 @@ from typing import Callable, Union, Optional, Tuple
 
 import chex
 import distrax
+import jax.nn
 import jax.numpy as jnp
 import haiku as hk
 
 from flow.distrax_with_extra import BijectorWithExtra
 from flow.bijectors.batch import BatchBijector
+from utils.numerical import inverse_softplus
 
 BijectorParams = Union[chex.Array]
 
@@ -108,12 +110,17 @@ def build_unconditional_centre_of_mass_layer(
         layer_number: int,
         dim: int,
         n_aug: int,
-        identity_init: bool) -> BijectorWithExtra:
+        identity_init: bool,
+) -> BijectorWithExtra:
 
     def bijector_fn(params):
         chex.assert_shape(params, (n_aug, dim))
-        log_scaling = params
-        inner_bijector = distrax.ScalarAffine(log_scale=log_scaling, shift=jnp.zeros_like(log_scaling))
+
+        # If params is initialised to 0 then this initialises the flow to the identity.
+        log_scaling = params + inverse_softplus(jnp.array(1.))
+        scale = jax.nn.softplus(log_scaling)
+
+        inner_bijector = distrax.ScalarAffine(scale=scale, shift=jnp.zeros_like(log_scaling))
         return inner_bijector
 
     def conditioner(zero_mean_point_clouds: chex.Array) -> chex.Array:
