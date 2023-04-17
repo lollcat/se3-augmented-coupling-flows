@@ -13,7 +13,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: false
+  act_norm: true
   base:
     train_x_scale: false
     x_scale_init: 1.0
@@ -39,7 +39,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
-      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
+      orthogonalization_method: loewdin  #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
@@ -96,7 +96,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_TrainableTarget${target.aux.trainable_augmented_scale}_AugConditioned${target.aux.conditioned_on_x}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}_actnorm${flow.act_norm}
+    name: loewdin_qm9pos_${flow.type}_${flow.nets.type}_TrainableTarget${target.aux.trainable_augmented_scale}_AugConditioned${target.aux.conditioned_on_x}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}_actnorm${flow.act_norm}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]
