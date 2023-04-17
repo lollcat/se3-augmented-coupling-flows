@@ -67,7 +67,7 @@ def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: b
             c = jnp.cross(vectors[:, :1, :], vectors[:, 1:, :])
             vectors = jnp.concatenate((vectors, c), axis=1)
         w, s, vt = jnp.linalg.svd(vectors, full_matrices=False)
-        change_of_basis_matrix = jax.vmap(jnp.matmul)(w, vt)
+        change_of_basis_matrix = jnp.swapaxes(jax.vmap(jnp.matmul)(w, vt), 1, 2)
 
     chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
     return change_of_basis_matrix
