@@ -199,6 +199,10 @@ def create_flow(recipe: AugmentedFlowRecipe):
             chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), extra
 
+        # Restrict to subspace before passing through bijector.
+        x = sample.positions[..., 0, :]
+        centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
+        sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
         log_prob_shape = sample.positions.shape[:-3]
         (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
                                            xs=params,
@@ -219,6 +223,11 @@ def create_flow(recipe: AugmentedFlowRecipe):
             x, log_det = bijector_inverse_and_log_det_single.apply(bijector_params, y)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), None
+
+        # Restrict to subspace before passing through bijector.
+        x = sample.positions[..., 0, :]
+        centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
+        sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
 
         log_prob_shape = sample.positions.shape[:-3]
         (x, log_det), _ = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
