@@ -133,7 +133,7 @@ def build_aux_dist(n_aug: int,
         n_nodes, dim = x.shape[-2:]
         if trainable_scale:
             log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(n_aug,),
-                                         init=hk.initializers.Constant(jnp.log(augmented_scale_init)))
+                                         init=hk.initializers.Constant(jnp.log(augmented_scale_init)), dtype=float)
         else:
             scale = jnp.ones(n_aug) * augmented_scale_init
             log_scale = jnp.log(scale)

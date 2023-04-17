@@ -1,5 +1,6 @@
 import hydra
 from omegaconf import DictConfig
+import jax
 
 from molboil.train.train import train
 from molboil.targets.data import load_lj13
@@ -39,6 +40,9 @@ def run(cfg: DictConfig):
     local_config = True
     if local_config:
         cfg = to_local_config(cfg)
+
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
 
     experiment_config = create_train_config(cfg,
                                             dim=3,

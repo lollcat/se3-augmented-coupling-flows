@@ -8,6 +8,7 @@ from molboil.targets.data import load_dw4
 from examples.create_train_config import create_train_config
 from target.double_well import make_dataset
 from utils.data import positional_dataset_only_to_full_graph
+import jax
 
 def load_dataset_original(train_set_size: int, valid_set_size: int):
     train, valid, test = load_dw4(train_set_size)
@@ -37,12 +38,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 10
     cfg.logger = DictConfig({"list_logger": None})
+    cfg.training.use_64_bit = False
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
     cfg.flow.type = ['nice']
-    cfg.flow.n_aug = 1
-    cfg.flow.n_layers = 2
+    cfg.flow.n_aug = 3
+    cfg.flow.n_layers = 1
     cfg.flow.act_norm = True
 
 
@@ -61,11 +63,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
     local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
+
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
 
     if cfg.target.custom_samples:
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")

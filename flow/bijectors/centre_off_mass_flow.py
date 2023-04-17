@@ -48,7 +48,7 @@ class CentreOfMassFlow(BijectorWithExtra):
         chex.assert_shape(centre_of_masses_augmented, (n_augmented, dim))
 
         # Add the centre of masses back into the array.
-        x = centred_point_clouds.at[:, 1:].add(centre_of_masses_augmented)
+        x = centred_point_clouds.at[:, 1:].add(centre_of_masses_augmented[None])
         return x
 
     def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
@@ -121,7 +121,9 @@ def build_unconditional_centre_of_mass_layer(
 
         log_scale = hk.get_parameter(name=f'centre_of_mass_shifting_lay{layer_number}',
                                             shape=(n_aug,),
-                                            init=jnp.zeros if identity_init else hk.initializers.Constant(1.))
+                                            init=jnp.zeros if identity_init else hk.initializers.VarianceScaling(1.),
+                                     dtype=float
+                                     )
         log_scale = jnp.repeat(log_scale[:, None], dim, axis=-1)
         return log_scale
 

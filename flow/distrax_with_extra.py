@@ -45,6 +45,24 @@ class BijectorWithExtra(distrax.Bijector):
 
 class ChainWithExtra(distrax.Chain, BijectorWithExtra):
 
+    def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
+        """Computes y = f(x) and log|det J(f)(x)|."""
+        x, log_det = self._bijectors[-1].forward_and_log_det(x)
+        for bijector in reversed(self._bijectors[:-1]):
+            x, ld = bijector.forward_and_log_det(x)
+            chex.assert_equal_shape((log_det, ld))
+            log_det += ld
+        return x, log_det
+
+    def inverse_and_log_det(self, y: Array) -> Tuple[Array, Array]:
+        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
+        y, log_det = self._bijectors[0].inverse_and_log_det(y)
+        for bijector in self._bijectors[1:]:
+            y, ld = bijector.inverse_and_log_det(y)
+            chex.assert_equal_shape((log_det, ld))
+            log_det += ld
+        return y, log_det
+
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info."""
         n_layers = len(self._bijectors)
@@ -57,6 +75,7 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
         info_aggregator.update({f"lay_{n_layers}\{n_layers}" + key: value for key, value in extra.info_aggregator.items()})
         for i, bijector in enumerate(reversed(self._bijectors[:-1])):
             x, ld, extra = bijector.forward_and_log_det_with_extra(x)
+            chex.assert_equal_shape((log_det, ld))
             log_det += ld
             info.update({f"lay_{n_layers - 1 - i}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
             info_aggregator.update({f"lay_{n_layers - 1 - i}\{n_layers}" + key: value for key, value in
@@ -78,6 +97,7 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
         losses.append(extra.aux_loss)
         for i, bijector in enumerate(self._bijectors[1:]):
             y, ld, extra = bijector.inverse_and_log_det_with_extra(y)
+            chex.assert_equal_shape((log_det, ld))
             log_det += ld
             info.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in extra.aux_info.items()})
             info_aggregator.update({f"lay_{2 + i}\{n_layers}" + key: value for key, value in

@@ -57,7 +57,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
                               lambda: (updates, new_opt_state, opt_state.ignored_grads_count))
 
         state = IgnoreNanOptState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
-                                  grad_norms=grad_norms, total_grad_steps=opt_state.total_steps + 1)
+                                  grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
         return updates, state
 
 

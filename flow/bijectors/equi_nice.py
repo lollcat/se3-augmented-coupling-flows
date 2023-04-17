@@ -39,7 +39,7 @@ def make_se_equivariant_nice(graph_features,
     # Used to for zero initialisation.
     get_scaling_weight_fn = lambda: hk.get_parameter(
         f"layer_{layer_number}_swap{swap}_scaling_weight",  shape=(), init=jnp.zeros if identity_init else
-        hk.initializers.Constant(0.0001))
+        hk.initializers.Constant(0.0001), dtype=float)
 
     def bijector_fn(params):
         shift = params
