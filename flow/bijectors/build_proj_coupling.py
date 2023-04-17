@@ -11,7 +11,7 @@ from flow.bijectors.proj_coupling import ProjSplitCoupling
 from utils.numerical import inverse_softplus
 
 
-_N_ADDITIONAL_BASIS_VECTORS_LOEWDIM = 1
+_N_ADDITIONAL_BASIS_VECTORS_LOEWDIN = 1
 
 def make_proj_coupling_layer(
         graph_features: chex.Array,
@@ -36,7 +36,7 @@ def make_proj_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
-    n_heads = n_heads + _N_ADDITIONAL_BASIS_VECTORS_LOEWDIM if orthogonalization_method == 'loewdin' else n_heads
+    n_heads = n_heads + _N_ADDITIONAL_BASIS_VECTORS_LOEWDIN if orthogonalization_method == 'loewdin' else n_heads
     if transform_type == "real_nvp":
         params_per_dim_channel = dim * 2
         n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split

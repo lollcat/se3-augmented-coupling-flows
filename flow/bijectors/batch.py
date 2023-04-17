@@ -3,6 +3,7 @@ from typing import Tuple
 import distrax
 import jax
 import chex
+import haiku as hk
 
 from flow.distrax_with_extra import BijectorWithExtra, Extra
 

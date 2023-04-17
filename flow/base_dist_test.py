@@ -21,7 +21,7 @@ def tesst_base_distribution():
     # Sample: Test that it does not smoke.
     sample = dist.sample(seed=key, sample_shape=batch_size)
     chex.assert_shape(sample, shape)
-    assert_mean_zero(sample, node_axis=-3)
+    assert_mean_zero(sample[:, :, 0], node_axis=1)
 
     # Log prob: Test that it is invariant to translation and rotation.
     log_prob = dist.log_prob(sample)

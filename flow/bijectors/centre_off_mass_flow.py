@@ -113,6 +113,8 @@ def build_unconditional_centre_of_mass_layer(
         identity_init: bool,
 ) -> BijectorWithExtra:
 
+    # TODO: Could use graph features by passing them through a transformer.
+
     def bijector_fn(params):
         chex.assert_shape(params, (n_aug, dim))
 

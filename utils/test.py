@@ -39,7 +39,7 @@ def bijector_test(bijector_forward, bijector_backward,
     key = jax.random.PRNGKey(0)
     key, subkey = jax.random.split(key)
 
-    x_and_a = jax.random.normal(subkey, shape=event_shape) * 0.1
+    x_and_a = jax.random.normal(subkey, shape=event_shape)
     x_and_a = x_and_a - jnp.mean(x_and_a[:, 0], axis=0, keepdims=True)[:, None]
 
     if x_and_a.dtype == jnp.float64:
@@ -50,6 +50,11 @@ def bijector_test(bijector_forward, bijector_backward,
     # Initialise bijector parameters.
     params = bijector_forward.init(key, x_and_a)
     print(f"bijector param count of {param_count(params)}")
+
+    # Check parameter init not effected by batch or no-batch.
+    params_batch_init = bijector_forward.init(key, jnp.repeat(x_and_a[None], 10, axis=0))
+    chex.assert_trees_all_equal(params, params_batch_init)
+    chex.assert_trees_all_equal_structs(params_batch_init, params)
 
     # Perform a forward pass, reverse and check the original `x_and_a` is recovered.
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
@@ -83,15 +88,16 @@ def bijector_test(bijector_forward, bijector_backward,
 
 
     # Forward reverse test but with a batch.
-    batch_size = 11
-    x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))*0.1
-    x_and_a = x_and_a - jnp.mean(x_and_a, axis=-3, keepdims=True)
+    batch_size = 101
+    x_and_a = jax.random.normal(subkey, shape=(batch_size, *x_and_a.shape))
+    x_and_a = x_and_a - jnp.mean(x_and_a[:, :, 0], axis=1, keepdims=True)[:, None]
     x_and_a_new, log_det_fwd = bijector_forward.apply(params, x_and_a)
     centre_of_mass = jnp.mean(x_and_a_new[:, :, 0], axis=1)
     chex.assert_trees_all_close(1 + centre_of_mass, 1 + jnp.zeros_like(centre_of_mass),
                                 rtol=rtol)  # Check subspace restriction.
     centre_of_mass_aug = jnp.mean(x_and_a_new[:, :, 1:], axis=0)
-    assert (jnp.abs(centre_of_mass_aug) > 0.001).all()
+    # (jnp.abs(jnp.mean(x_and_a[:, :, 1:], axis=0)) > 0.001).sum() is also interesting to eyeball.
+    assert (jnp.abs(centre_of_mass_aug) > 0.0001).all()
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)
