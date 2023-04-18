@@ -38,7 +38,7 @@ def run(cfg: DictConfig):
     # Create eval function
     eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                     flow=flow, K=cfg.training.K_marginal_log_lik,
-                                    test_invariances=False)
+                                    test_invariances=True)
     eval_fn_ = partial(eval_fn, eval_on_test_batch_fn=eval_on_test_batch_fn,
                        eval_batch_free_fn=None, batch_size=cfg.training.plot_batch_size)
     eval_and_plot_fn_ = partial(eval_and_plot_fn, sample_fn=sample_fn, train_data=train_set, test_data=val_set,

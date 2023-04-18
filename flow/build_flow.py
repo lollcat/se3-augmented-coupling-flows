@@ -5,7 +5,7 @@ from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
 from typing import NamedTuple, Sequence, Union
 import distrax
 
-from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian
+from flow.base_dist import JointBaseDistribution
 from flow.conditional_dist import build_aux_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
@@ -16,9 +16,10 @@ from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
 
+
 class ConditionalAuxDistConfig(NamedTuple):
-    global_centering: bool = False
-    trainable_augmented_scale: bool = True
+    conditioned_on_x: bool = False
+    trainable_augmented_scale: bool = False
     scale_init: float = 1.0
 
 class BaseConfig(NamedTuple):
@@ -39,7 +40,7 @@ class FlowDistConfig(NamedTuple):
     act_norm: bool = False
     kwargs: dict = {}
     base: BaseConfig = BaseConfig()
-    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig(trainable_augmented_scale=False)
+    target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
 
 
 def build_flow(config: FlowDistConfig) -> AugmentedFlow:
@@ -53,16 +54,17 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     for flow in flow_type:
         assert flow in ['nice', 'proj', 'spherical']
 
+    if config.base.aug.trainable_augmented_scale:  # or config.target_aux_config.trainable_augmented_scale:
+        raise NotImplementedError("I have not got these working nicely yet, do not use these options.")
+
     def make_base() -> distrax.Distribution:
-        base = CentreGravitryGaussianAndCondtionalGuassian(
+        base = JointBaseDistribution(
             dim=config.dim,
             n_nodes=config.nodes,
-            global_centering=config.base.aug.global_centering,
-            trainable_x_scale=config.base.train_x_scale,
+            n_aux=config.n_aug,
             x_scale_init=config.base.x_scale_init,
-            trainable_augmented_scale=config.base.aug.trainable_augmented_scale,
             augmented_scale_init=config.base.aug.scale_init,
-            n_aux=config.n_aug
+            augmented_conditioned=config.base.aug.conditioned_on_x
         )
         return base
 
@@ -80,8 +82,8 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 identity_init=config.identity_init)
             bijectors.append(bijector)
 
-        if config.n_aug > 1:
-            bijectors.append(AugPermuteBijector(aug_only=False))
+        # if config.n_aug > 1:
+        #     bijectors.append(AugPermuteBijector(aug_only=True))
 
 
         for swap in (False, True):  # For swap False we condition augmented on original.
@@ -126,11 +128,11 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
     make_aug_target = build_aux_dist(
         n_aug=config.n_aug,
-        name='target',
-        global_centering=config.target_aux_config.global_centering,
         augmented_scale_init=config.target_aux_config.scale_init,
-        trainable_scale=config.target_aux_config.trainable_augmented_scale)
-
+        trainable_scale=config.target_aux_config.trainable_augmented_scale,
+        name='aug_target_dist',
+        conditioned=config.target_aux_config.conditioned_on_x
+    )
 
     definition = AugmentedFlowRecipe(make_base=make_base,
                                      make_bijector=make_bijector,

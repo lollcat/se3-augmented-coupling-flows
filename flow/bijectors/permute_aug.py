@@ -7,7 +7,7 @@ from flow.distrax_with_extra import BijectorWithExtra
 
 
 class AugPermuteBijector(BijectorWithExtra):
-    def __init__(self, aug_only: bool = False):
+    def __init__(self, aug_only: bool = True):
         self.aug_only = aug_only
         super().__init__(event_ndims_in=3, is_constant_jacobian=True)
 

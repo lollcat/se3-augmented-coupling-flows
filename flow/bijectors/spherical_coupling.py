@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 
 from molboil.utils.numerical import safe_norm
-from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det
-from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
+from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
+from flow.bijectors.spherical_flow_layer import SphericalFlow
 
 BijectorParams = chex.Array
 
@@ -15,15 +15,19 @@ BijectorParams = chex.Array
 class SphericalSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
-                 event_ndims: int,
                  graph_features: chex.Array,
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
-                 split_axis: int = -2,
                  use_aux_loss: bool = True,
                  n_inner_transforms: int = 1,
+                 event_ndims: int = 3,
+                 split_axis: int = -2,
                  ):
+        if event_ndims != 3:
+            raise NotImplementedError("Only implemented for 3 event ndims")
+        if split_axis != -2:
+            raise NotImplementedError("Only implemented for split axis on the multiplicity axis (-2")
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
         if split_index < 0:
           raise ValueError(
@@ -59,26 +63,31 @@ class SphericalSplitCoupling(BijectorWithExtra):
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams, vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def adjust_centering_pre_proj(self, x: chex.Array) -> chex.Array:
+        """x[:, 0, :] is constrained to ZeroMean Gaussian. But if `self._swap` is True, then we
+        change this constraint to be with respect to x2[:, 0, :] instead."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+    def adjust_centering_post_proj(self, x: chex.Array) -> chex.Array:
+        """Move centre of mass to be on the first multiplicity again if `self._swap` is True."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+    def _inner_bijector(self, params: BijectorParams, reference: chex.Array,
+                        vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
-      bijector = self._bijector(params, vector_index)
-      if bijector.event_ndims_in != bijector.event_ndims_out:
-          raise ValueError(
-              f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
-              f'Instead, it has `event_ndims_in=={bijector.event_ndims_in}` and '
-              f'`event_ndims_out=={bijector.event_ndims_out}`.')
-      extra_ndims = self.event_ndims_in - bijector.event_ndims_in
-      if extra_ndims < 0:
-          raise ValueError(
-              f'The inner bijector can\'t have more event dimensions than the '
-              f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
-              f'bijector and {self.event_ndims_in} for the coupling bijector.')
-      elif extra_ndims > 0:
-          if isinstance(bijector, BijectorWithExtra):
-              bijector = BlockWithExtra(bijector, extra_ndims)
-          else:
-              bijector = distrax.Block(bijector, extra_ndims)
-      return bijector
+      inner_bijector = self._bijector(params, vector_index)
+      spherical_bijector = SphericalFlow(inner_bijector, reference)
+      return spherical_bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
             Tuple[chex.Array, chex.Array, Extra]:
@@ -131,23 +140,16 @@ class SphericalSplitCoupling(BijectorWithExtra):
             extra = Extra(aux_loss=aux_loss, aux_info=info, info_aggregator=info_aggregator)
             return extra
 
-    def to_spherical_and_log_det(self, x, reference):
-        chex.assert_rank(x, 3)
-        chex.assert_rank(reference, 4)
-        sph_x, log_det = jax.vmap(jax.vmap(to_spherical_and_log_det))(x, reference)
-        return sph_x, jnp.sum(log_det)
 
-    def to_cartesian_and_log_det(self, x_sph, reference):
-        chex.assert_rank(x_sph, 3)
-        chex.assert_rank(reference, 4)
-        x, log_det = jax.vmap(jax.vmap(to_cartesian_and_log_det))(x_sph, reference)
-        return x, jnp.sum(log_det)
 
 
     def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         self._check_forward_input_shape(x)
+        chex.assert_rank(x, 3)
         dim = x.shape[-1]
+
+        x = self.adjust_centering_pre_proj(x)
         x1, x2 = self._split(x)
         reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
@@ -156,21 +158,23 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = jnp.zeros(())
         for i in range(self.n_inner_transforms):
             reference_points = reference_points_all[:, :, i]
-            sph_x_in, log_det_norm_fwd = self.to_spherical_and_log_det(x2, reference_points)
-            sph_x_out, logdet_inner_bijector = \
-                self._inner_bijector(bijector_feat_in, i).forward_and_log_det(sph_x_in)
-            chex.assert_equal_shape((sph_x_out, sph_x_in))
-            x2, log_det_norm_rv = self.to_cartesian_and_log_det(sph_x_out, reference_points)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
+            x2, log_det = bijector.forward_and_log_det(x2)
+            log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
         y2 = x2
-        return self._recombine(x1, y2), log_det_total, extra
+        y = self._recombine(x1, y2)
+        y = self.adjust_centering_post_proj(y)
+        return y, log_det_total, extra
 
     def inverse_and_log_det_single_with_extra(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
         dim = y.shape[-1]
+        chex.assert_rank(y, 3)
+
+        y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
         reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim_ = reference_points_all.shape
@@ -179,14 +183,15 @@ class SphericalSplitCoupling(BijectorWithExtra):
         log_det_total = jnp.zeros(())
         for i in reversed(range(self.n_inner_transforms)):
             reference_points = reference_points_all[:, :, i]
-            sph_y_in, log_det_norm_fwd = self.to_spherical_and_log_det(y2, reference_points)
-            ph_y_out, logdet_inner_bijector = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(sph_y_in)
-            y2, log_det_norm_rv = self.to_cartesian_and_log_det(ph_y_out, reference_points)
-            log_det_total = log_det_total + logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
+            bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
+            y2, log_det = bijector.inverse_and_log_det(y2)
+            log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
         x2 = y2
-        return self._recombine(y1, x2), log_det_total, extra
+        x = self._recombine(y1, x2)
+        x = self.adjust_centering_post_proj(x)
+        return x, log_det_total, extra
 
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         return self.forward_and_log_det_single_with_extra(x, graph_features)[:2]
