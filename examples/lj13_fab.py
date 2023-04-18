@@ -21,6 +21,9 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.batch_size = 2
     cfg.flow.type = 'nice'
     cfg.flow.n_aug = 1
+    cfg.fab.eval_fab_batch_size = 2
+    cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
+    cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
 
     cfg.training.n_epoch = 32
     cfg.training.save = False

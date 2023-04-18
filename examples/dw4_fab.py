@@ -36,6 +36,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
     cfg.fab.eval_fab_batch_size = 32
+    cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
+    cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
     cfg.logger = DictConfig({"list_logger": None})
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 

@@ -6,6 +6,11 @@ hydra:
     chdir: false
 
 fab:
+  with_buffer: true
+  buffer_max_length: 5000
+  buffer_min_length: 100
+  n_updates_per_smc_forward_pass: 4
+  w_adjust_clip: 10.
   use_resampling: true
   use_hmc: false
   transition_operator:
@@ -22,10 +27,12 @@ fab:
   alpha: 2.  # alpha-divergence param
   n_intermediate_distributions: 4
   spacing_type: linear
+  eval_fab_batch_size: 1000
+
 
 target:
   aux:
-    global_centering: false
+    conditioned_on_x: true
     scale_init: 1.0
     trainable_augmented_scale: false
 
@@ -36,9 +43,9 @@ flow:
     train_x_scale: true
     x_scale_init: 1.0
     aux:
-      global_centering: false
+      conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: true
+      trainable_augmented_scale: false
   dim: 3
   nodes: 13
   n_layers: 8
@@ -56,6 +63,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
+      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
@@ -81,10 +89,12 @@ training:
     init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 6e-4
+    peak_lr: 3e-4
     end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 1.0
+    max_global_norm: null
+    max_param_grad: null
+    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
