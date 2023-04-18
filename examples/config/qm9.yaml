@@ -13,7 +13,7 @@ target:
 
 flow:
   n_aug: 3
-  act_norm: true
+  act_norm: false
   base:
     train_x_scale: false
     x_scale_init: 1.0
@@ -33,12 +33,12 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
-      transform_type: real_nvp # spline or real_nvp
+      transform_type: spline # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
   nets:
     type: egnn

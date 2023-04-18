@@ -11,11 +11,11 @@ target:
     val: target/data/aldp_500K_test_mini.h5
   aux:
     conditioned_on_x: true
-    scale_init: 0.1
+    scale_init: 1.0
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 1
+  n_aug: 3
   act_norm: false
   base:
     train_x_scale: false
@@ -38,8 +38,8 @@ flow:
       n_inner_transforms: 3
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
