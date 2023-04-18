@@ -69,15 +69,18 @@ class SphericalSplitCoupling(BijectorWithExtra):
         chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
         if self._swap:
             centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
         else:
-            centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
-        return x - centre_of_mass
+            return x
 
     def adjust_centering_post_proj(self, x: chex.Array) -> chex.Array:
-        """Move centre of mass to be on the first multiplicity again."""
+        """Move centre of mass to be on the first multiplicity again if `self._swap` is True."""
         chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
-        centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
-        return x - centre_of_mass
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
 
     def _inner_bijector(self, params: BijectorParams, reference: chex.Array,
                         vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:

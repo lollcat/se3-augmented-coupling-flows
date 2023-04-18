@@ -27,7 +27,7 @@ class IsotropicScalingFlow(BijectorWithExtra):
         self.n_aug = n_aug
 
     def get_scale_from_logit(self, logit: chex.Array) -> chex.Array:
-        """Affine bijector acting on the zero-mean space represented in the ambient space, preserving the mean."""
+        """Compute the scaling factor (forced to be positive)."""
         chex.assert_shape(logit, (self.n_aug + 1,))
 
         # If params is initialised to 0 then this initialises the flow to the identity.
@@ -41,12 +41,10 @@ class IsotropicScalingFlow(BijectorWithExtra):
         n_nodes, multiplicity, dim = x.shape
         n_augmented = multiplicity - 1
 
-        centre_of_mass_x0 = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
-        x = x - centre_of_mass_x0  # Make sure everything is relative to x0 (the non-augmented variable).
         x0 = x[:, 0:1]
         chex.assert_shape(x0, (n_nodes, 1, dim))
 
-        # Now pull out the centre of masses as separate.
+        # Pull out the centre of masses as separate.
         augmented_variables = x[:, 1:]
         centre_of_masses_augmented = jnp.mean(augmented_variables, axis=0)
         chex.assert_shape(centre_of_masses_augmented, (n_augmented, dim))

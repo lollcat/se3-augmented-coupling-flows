@@ -225,7 +225,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
             return (x, log_det_prev + log_det), None
 
         # Restrict to subspace before passing through bijector.
-        x = sample.positions[..., 0, :]
+        x = sample.positions[..., 0, :]   # Regular coordinates, NOT augmented.
         centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
         sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
 
