@@ -1,9 +1,10 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 
 import chex
 import wandb
 import os
 import pathlib
+import jax
 from datetime import datetime
 from omegaconf import DictConfig
 from functools import partial
@@ -15,15 +16,15 @@ from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow
 from examples.default_plotter_fab import make_default_plotter
-from examples.configs import TrainingState
 from train.max_lik_train_and_eval import get_eval_on_test_batch
 from examples.create_train_config import setup_logger, create_flow_config
 from utils.optimize import get_optimizer, OptimizerConfig
 
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
 from fabjax.buffer import build_prioritised_buffer
-from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns
-from train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns
+from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
+from train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
+from train.fab_eval import fab_eval_function
 
 
 def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n_nodes,
@@ -86,7 +87,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     else:
         transition_operator = build_metropolis(dim_total, metro_n_outer_steps, metro_init_step_size,
                                                tune_step_size=tune_step_size, target_p_accept=target_p_accept)
-    ais = build_smc(transition_operator=transition_operator,
+    smc = build_smc(transition_operator=transition_operator,
                     n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                     alpha=alpha, use_resampling=cfg.fab.use_resampling)
 
@@ -94,7 +95,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
         plotter = make_default_plotter(
                 test_data=test_data,
                 flow=flow,
-                ais=ais,
+                ais=smc,
                 log_p_x=target_log_p_x_fn,
                 n_samples_from_flow=cfg.training.plot_batch_size,
                 max_n_samples=1000,
@@ -109,7 +110,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                                           min_length_to_sample=cfg.fab.buffer_min_length)
         init_fn, update_fn = build_fab_with_buffer_init_step_fns(
             flow=flow, log_p_x=target_log_p_x_fn, features=features,
-            smc=ais, optimizer=optimizer,
+            smc=smc, optimizer=optimizer,
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer
@@ -117,21 +118,28 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     else:
         print("running fab without buffer")
         init_fn, update_fn = build_fab_no_buffer_init_step_fns(
-            flow=flow,log_p_x=target_log_p_x_fn, features=features,
-            smc=ais, optimizer=optimizer, batch_size=cfg.training.batch_size,
+            flow=flow, log_p_x=target_log_p_x_fn, features=features,
+            smc=smc, optimizer=optimizer, batch_size=cfg.training.batch_size,
         )
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
-        eval_batch_free_fn = None
 
-        def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
+        @jax.jit
+        def evaluation_fn(state: Union[TrainStateNoBuffer, TrainStateWithBuffer], key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
-                    eval_batch_free_fn=eval_batch_free_fn,
+                    eval_batch_free_fn=None,
                     batch_size=cfg.training.eval_batch_size)
+            eval_info_fab = fab_eval_function(
+                state=state, key=key, flow=flow,
+                smc=smc, batch_size=cfg.fab.eval_fab_batch_size,
+                log_p_x=target_log_p_x_fn,
+                features=train_data.features[0],
+            )
+            eval_info.update(eval_info_fab)
             return eval_info
 
     if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):
