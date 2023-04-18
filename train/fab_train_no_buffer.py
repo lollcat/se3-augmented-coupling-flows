@@ -69,7 +69,8 @@ def build_smc_forward_pass(
 
     event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
 
-    def smc_forward_pass(params: AugmentedFlowParams, smc_state: SMCState, key: chex.PRNGKey):
+    def smc_forward_pass(params: AugmentedFlowParams, smc_state: SMCState, key: chex.PRNGKey,
+                         unflatten_output: bool = True):
         flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
             log_p_x=log_p_x, flow=flow, params=params, features_with_multiplicity=features_with_multiplicity,
             event_shape=event_shape
@@ -78,7 +79,9 @@ def build_smc_forward_pass(
         sample_flow = flow.sample_apply(params, features, key, (batch_size,))
         x0 = flatten(sample_flow.positions)
         point, log_w, smc_state, smc_info = smc.step(x0, smc_state, log_q_flat_fn, log_p_flat_fn)
-        x_smc = unflatten(point.x)
+        x_smc = point.x
+        if unflatten_output:
+            x_smc = unflatten(x_smc)
         return sample_flow.positions, x_smc, log_w, point.log_q, smc_state, smc_info
 
     return smc_forward_pass

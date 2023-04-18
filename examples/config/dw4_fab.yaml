@@ -6,6 +6,11 @@ hydra:
     chdir: false
 
 fab:
+  with_buffer: true
+  buffer_max_length: 1000
+  buffer_min_length: 100
+  n_updates_per_smc_forward_pass: 4
+  w_adjust_clip: 10.
   use_resampling: true
   use_hmc: false
   transition_operator:

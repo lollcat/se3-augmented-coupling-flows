@@ -21,7 +21,9 @@ from examples.create_train_config import setup_logger, create_flow_config
 from utils.optimize import get_optimizer, OptimizerConfig
 
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
+from fabjax.buffer import build_prioritised_buffer
 from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns
+from train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns
 
 
 def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n_nodes,
@@ -99,10 +101,25 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                 max_distance=20.)
 
     features = train_data.features[0]
-    init_fn, update_fn = build_fab_no_buffer_init_step_fns(
-        flow=flow,log_p_x=target_log_p_x_fn, features=features,
-        smc=ais, optimizer=optimizer, batch_size=cfg.training.batch_size,
-    )
+
+    if cfg.fab.with_buffer:
+        print("running fab with buffer")
+        assert cfg.fab.n_updates_per_smc_forward_pass*cfg.training.batch_size < cfg.fab.buffer_min_length
+        buffer = build_prioritised_buffer(dim=dim_total, max_length=cfg.fab.buffer_max_length,
+                                          min_length_to_sample=cfg.fab.buffer_min_length)
+        init_fn, update_fn = build_fab_with_buffer_init_step_fns(
+            flow=flow, log_p_x=target_log_p_x_fn, features=features,
+            smc=ais, optimizer=optimizer,
+            batch_size=cfg.training.batch_size,
+            n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
+            buffer=buffer
+        )
+    else:
+        print("running fab without buffer")
+        init_fn, update_fn = build_fab_no_buffer_init_step_fns(
+            flow=flow,log_p_x=target_log_p_x_fn, features=features,
+            smc=ais, optimizer=optimizer, batch_size=cfg.training.batch_size,
+        )
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions

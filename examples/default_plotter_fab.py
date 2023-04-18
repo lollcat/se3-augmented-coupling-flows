@@ -1,4 +1,4 @@
-from typing import Callable, Optional, List, Tuple
+from typing import Callable, Optional, List, Tuple, Union
 
 from functools import partial
 import chex
@@ -10,6 +10,7 @@ import matplotlib as mpl
 from molboil.utils.plotting import bin_samples_by_dist
 
 from train.fab_train_no_buffer import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
+from train.fab_train_with_buffer import TrainStateWithBuffer
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
@@ -50,7 +51,8 @@ def make_default_plotter(
     ais_forward = build_smc_forward_pass(flow, log_p_x, test_data.features[0], ais, n_samples)
 
     @partial(jax.jit)
-    def get_data_for_plotting(state: TrainStateNoBuffer, key: chex.PRNGKey, test_data=test_data[:max_n_samples]):
+    def get_data_for_plotting(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
+                              key: chex.PRNGKey, test_data=test_data[:max_n_samples]):
         pos_x_target = test_data.positions
 
         params = state.params

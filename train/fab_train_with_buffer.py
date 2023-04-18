@@ -42,7 +42,7 @@ def fab_loss_buffer_samples(
 
 
 class TrainStateWithBuffer(NamedTuple):
-    flow_params: AugmentedFlowParams
+    params: AugmentedFlowParams
     key: chex.PRNGKey
     opt_state: optax.OptState
     smc_state: SMCState
@@ -70,6 +70,7 @@ def build_fab_with_buffer_init_step_fns(
     smc_forward = build_smc_forward_pass(flow, log_p_x, features, smc, batch_size)
     features_with_multiplicity = features[:, None]
     event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
+    flat_event_shape = np.prod(event_shape)
 
 
     def init(key: chex.PRNGKey) -> TrainStateWithBuffer:
@@ -87,18 +88,22 @@ def build_fab_with_buffer_init_step_fns(
             """fer."""
             smc_state = carry
             key = xs
-            sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(flow_params, smc_state, key)
+            sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(flow_params, smc_state, key,
+                                                                                unflatten_output=False)
+            chex.assert_shape(x_smc, (batch_size, flat_event_shape))
+            chex.assert_shape(log_w, (batch_size,))
+            chex.assert_shape(log_q, (batch_size,))
             return smc_state, (x_smc, log_w, log_q)
 
         n_forward_pass = (buffer.min_lengtht_to_sample // batch_size) + 1
         smc_state, (x, log_w, log_q) = jax.lax.scan(body_fn, init=smc_state,
-                                                    xs=jax.random.split(key4, n_forward_pass))
+                                                    xs=jax.random.split(key3, n_forward_pass))
 
-        buffer_state = buffer.init(jnp.reshape(x, (n_forward_pass*batch_size, np.prod(event_shape))),
-                                               log_w.flatten(),
-                                               log_q.flatten())
+        buffer_state = buffer.init(x=jnp.reshape(x, (n_forward_pass*batch_size, flat_event_shape)),
+                                               log_w=log_w.flatten(),
+                                               log_q_old=log_q.flatten())
 
-        return TrainStateWithBuffer(flow_params=flow_params, key=key3, opt_state=opt_state,
+        return TrainStateWithBuffer(params=flow_params, key=key4, opt_state=opt_state,
                                     smc_state=smc_state, buffer_state=buffer_state)
 
     def one_gradient_update(carry: Tuple[AugmentedFlowParams, optax.OptState], xs: Tuple[chex.Array, chex.Array]):
@@ -138,7 +143,7 @@ def build_fab_with_buffer_init_step_fns(
                                                                       n_updates_per_smc_forward_pass)
         # Perform sgd steps on flow.
         (new_flow_params, new_opt_state), (infos, log_w_adjust, log_q_old) = jax.lax.scan(
-            one_gradient_update, init=(state.flow_params, state.opt_state), xs=(x_buffer, log_q_old_buffer),
+            one_gradient_update, init=(state.params, state.opt_state), xs=(x_buffer, log_q_old_buffer),
             length=n_updates_per_smc_forward_pass
         )
         # Adjust samples in the buffer.
@@ -152,12 +157,14 @@ def build_fab_with_buffer_init_step_fns(
         # Run smc and add samples to the buffer. Note this is done with the flow params before they were updated so that
         # this can occur in parallel (jax will do this after compilation).
         key, subkey = jax.random.split(key)
-        sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(state, subkey)
+        sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(params=state.params,
+                                                                            smc_state=state.smc_state, key=subkey,
+                                                                            unflatten_output=False)
         info.update(smc_info)
 
         buffer_state = buffer.add(x=x_smc, log_w=log_w, log_q=log_q, buffer_state=buffer_state)
 
-        new_state = TrainStateWithBuffer(flow_params=new_flow_params, key=key, opt_state=new_opt_state,
+        new_state = TrainStateWithBuffer(params=new_flow_params, key=key, opt_state=new_opt_state,
                                          smc_state=smc_state, buffer_state=buffer_state)
         return new_state, info
 
