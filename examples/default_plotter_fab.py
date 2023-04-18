@@ -56,7 +56,7 @@ def make_default_plotter(
         params = state.params
         key1, key2 = jax.random.split(key)
         # Get samples from flow and AIS.
-        flow_samples, ais_samples, log_w = ais_forward(state, key1)[:3]
+        flow_samples, ais_samples, log_w = ais_forward(state.params, state.smc_state, key1)[:3]
 
         # Process samples.
         pos_x_flow, pos_a_flow, a_min_x_flow = process_samples(flow_samples)

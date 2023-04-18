@@ -9,6 +9,7 @@ import optax
 
 from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.utils.graph import setup_flat_log_prob
+from utils.optimize import IgnoreNanOptState
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
 
@@ -34,6 +35,28 @@ class TrainStateNoBuffer(NamedTuple):
     smc_state: SMCState
 
 
+def flat_log_prob_components(log_p_x: LogProbFn, flow: AugmentedFlow, params: AugmentedFlowParams,
+                             features_with_multiplicity: chex.Array, event_shape: chex.Shape):
+    def flow_log_prob_apply(params, x):
+        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
+
+    def log_q_fn(x: chex.Array) -> chex.Array:
+        return flow_log_prob_apply(params, x)
+
+    flatten, unflatten, log_q_flat_fn = setup_flat_log_prob(log_q_fn, event_shape)
+
+    def log_p_flat_fn(x: chex.Array):
+        x = unflatten(x)
+        x, a = jnp.split(x, [1, ], axis=-2)
+        x = jnp.squeeze(x, axis=-2)
+        log_prob_x = log_p_x(x)
+        log_prob_augmented = flow.aux_target_log_prob_apply(
+            params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
+        return log_prob_x + log_prob_augmented
+
+    return flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply
+
+
 def build_smc_forward_pass(
         flow: AugmentedFlow,
         log_p_x: LogProbFn,
@@ -44,31 +67,19 @@ def build_smc_forward_pass(
     features_with_multiplicity = features[:, None]
     n_nodes = features.shape[0]
 
-    def flow_log_prob_apply(params, x):
-        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
-
     event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
 
-    def smc_forward_pass(state: TrainStateNoBuffer, key: chex.PRNGKey):
-        def log_q_fn(x: chex.Array) -> chex.Array:
-            return flow_log_prob_apply(state.params, x)
+    def smc_forward_pass(params: AugmentedFlowParams, smc_state: SMCState, key: chex.PRNGKey):
+        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+            log_p_x=log_p_x, flow=flow, params=params, features_with_multiplicity=features_with_multiplicity,
+            event_shape=event_shape
+        )
 
-        flatten, unflatten, log_q_flat_fn = setup_flat_log_prob(log_q_fn, event_shape)
-
-        def log_p_flat_fn(x: chex.Array):
-            x = unflatten(x)
-            x, a = jnp.split(x, [1, ], axis=-2)
-            x = jnp.squeeze(x, axis=-2)
-            log_prob_x = log_p_x(x)
-            log_prob_augmented = flow.aux_target_log_prob_apply(
-                state.params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
-            return log_prob_x + log_prob_augmented
-
-        sample_flow = flow.sample_apply(state.params, features, key, (batch_size,))
+        sample_flow = flow.sample_apply(params, features, key, (batch_size,))
         x0 = flatten(sample_flow.positions)
-        point, log_w, smc_state, smc_info = smc.step(x0, state.smc_state, log_q_flat_fn, log_p_flat_fn)
+        point, log_w, smc_state, smc_info = smc.step(x0, smc_state, log_q_flat_fn, log_p_flat_fn)
         x_smc = unflatten(point.x)
-        return sample_flow.positions, x_smc, log_w, smc_state, smc_info
+        return sample_flow.positions, x_smc, log_w, point.log_q, smc_state, smc_info
 
     return smc_forward_pass
                                                              
@@ -87,9 +98,8 @@ def build_fab_no_buffer_init_step_fns(
     # Setup smc forward pass.
     smc_forward = build_smc_forward_pass(flow, log_p_x, features, smc, batch_size)
     features_with_multiplicity = features[:, None]
-    def flow_log_prob_apply(params, x):
-        return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
 
+    event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
 
     def init(key: chex.PRNGKey) -> TrainStateNoBuffer:
         """Initialise the flow, optimizer and smc states."""
@@ -103,11 +113,16 @@ def build_fab_no_buffer_init_step_fns(
     @jax.jit
     @chex.assert_max_traces(4)
     def step(state: TrainStateNoBuffer) -> Tuple[TrainStateNoBuffer, Info]:
+        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+            log_p_x=log_p_x, flow=flow, params=state.params, features_with_multiplicity=features_with_multiplicity,
+            event_shape=event_shape
+        )
+
         key, subkey = jax.random.split(state.key)
         info = {}
 
         # Run smc.
-        sample_flow, x_smc, log_w, smc_state, smc_info = smc_forward(state, subkey)
+        sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(state.params, state.smc_state, subkey)
         info.update(smc_info)
 
         # Estimate loss and update flow params.
