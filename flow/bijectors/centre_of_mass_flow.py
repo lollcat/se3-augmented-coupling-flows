@@ -28,8 +28,6 @@ class CentreOfMassFlow(BijectorWithExtra):
         n_nodes, multiplicity, dim = x.shape
         n_augmented = multiplicity - 1
 
-        centre_of_mass_x0 = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
-        x = x - centre_of_mass_x0  # Make sure everything is relative to x0 (the non-augmented variable).
         x0 = x[:, 0:1]
         chex.assert_shape(x0, (n_nodes, 1, dim))
 
