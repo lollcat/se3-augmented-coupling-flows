@@ -15,8 +15,9 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
                       log_p_x,
                       features: GraphFeatures,
                       batch_size: int) -> dict:
-    """Evaluate the ESS of the flow, and AIS. We manually turn off the resampling step of SMC so that we can
-    get it's effective sample size."""
+    """Evaluate the ESS of the flow, and AIS. """
+    assert smc.alpha == 1.  # Make sure target is set to p.
+    assert smc.use_resampling is False  # Make sure we are doing AIS, not SMC.
 
     smc_forward = build_smc_forward_pass(flow, log_p_x, features, smc, batch_size)
 

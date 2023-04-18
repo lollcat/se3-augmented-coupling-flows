@@ -127,6 +127,11 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
 
+        # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+        smc_eval = build_smc(transition_operator=transition_operator,
+                        n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
+                        alpha=1., use_resampling=False)
+
         @jax.jit
         def evaluation_fn(state: Union[TrainStateNoBuffer, TrainStateWithBuffer], key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
@@ -135,7 +140,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                     batch_size=cfg.training.eval_batch_size)
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
-                smc=smc, batch_size=cfg.fab.eval_fab_batch_size,
+                smc=smc_eval, batch_size=cfg.fab.eval_fab_batch_size,
                 log_p_x=target_log_p_x_fn,
                 features=train_data.features[0],
             )
