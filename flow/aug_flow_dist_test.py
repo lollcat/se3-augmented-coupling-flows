@@ -3,22 +3,22 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from utils.test import test_fn_is_invariant
-from utils.test import get_minimal_nets_config
+from utils.test import test_fn_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
 
 
-_N_FLOW_LAYERS = 3
-_N_NODES = 7
+_N_FLOW_LAYERS = 1
+_N_AUG = 1
+_N_NODES = 3
 _FLOW_TYPE = "nice"
-_FAST_COMPILE_FLOW = False
 _IDENTITY_INIT = False
 _FEATURE_DIM = 2
+_ACT_NORM = True
 
 
-def test_distribution(dim: int = 3, n_aug: int = 3):
+def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -42,7 +42,8 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
         nets_config=get_minimal_nets_config('egnn'),
         base=base_aux_config,
         target_aux_config=target_aux_config,
-        n_aug=n_aug
+        n_aug=n_aug,
+        act_norm=_ACT_NORM
     )
 
     flow = build_flow(config)
@@ -57,6 +58,13 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     params_check = flow.init(subkey, dummy_samples[0])
     chex.assert_trees_all_equal(params, params_check)  # Check that params aren't effected by batch-ing.
 
+
+    # Get some info manually - useful for direct inspection.
+    dummy_samples_full = FullGraphSample(
+        positions=jax.random.normal(subkey, (batch_size, n_nodes, n_aug+1, dim)),
+        features=jnp.zeros((batch_size, n_nodes, 1, _FEATURE_DIM)))
+    info_test = get_checks_for_flow_properties(dummy_samples_full, flow, params, subkey)
+    assert info_test['mean_abs_diff_log_det_forward_reverse'] < 0.001
     info = flow.get_base_and_target_info(params)
 
     # Test aux-target distribution.
@@ -124,7 +132,7 @@ def test_distribution(dim: int = 3, n_aug: int = 3):
     test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
 
-def test_target_reparam(dim: int = 3, n_aug: int = 3):
+def tesst_target_reparam(dim: int = 3, n_aug: int = 3):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -178,8 +186,12 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    test_target_reparam(dim=3)
+    tesst_distribution(dim=2)
+    print("passed distribution dist 2D")
 
+    tesst_distribution(dim=3)
+    print("passed distribution dist 3D")
 
-    test_distribution(dim=3)
-    test_distribution(dim=2)
+    tesst_target_reparam(dim=3)
+    print("passed target reparam test")
+

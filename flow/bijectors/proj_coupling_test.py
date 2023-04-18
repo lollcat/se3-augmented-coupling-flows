@@ -14,6 +14,8 @@ def tesst_bijector_with_proj(
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
 
+    orth_type = ['loewdin', 'gram-schmidt'][0]
+
     def make_flow():
         bijectors = []
         for i in range(n_layers):
@@ -29,7 +31,8 @@ def tesst_bijector_with_proj(
                 nets_config=nets_config,
                 add_small_identity=False,
                 num_bins=4,
-                n_inner_transforms=3
+                n_inner_transforms=1,
+                orthogonalization_method=orth_type
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
@@ -57,11 +60,13 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
     for transform_type in ["spline", "real_nvp"]:
+        tesst_bijector_with_proj(transform_type=transform_type, dim=3)
+        print('passed test in 3D')
+
         tesst_bijector_with_proj(transform_type=transform_type, dim=2)
         print('passed test in 2D')
 
-        tesst_bijector_with_proj(transform_type=transform_type, dim=3)
-        print('passed test in 3D')
+
 
 
 

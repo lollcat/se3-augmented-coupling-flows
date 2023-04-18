@@ -8,22 +8,11 @@ import jax.numpy as jnp
 from molboil.utils.numerical import rotate_2d
 
 from utils.numerical import vector_rejection, safe_norm
-from flow.distrax_with_extra import BijectorWithExtra, Array, BlockWithExtra, Extra
+from flow.distrax_with_extra import BijectorWithExtra, Array, Extra
+from flow.bijectors.proj_flow_layer import ProjFlow
 
 BijectorParams = chex.Array
 
-
-def project(x, origin, change_of_basis_matrix):
-    chex.assert_rank(x, 1)
-    chex.assert_rank(change_of_basis_matrix, 2)
-    chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
-    return change_of_basis_matrix.T @ (x - origin)
-
-def unproject(x, origin, change_of_basis_matrix):
-    chex.assert_rank(x, 1)
-    chex.assert_rank(change_of_basis_matrix, 2)
-    chex.assert_equal_shape((x, origin, change_of_basis_matrix[0], change_of_basis_matrix[:, 0]))
-    return change_of_basis_matrix @ x + origin
 
 
 
@@ -76,18 +65,22 @@ def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: b
 class ProjSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
-                 event_ndims: int,
                  graph_features: chex.Array,
                  get_basis_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams, int], Union[BijectorWithExtra, distrax.Bijector]],
                  origin_on_coupled_pair: bool = True,
                  swap: bool = False,
-                 split_axis: int = -1,
                  add_small_identity: bool = True,
-                 orthogonalization_method: str = 'gram-schmidt',
+                 orthogonalization_method: str = 'loewdin',
                  n_inner_transforms: int = 1,
+                 event_ndims: int = 3,
+                 split_axis: int = -2,
                  ):
         super().__init__(event_ndims_in=event_ndims, is_constant_jacobian=False)
+        if event_ndims != 3:
+            raise NotImplementedError("Only implemented for 3 event ndims")
+        if split_axis != -2:
+            raise NotImplementedError("Only implemented for split axis on the multiplicity axis (-2")
         if split_index < 0:
           raise ValueError(
               f'The split index must be non-negative; got {split_index}.')
@@ -113,36 +106,44 @@ class ProjSplitCoupling(BijectorWithExtra):
         self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
-    def _split(self, x: Array) -> Tuple[Array, Array]:
+    def adjust_centering_pre_proj(self, x: chex.Array) -> chex.Array:
+        """x[:, 0, :] is constrained to ZeroMean Gaussian. But if `self._swap` is True, then we
+        change this constraint to be with respect to x2[:, 0, :] instead."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+    def adjust_centering_post_proj(self, x: chex.Array) -> chex.Array:
+        """Move centre of mass to be on the first multiplicity again if `self._swap` is True."""
+        chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
+        if self._swap:
+            centre_of_mass = jnp.mean(x[:, 0], axis=0, keepdims=True)[:, None, :]
+            return x - centre_of_mass
+        else:
+            return x
+
+
+    def _split(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
         if self._swap:
-          x1, x2 = x2, x1
+            x1, x2 = x2, x1
         return x1, x2
 
-    def _recombine(self, x1: Array, x2: Array) -> Array:
+    def _recombine(self, x1: chex.Array, x2: chex.Array) -> chex.Array:
         if self._swap:
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
 
-    def _inner_bijector(self, params: BijectorParams, transform_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
+    def _inner_bijector(self, params: BijectorParams, transform_index: int,
+                        origin: chex.Array, change_of_basis_matrix: chex.Array) -> \
+            Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
-      bijector = self._bijector(params, transform_index)
-      if bijector.event_ndims_in != bijector.event_ndims_out:
-          raise ValueError(
-              f'The inner bijector must have `event_ndims_in==event_ndims_out`. '
-              f'Instead, it has `event_ndims_in=={bijector.event_ndims_in}` and '
-              f'`event_ndims_out=={bijector.event_ndims_out}`.')
-      extra_ndims = self.event_ndims_in - bijector.event_ndims_in
-      if extra_ndims < 0:
-          raise ValueError(
-              f'The inner bijector can\'t have more event dimensions than the '
-              f'coupling bijector. Got {bijector.event_ndims_in} for the inner '
-              f'bijector and {self.event_ndims_in} for the coupling bijector.')
-      elif extra_ndims > 0:
-          if isinstance(bijector, BijectorWithExtra):
-              bijector = BlockWithExtra(bijector, extra_ndims)
-          else:
-              bijector = distrax.Block(bijector, extra_ndims)
+      inner_inner_bijector = self._bijector(params, transform_index)  # e.g. spline or rnvp
+      bijector = ProjFlow(inner_bijector=inner_inner_bijector, origin=origin,
+                          change_of_basis_matrix=change_of_basis_matrix)
       return bijector
 
     def get_basis_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
@@ -169,7 +170,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         extra = self.get_extra(vectors)
 
         chex.assert_shape(origin, (n_nodes, multiplicity, self.n_inner_transforms, dim))
-        #chex.assert_shape(vectors, (n_nodes, multiplicity, self.n_inner_transforms, dim-1, dim))
+        chex.assert_shape(change_of_basis_matrices, (n_nodes, multiplicity, self.n_inner_transforms, dim, dim))
         return origin, change_of_basis_matrices, h, extra
 
     def get_vector_info_single(self, basis_vectors: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
@@ -210,7 +211,11 @@ class ProjSplitCoupling(BijectorWithExtra):
 
     def forward_and_log_det_with_extra_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes y = f(x) and log|det J(f)(x)|."""
+        chex.assert_rank(x, 3)
+        dim = x.shape[-1]
+
         self._check_forward_input_shape(x)
+        x = self.adjust_centering_pre_proj(x)
         x1, x2 = self._split(x)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(x1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
@@ -220,19 +225,22 @@ class ProjSplitCoupling(BijectorWithExtra):
         for i in range(self.n_inner_transforms):
             origin = origins[:, :, i]
             change_of_basis_matrix = change_of_basis_matrices[:, :, i]
-            x2_proj = jax.vmap(jax.vmap(project))(x2, origin, change_of_basis_matrix)
-            x2, logdet = self._inner_bijector(bijector_feat_in, i).forward_and_log_det(x2_proj)
-            # inner_bijector = self._inner_bijector(bijector_feat_in); inner_bijector._bijector._x_pos
-            # inner_bijector.forward_and_log_det(jnp.ones_like(x2_proj)*20)
-            x2 = jax.vmap(jax.vmap(unproject))(x2, origin, change_of_basis_matrix)
-            log_det_total = log_det_total + logdet
+            inner_bijector = self._inner_bijector(bijector_feat_in, i, origin, change_of_basis_matrix)
+            x2, log_det_inner = inner_bijector.forward_and_log_det(x2)
+            log_det_total = log_det_total + log_det_inner
 
         y2 = x2
-        return self._recombine(x1, y2), log_det_total, extra
+        y = self._recombine(x1, y2)
+        y = self.adjust_centering_post_proj(y)
+        return y, log_det_total, extra
 
     def inverse_and_log_det_with_extra_single(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
         self._check_inverse_input_shape(y)
+        chex.assert_rank(y, 3)
+        dim = y.shape[-1]
+
+        y = self.adjust_centering_post_proj(y)
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
@@ -242,13 +250,14 @@ class ProjSplitCoupling(BijectorWithExtra):
         for i in reversed(range(self.n_inner_transforms)):
             origin = origins[:, :, i]
             change_of_basis_matrix = change_of_basis_matrices[:, :, i]
-            y2_proj = jax.vmap(jax.vmap(project))(y2, origin, change_of_basis_matrix)
-            y2, logdet = self._inner_bijector(bijector_feat_in, i).inverse_and_log_det(y2_proj)
-            y2 = jax.vmap(jax.vmap(unproject))(y2, origin, change_of_basis_matrix)
-            log_det_total = log_det_total + logdet
+            inner_bijector = self._inner_bijector(bijector_feat_in, i, origin, change_of_basis_matrix)
+            y2, log_det_inner = inner_bijector.inverse_and_log_det(y2)
+            log_det_total = log_det_total + log_det_inner
 
         x2 = y2
-        return self._recombine(y1, x2), log_det_total, extra
+        x = self._recombine(y1, x2)
+        x = self.adjust_centering_post_proj(x)
+        return x, log_det_total, extra
 
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         return self.forward_and_log_det_with_extra_single(x, graph_features)[:2]

@@ -10,17 +10,17 @@ target:
     train: target/data/aldp_500K_train_mini.h5
     val: target/data/aldp_500K_test_mini.h5
   aux:
-    global_centering: false
+    conditioned_on_x: true
     scale_init: 0.1
     trainable_augmented_scale: false
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     train_x_scale: false
     aux:
-      global_centering: false
+      conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: false
   dim: 3
@@ -40,6 +40,7 @@ flow:
       num_bins: 8
       lower: -2.
       upper: 2.
+      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
@@ -61,7 +62,9 @@ training:
     peak_lr: 1e-4 # can be null
     end_lr: 0. # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 10000.0
+    max_global_norm: null
+    max_param_grad: null
+    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
   batch_size: 64
