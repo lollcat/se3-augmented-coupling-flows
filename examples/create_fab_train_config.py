@@ -104,7 +104,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
 
     if cfg.fab.with_buffer:
         print("running fab with buffer")
-        assert cfg.fab.n_updates_per_smc_forward_pass*cfg.training.batch_size < cfg.fab.buffer_min_length
+        assert cfg.fab.n_updates_per_smc_forward_pass*cfg.training.batch_size <= cfg.fab.buffer_min_length
         buffer = build_prioritised_buffer(dim=dim_total, max_length=cfg.fab.buffer_max_length,
                                           min_length_to_sample=cfg.fab.buffer_min_length)
         init_fn, update_fn = build_fab_with_buffer_init_step_fns(
