@@ -27,7 +27,7 @@ fab:
   alpha: 2.  # alpha-divergence param
   n_intermediate_distributions: 2
   spacing_type: linear
-  eval_fab_batch_size: 1000
+  eval_fab_batch_size: 100
 
 
 target:
