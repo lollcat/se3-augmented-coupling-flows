@@ -50,7 +50,7 @@ flow:
       trainable_augmented_scale: false
   dim: 3
   nodes: 13
-  n_layers: 8
+  n_layers: 4
   identity_init: true
   type: spherical #  nice proj spherical
   kwargs:
