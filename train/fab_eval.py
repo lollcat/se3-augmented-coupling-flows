@@ -1,10 +1,13 @@
-from typing import Union
+from typing import Union, Tuple
 
 import chex
+import jax
+import jax.numpy as jnp
 from fabjax.sampling.smc import SequentialMonteCarloSampler
+from fabjax.sampling.resampling import log_effective_sample_size
 
 from flow.aug_flow_dist import AugmentedFlow, GraphFeatures
-from train.fab_train_no_buffer import TrainStateNoBuffer, build_smc_forward_pass
+from train.fab_train_no_buffer import TrainStateNoBuffer, flat_log_prob_components
 from train.fab_train_with_buffer import TrainStateWithBuffer
 
 
@@ -14,16 +17,36 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
                       smc: SequentialMonteCarloSampler,
                       log_p_x,
                       features: GraphFeatures,
-                      batch_size: int) -> dict:
+                      batch_size: int,
+                      inner_batch_size: int) -> dict:
     """Evaluate the ESS of the flow, and AIS. """
     assert smc.alpha == 1.  # Make sure target is set to p.
     assert smc.use_resampling is False  # Make sure we are doing AIS, not SMC.
 
-    smc_forward = build_smc_forward_pass(flow, log_p_x, features, smc, batch_size)
+    # Setup scan function.
+    features_with_multiplicity = features[:, None]
+    n_nodes = features.shape[0]
+    event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
+    features_with_multiplicity = features[:, None]
+    flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+        log_p_x=log_p_x, flow=flow, params=state.params, features_with_multiplicity=features_with_multiplicity,
+        event_shape=event_shape
+    )
+    def inner_fn(carry: None, xs: chex.PRNGKey) -> Tuple[None, Tuple[chex.Array, chex.Array]]:
+        """Perform SMC forward pass and grab just the importance weights."""
+        key = xs
+        sample_flow = flow.sample_apply(state.params, features, key, (batch_size,))
+        x0 = flatten(sample_flow.positions)
+        point, log_w, smc_state, smc_info = smc.step(x0, state.smc_state, log_q_flat_fn, log_p_flat_fn)
+        log_w_flow = point.log_p - point.log_q
+        return None, (log_w_flow, log_w)
 
+    # Run scan function.
+    n_batches = (batch_size // inner_batch_size) + 1
+    _, (log_w_flow, log_w_ais) = jax.lax.scan(inner_fn, init=None, xs=jax.random.split(key, n_batches))
 
-    sample_flow, x_smc, log_w, log_q, smc_state, smc_info = smc_forward(state.params, state.smc_state, key)
+    # Compute metrics
     info = {}
-    info.update(eval_ess_flow=smc_info['ess_q_p'],
-                eval_ess_ais=smc_info['ess_smc_final'])
+    info.update(eval_ess_flow=jnp.exp(log_effective_sample_size(log_w_flow.flatten())),
+                eval_ess_ais=jnp.exp(log_effective_sample_size(log_w_ais.flatten())))
     return info

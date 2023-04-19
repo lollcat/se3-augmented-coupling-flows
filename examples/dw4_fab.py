@@ -35,7 +35,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
-    cfg.fab.eval_fab_batch_size = 32
+    cfg.fab.eval_inner_batch_size = 32
+    cfg.fab.eval_total_batch_size = 64
     cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
     cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
     cfg.logger = DictConfig({"list_logger": None})
@@ -67,7 +68,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
     # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)

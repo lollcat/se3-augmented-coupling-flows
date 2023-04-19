@@ -140,9 +140,11 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
                     batch_size=cfg.training.eval_batch_size)
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
-                smc=smc_eval, batch_size=cfg.fab.eval_fab_batch_size,
+                smc=smc_eval,
                 log_p_x=target_log_p_x_fn,
                 features=train_data.features[0],
+                batch_size=cfg.fab.eval_total_batch_size,
+                inner_batch_size=cfg.fab.eval_inner_batch_size
             )
             eval_info.update(eval_info_fab)
             return eval_info

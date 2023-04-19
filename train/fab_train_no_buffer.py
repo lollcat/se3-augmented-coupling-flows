@@ -66,7 +66,6 @@ def build_smc_forward_pass(
 
     features_with_multiplicity = features[:, None]
     n_nodes = features.shape[0]
-
     event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
 
     def smc_forward_pass(params: AugmentedFlowParams, smc_state: SMCState, key: chex.PRNGKey,
