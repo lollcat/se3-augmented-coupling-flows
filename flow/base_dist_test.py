@@ -6,7 +6,7 @@ from flow.x_base_dist import assert_mean_zero
 from utils.test import assert_is_invariant
 
 
-def tesst_base_distribution():
+def test_base_distribution():
     """Test that the base distribution does not smoke. And that it's log prob is invariant to
     rotation and translation."""
     key = jax.random.PRNGKey(0)
@@ -40,4 +40,4 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    tesst_base_distribution()
+    test_base_distribution()
