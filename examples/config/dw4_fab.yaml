@@ -12,7 +12,7 @@ fab:
   n_updates_per_smc_forward_pass: 4
   w_adjust_clip: 10.
   use_resampling: true
-  use_hmc: false
+  use_hmc: true
   transition_operator:
     hmc:
       n_outer_steps: 1
