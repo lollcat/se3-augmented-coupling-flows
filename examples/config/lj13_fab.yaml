@@ -5,26 +5,49 @@ hydra:
   job:
     chdir: false
 
+fab:
+  with_buffer: true
+  buffer_max_length: 5000
+  buffer_min_length: 100
+  n_updates_per_smc_forward_pass: 4
+  w_adjust_clip: 10.
+  use_resampling: true
+  use_hmc: false
+  transition_operator:
+    hmc:
+      n_outer_steps: 1
+      init_step_size: 1e-3
+      target_p_accept: 0.65
+      tune_step_size: true
+    metropolis:
+      n_outer_steps: 1
+      init_step_size: 1.
+      target_p_accept: 0.65
+      tune_step_size: true
+  alpha: 2.  # alpha-divergence param
+  n_intermediate_distributions: 4
+  spacing_type: linear
+  eval_fab_batch_size: 1000
+
+
 target:
-  data:
-    train: target/data/aldp_500K_train_mini.h5
-    val: target/data/aldp_500K_test_mini.h5
   aux:
     conditioned_on_x: true
     scale_init: 1.0
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
-  act_norm: false
+  n_aug: 1
+  act_norm: true
   base:
-    train_x_scale: false
+    train_x_scale: true
+    x_scale_init: 1.0
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: false
   dim: 3
-  nodes: 22
+  nodes: 13
   n_layers: 8
   identity_init: true
   type: spherical #  nice proj spherical
@@ -38,8 +61,8 @@ flow:
       n_inner_transforms: 3
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -10.
-      upper: 10.
+      lower: -2.
+      upper: 2.
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
@@ -49,53 +72,56 @@ flow:
       mlp_units: [ 32, 32 ]
       n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
+    e3gnn:
+      name: e3gnn
+      n_blocks: 3 # number of layers
+      mlp_units: [32, 32]
+      n_vectors_hidden_per_vec_in: 4
+      n_invariant_feat_hidden: 32
+      get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [64,64]
+      mlp_units: [32, 32]
       stable: true
 
 
 training:
   optimizer:
-    init_lr: 0.
+    init_lr: 1e-4
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 1e-4 # can be null
-    end_lr: 0. # can be null
+    peak_lr: 3e-4
+    end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: null
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
-  batch_size: 64
+  batch_size: 32
   eval_batch_size: 128
-  plot_batch_size: 1000
+  plot_batch_size: 128
   seed: 0
-  train_set_size: null
-  test_set_size: null
+  train_set_size: 1000
+  test_set_size: 1000
   n_checkpoints: 0
-  n_eval: 20
+  n_eval: 10
   K_marginal_log_lik: 20
   save: true
-  save_dir: aldp_results
-  resume: true
-  runtime_limit: 23.5
+  save_dir: lj13_results
+  resume: false
+  runtime_limit: null
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
 
-
-eval:
-  plot_n_batches: 10
-
-
 logger:
 #  list_logger: null
-  pandas_logger:
-    save_period: 1 # how often to save the pandas dataframe as a csv
-#  wandb:
-#    name: aldp_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
-#    project: fab
-#    entity: flow-ais-bootstrap
-#    tags: [aldp,loll]
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: lj13_${flow.type}_${flow.type}
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [lj13]
+
