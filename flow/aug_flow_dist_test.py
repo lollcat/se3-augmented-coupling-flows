@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from utils.test import test_fn_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
+from utils.test import assert_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
@@ -129,7 +129,7 @@ def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
         log_probs = flow.log_prob_apply(params, x)
         return log_probs
 
-    test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
+    assert_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
 
 def tesst_target_reparam(dim: int = 3, n_aug: int = 3):

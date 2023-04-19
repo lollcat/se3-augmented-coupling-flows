@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from chex import PRNGKey, Array
 
 from flow.conditional_dist import ConditionalCentreofMassGaussian
-from flow.centre_of_mass_gaussian import CentreGravityGaussian
+from flow.x_base_dist import CentreGravityGaussian
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 
 

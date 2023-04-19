@@ -2,8 +2,8 @@ import chex
 import jax
 
 from flow.base_dist import JointBaseDistribution
-from flow.centre_of_mass_gaussian import assert_mean_zero
-from utils.test import test_fn_is_invariant
+from flow.x_base_dist import assert_mean_zero
+from utils.test import assert_is_invariant
 
 
 def tesst_base_distribution():
@@ -26,7 +26,7 @@ def tesst_base_distribution():
     # Log prob: Test that it is invariant to translation and rotation.
     log_prob = dist.log_prob(sample)
     chex.assert_shape(log_prob, (batch_size,))
-    test_fn_is_invariant(invariant_fn=dist.log_prob, key=key, event_shape=shape[1:])
+    assert_is_invariant(invariant_fn=dist.log_prob, key=key, event_shape=shape[1:])
 
 
     # Single sample and log prob: Test that it does not smoke.

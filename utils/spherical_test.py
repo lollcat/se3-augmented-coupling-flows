@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import chex
 import jax
 
-from molboil.utils.test import test_fn_is_invariant, test_fn_is_equivariant
+from molboil.utils.test import assert_is_invariant, assert_is_equivariant
 
 from utils.spherical import to_spherical_and_log_det, to_cartesian_and_log_det, _to_polar_and_log_det, polar_to_cartesian_and_log_det
 
@@ -46,14 +46,14 @@ def tesst_to_spherical_is_invariant():
 
     def invariant_fn(x_and_ref):
         # Note: Invariant to rotations to both x and reference, hence package them as single input for this test.
-        chex.assert_shape(x_and_ref, (4, 1, 3))  # Need multiplicity axis for `test_fn_is_invariant`.
+        chex.assert_shape(x_and_ref, (4, 1, 3))  # Need multiplicity axis for `assert_is_invariant`.
         x_and_ref = jnp.squeeze(x_and_ref, axis=1)
         x, reference = jnp.split(x_and_ref, [1,], axis=0)
         x = jnp.squeeze(x, axis=0)
         return to_spherical_and_log_det(x, reference)[0]
 
     event_shape = (4, 1, 3)
-    test_fn_is_invariant(invariant_fn = invariant_fn, key=key, event_shape=event_shape, translate=True)
+    assert_is_invariant(invariant_fn = invariant_fn, key=key, event_shape=event_shape, translate=True)
 
 
 def tesst_to_spherical_and_back_is_equivariant():
@@ -62,7 +62,7 @@ def tesst_to_spherical_and_back_is_equivariant():
 
     def equivariant_fn(x_and_ref):
         # Note: Invariant to rotations to both x and reference, hence package them as single input for this test.
-        chex.assert_shape(x_and_ref, (4, 1, 3))  # Need multiplicity axis for `test_fn_is_invariant`.
+        chex.assert_shape(x_and_ref, (4, 1, 3))  # Need multiplicity axis for `assert_is_invariant`.
         x_and_ref = jnp.squeeze(x_and_ref, axis=1)
         x, reference = jnp.split(x_and_ref, [1,], axis=0)
         x = jnp.squeeze(x, axis=0)
@@ -73,7 +73,7 @@ def tesst_to_spherical_and_back_is_equivariant():
 
 
     event_shape = (4, 1, 3)
-    test_fn_is_equivariant(equivariant_fn=equivariant_fn, key=key, event_shape=event_shape, translate=True)
+    assert_is_equivariant(equivariant_fn=equivariant_fn, key=key, event_shape=event_shape, translate=True)
 
 
 
