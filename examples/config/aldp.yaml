@@ -18,7 +18,10 @@ flow:
   n_aug: 1
   act_norm: false
   base:
-    train_x_scale: false
+    x_dist:
+      type: centre_gravity_gaussian
+      a: 0.3
+      trainable_mode_scale: false
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}

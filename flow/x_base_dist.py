@@ -69,7 +69,7 @@ class HarmoticPotential(distrax.Distribution):
         value = remove_mean(value)
         value = self.P.T @ value
         value = value / self.std[:, None]
-        value = value[1:] / jnp.exp(self.log_mode_scale)[:, None]
+        value = value[..., 1:, :] / jnp.exp(self.log_mode_scale)[:, None]
         log_p = - 0.5 * jnp.sum(value**2, axis=(-2, -1)) - self.log_det \
                 - self.log_Z - self.dim * jnp.sum(self.log_mode_scale)
         return log_p
