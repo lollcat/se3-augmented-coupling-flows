@@ -52,7 +52,7 @@ flow:
   n_layers: 4
   act_norm: false
   identity_init: true
-  type: proj #  nice proj spherical
+  type: spherical #  nice proj spherical
   kwargs:
     n_inner_transforms: 1
     spherical:
