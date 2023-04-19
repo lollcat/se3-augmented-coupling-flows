@@ -1,9 +1,10 @@
 import chex
 import jax
 
+from molboil.utils.test import assert_is_invariant
+
 from flow.base_dist import JointBaseDistribution
 from flow.x_base_dist import assert_mean_zero
-from utils.test import assert_is_invariant
 
 
 def test_base_distribution():

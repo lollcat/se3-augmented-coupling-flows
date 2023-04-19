@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from utils.test import assert_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
+from molboil.utils.test import assert_is_invariant
+
+from utils.test import get_minimal_nets_config, get_checks_for_flow_properties
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
