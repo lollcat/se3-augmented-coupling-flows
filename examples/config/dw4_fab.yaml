@@ -7,16 +7,16 @@ hydra:
 
 fab:
   with_buffer: true
-  buffer_max_length: 1000
-  buffer_min_length: 100
-  n_updates_per_smc_forward_pass: 4
+  buffer_max_length: 3200 # batch size times 100
+  buffer_min_length: 320  # batch size times 10
+  n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
   use_resampling: true
   use_hmc: true
   transition_operator:
     hmc:
       n_outer_steps: 1
-      init_step_size: 1e-3
+      init_step_size: 1.
       target_p_accept: 0.65
       tune_step_size: true
     metropolis:
@@ -25,7 +25,7 @@ fab:
       target_p_accept: 0.65
       tune_step_size: true
   alpha: 2.  # alpha-divergence param
-  n_intermediate_distributions: 4
+  n_intermediate_distributions: 2
   spacing_type: linear
   eval_fab_batch_size: 1000
 
@@ -48,13 +48,13 @@ flow:
       trainable_augmented_scale: false
   dim: 2
   nodes: 4
-  n_aug: 5
+  n_aug: 1
   n_layers: 4
   act_norm: false
   identity_init: true
   type: proj #  nice proj spherical
   kwargs:
-    n_inner_transforms: 2
+    n_inner_transforms: 1
     spherical:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -82,7 +82,7 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-5
+    init_lr: 3e-4
     optimizer_name: adam
     use_schedule: false
     peak_lr: 1e-3 # can be null
@@ -92,8 +92,8 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 50
-  batch_size: 200
+  n_epoch: 2000
+  batch_size: 32
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
@@ -117,8 +117,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_${flow.type}
+    name: dw4_fab_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4]
+    tags: [dw4,fab]
 
