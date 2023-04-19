@@ -2,7 +2,7 @@ from typing import Any
 
 from functools import partial
 import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, open_dict
 import jax.numpy as jnp
 import jax
 
@@ -30,7 +30,8 @@ def run(cfg: DictConfig):
             [6, 8], [8, 9], [8, 10], [10, 11], [10, 12], [10, 13], [8, 14],
             [14, 15], [14, 16], [16, 17], [16, 18], [18, 19], [18, 20], [18, 21]
         ]
-        OmegaConf.update(cfg, 'flow.base.x_dist', {'edges': edges}, merge=True)
+        with open_dict(cfg):
+            cfg.flow.base.x_dist.edges = edges
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
