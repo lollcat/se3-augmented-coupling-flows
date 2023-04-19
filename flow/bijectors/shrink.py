@@ -1,132 +1,152 @@
-from typing import Optional, Tuple, Callable
+from typing import Callable, Union, Optional, Tuple
 
+import chex
+import distrax
+import jax.nn
 import jax.numpy as jnp
 import haiku as hk
-import chex
-import jax
 
-from flow.distrax_with_extra import SplitCouplingWithExtra, BijectorWithExtra
+from nets.conditioner_mlp import ConditionerHead
+from flow.distrax_with_extra import BijectorWithExtra
+from flow.bijectors.batch import BatchBijector
+from utils.numerical import inverse_softplus, safe_norm
 
-def per_particle_shift_forward(a: chex.Array, x: chex.Array, shift_interp: chex.Array) -> chex.Array:
-    """
-    Shift centre of mass along vector between aug-original centre of masses:
-    a = (a - alt_coords_global_mean)*centre_shift_interp + alt_coords_global_mean.
-    If shift interp is 1 then this is the identity transform. If shift interp is close to 0, then this moves
-    a very close to x.
+BijectorParams = Union[chex.Array]
 
-    The purpose of this flow is to allow the distribution of a (the augmented cooridnates)
-    to be at the right scale relative to x (original coordinates).
-    """
-    chex.assert_rank(a, 1)
-    chex.assert_equal_shape((a, x, shift_interp))
-    a = a * shift_interp + (1 - shift_interp) * x
-    return a
-
-def per_particle_shift_inverse(a: chex.Array, x: chex.Array, shift_interp: chex.Array) -> chex.Array:
-    chex.assert_rank(a, 1)
-    chex.assert_equal_shape((a, x, shift_interp))
-    a = (a - (1 - shift_interp) * x) / shift_interp
-    return a
-
-
-class ParticlePairShift(BijectorWithExtra):
+class IsotropicScalingFlow(BijectorWithExtra):
+    """A flow that scales the zero-mean sets of coordinates. I.e. acts on the x coords, and momentum coords."""
     def __init__(self,
-                 log_shift_interp: chex.Array,
-                 alt_coords: chex.Array,
-                 activation: Callable = jax.nn.softplus):
-        super().__init__(event_ndims_in=1, is_constant_jacobian=True)
-        self.alt_coords = alt_coords
-        if activation == jnp.exp:
-            self._centre_shift_interp = jnp.exp(log_shift_interp)
-            self._log_scale = log_shift_interp
-        else:
-            assert activation == jax.nn.softplus
-            inverse_softplus = lambda x: jnp.log(jnp.exp(x) - 1.)
-            log_centre_shift_interp_param = log_shift_interp + inverse_softplus(jnp.array(1.0))
-            self._centre_shift_interp = jax.nn.softplus(log_centre_shift_interp_param)
+                 conditioner: Callable[[chex.Array], BijectorParams],
+                 n_aug: int,
+                 dim: int,
+                 ):
+        super().__init__(event_ndims_in=3,
+                         event_ndims_out=3)
+        self.conditioner = conditioner
+        self.dim = dim
+        self.n_aug = n_aug
 
-            self._log_scale = jnp.log(jnp.abs(self._centre_shift_interp))
+    def get_scale_from_logit(self, logit: chex.Array) -> chex.Array:
+        """Compute the scaling factor (forced to be positive)."""
+        chex.assert_shape(logit, (self.n_aug + 1,))
 
-    def forward(self, x: chex.Array) -> chex.Array:
-        """Computes y = f(x)."""
-        chex.assert_equal_shape((x, self.alt_coords, self._centre_shift_interp))
-        if len(x.shape) == 3:
-            y = jax.vmap(jax.vmap(per_particle_shift_forward))(x, self.alt_coords, self._centre_shift_interp)
-        elif len(x.shape) == 4:
-            y = jax.vmap(jax.vmap(jax.vmap(per_particle_shift_forward)))(x, self.alt_coords, self._centre_shift_interp)
-        else:
-            raise Exception
-        chex.assert_equal_shape((y, x))
-        return y
+        # If params is initialised to 0 then this initialises the flow to the identity.
+        log_scaling = logit + inverse_softplus(jnp.array(1.))
+        scale = jax.nn.softplus(log_scaling)
 
-    def forward_log_det_jacobian(self, x: chex.Array) -> chex.Array:
-        """Computes log|det J(f)(x)|."""
-        return jnp.sum(self._log_scale, axis=-1)
+        return scale
 
-    def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
-        """Computes y = f(x) and log|det J(f)(x)|."""
-        return self.forward(x), self.forward_log_det_jacobian(x)
+    def split_to_zero_mean_point_clouds_and_centre_of_masses(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        chex.assert_rank(x, 3)
+        n_nodes, multiplicity, dim = x.shape
+        n_augmented = multiplicity - 1
 
-    def inverse(self, y: chex.Array) -> chex.Array:
-        """Computes x = f^{-1}(y)."""
-        chex.assert_equal_shape((y, self.alt_coords, self._centre_shift_interp))
-        if len(y.shape) == 3:
-            x = jax.vmap(jax.vmap(per_particle_shift_inverse))(y, self.alt_coords, self._centre_shift_interp)
-        elif len(y.shape) == 4:
-            x = jax.vmap(jax.vmap(jax.vmap(per_particle_shift_inverse)))(y, self.alt_coords, self._centre_shift_interp)
-        else:
-            raise Exception
-        chex.assert_equal_shape((y, x))
+        x0 = x[:, 0:1]
+        chex.assert_shape(x0, (n_nodes, 1, dim))
+
+        # Pull out the centre of masses as separate.
+        augmented_variables = x[:, 1:]
+        centre_of_masses_augmented = jnp.mean(augmented_variables, axis=0)
+        chex.assert_shape(centre_of_masses_augmented, (n_augmented, dim))
+        centred_augmented = augmented_variables - centre_of_masses_augmented[None]
+
+        centred_point_clouds = jnp.concatenate([x0, centred_augmented], axis=-2)
+        return centred_point_clouds, centre_of_masses_augmented
+
+    def recombine(self, centred_point_clouds: chex.Array, centre_of_masses_augmented: chex.Array) -> chex.Array:
+        """Recombine `centred_point_clouds` and `centre_of_masses_augmented` into a single array."""
+        chex.assert_rank(centred_point_clouds, 3)
+        n_nodes, multiplicity, dim = centred_point_clouds.shape
+        n_augmented = multiplicity - 1
+        chex.assert_shape(centre_of_masses_augmented, (n_augmented, dim))
+
+        # Add the centre of masses back into the array.
+        x = centred_point_clouds.at[:, 1:].add(centre_of_masses_augmented[None])
         return x
 
-    def inverse_log_det_jacobian(self, y: chex.Array) -> chex.Array:
-        """Computes log|det J(f^{-1})(y)|."""
-        return jnp.sum(jnp.negative(self._log_scale), -1)
+    def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        chex.assert_rank(x, 3)
+        chex.assert_rank(x, 3)
+        n_nodes, multiplicity, dim = x.shape
+        n_augmented = multiplicity - 1
+
+        # Split off centre of masses into separate representation.
+        centred_point_clouds, centre_of_masses_augmented = \
+            self.split_to_zero_mean_point_clouds_and_centre_of_masses(x)
+
+        # Get scale.
+        scale_logit = self.conditioner(centre_of_masses_augmented)
+        scale = self.get_scale_from_logit(scale_logit)
+
+        # Pass through bijection and compute log det.
+        # Note `scale` is of shape [multiplicity,],
+        # while `centred_point_clouds` is of shape [n_nodes, multiplicity, dim]
+        # hence the broadcasting.
+        centred_point_clouds_new = centred_point_clouds * scale[None, :, None]
+        log_det = (n_nodes - 1) * self.dim * jnp.sum(jnp.log(scale))
+
+        # Return to original representation.
+        y = self.recombine(centred_point_clouds=centred_point_clouds_new,
+                           centre_of_masses_augmented=centre_of_masses_augmented)
+        return y, log_det
+
 
     def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
-        """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
-        return self.inverse(y), self.inverse_log_det_jacobian(y)
+        chex.assert_rank(y, 3)
+        chex.assert_rank(y, 3)
+        n_nodes, multiplicity, dim = y.shape
+        n_augmented = multiplicity - 1
+
+        # Split off centre of masses into separate representation.
+        centred_point_clouds, centre_of_masses_augmented = \
+            self.split_to_zero_mean_point_clouds_and_centre_of_masses(y)
+
+        # Get scale.
+        scale_logit = self.conditioner(centre_of_masses_augmented)
+        scale = self.get_scale_from_logit(scale_logit)
+
+        # Pass through bijection and compute log det.
+        # Note `scale` is of shape [multiplicity,],
+        # while `centred_point_clouds` is of shape [n_nodes, multiplicity, dim]
+        # hence the broadcasting.
+        centred_point_clouds_new = centred_point_clouds / scale[None, :, None]
+        log_det = - (n_nodes - 1) * self.dim * jnp.sum(jnp.log(scale))
+
+        # Return to original representation.
+        y = self.recombine(centred_point_clouds=centred_point_clouds_new,
+                           centre_of_masses_augmented=centre_of_masses_augmented)
+        return y, log_det
 
 
-def make_conditioner(get_shift_fn, n_aug: int):
-    def conditioner(x):
-        shift_interp_logit = get_shift_fn()
-        assert x.shape[-2] == 1, "Currently we assume x is passed into conditioner."
-        shrinkage_graph_centre = jnp.repeat(x, n_aug, axis=-2)
-        expand_dims = [i for i in range(len(x.shape) - 2)] + [-1, ]
-        shift_interp_logit = jnp.expand_dims(shift_interp_logit, axis=expand_dims)
-        assert len(shift_interp_logit.shape) == len(x.shape)
-        shift_interp_logit = jnp.ones_like(x)*shift_interp_logit
-        return shift_interp_logit, shrinkage_graph_centre
 
-    return conditioner
-
-
-def make_shrink_aug_layer(
+def build_shrink_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
         n_aug: int,
-        swap: bool,
-        identity_init: bool) -> SplitCouplingWithExtra:
-    # TODO: make option to have graph_features used. Let swap be True
-    assert swap == False
+        identity_init: bool,
+        condition: bool = True
+) -> BijectorWithExtra:
+    # TODO: Could use graph features by passing them through a transformer.
 
-    def bijector_fn(params):
-        shift_interp_logit, alt_global_mean = params
-        return ParticlePairShift(log_shift_interp=shift_interp_logit,
-                                 alt_coords=alt_global_mean)
+    mlp_units: Tuple[int, ...] = (16, 16)  # Fix as a small MLP.
 
-    get_shift_fn = lambda: hk.get_parameter(name=f'global_shifting_lay{layer_number}_swap{swap}',
-                                            shape=(1 if swap else n_aug,),
-                                            init=jnp.zeros if identity_init else hk.initializers.Constant(1.))
+    def conditioner(centre_of_masses_augmented: chex.Array) -> chex.Array:
+        chex.assert_shape(centre_of_masses_augmented, (n_aug, dim))
 
-    conditioner = make_conditioner(get_shift_fn, n_aug)
-    return SplitCouplingWithExtra(
-        split_index=1,
-        event_ndims=3,  # [nodes, n_aug, dim]
-        conditioner=conditioner,
-        bijector=bijector_fn,
-        swap=swap,
-        split_axis=-2
-    )
+        if condition:
+            norms = safe_norm(centre_of_masses_augmented, axis=-1)  # Use norms to stay equivariant.
+            mlp = ConditionerHead(name=f'shrinkage_lay_{layer_number}', n_output_params=n_aug+1,
+                                  zero_init=identity_init, mlp_units=mlp_units)
+            log_scale = jnp.squeeze(mlp(norms[None, :]), axis=0)
+        else:
+            log_scale = hk.get_parameter(name=f'shrinkage_lay_{layer_number}',
+                                         shape=(n_aug + 1,),
+                                         init=jnp.zeros if identity_init else hk.initializers.VarianceScaling(1.),
+                                         dtype=float
+                                         )
+        chex.assert_shape(log_scale, (n_aug+1,))
+        return log_scale
+
+    bijector = IsotropicScalingFlow(conditioner=conditioner, n_aug=n_aug, dim=dim)
+    return BatchBijector(bijector)

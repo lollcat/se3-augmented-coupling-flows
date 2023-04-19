@@ -16,7 +16,7 @@ def test_conditional_dist(dim: int = 3, n_aug: int = 3):
     batch_size = 5
     key = jax.random.PRNGKey(0)
 
-    make_aux_target = build_aux_dist(name='target', n_aug=n_aug, global_centering=False, augmented_scale_init=1.,
+    make_aux_target = build_aux_dist(name='target', n_aug=n_aug, conditioned=True, augmented_scale_init=1.,
                                      trainable_scale=False)
 
     # Init params.

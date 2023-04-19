@@ -110,12 +110,12 @@ def make_spherical_coupling_layer(
 
     return SphericalSplitCoupling(
         split_index=(n_aug + 1) // 2,
-        event_ndims=3,  # [nodes, n_aug+1, dim]
         get_reference_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-2,
         use_aux_loss=use_aux_loss,
-        n_inner_transforms=n_inner_transforms
+        n_inner_transforms=n_inner_transforms,
+        event_ndims=3,  # [nodes, n_aug+1, dim]
+        split_axis=-2,
     )

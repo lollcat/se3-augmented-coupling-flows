@@ -1,9 +1,11 @@
 import hydra
 from omegaconf import DictConfig
+import jax
 
 from molboil.targets.data import load_qm9
 from molboil.train.train import train
 from examples.create_train_config import create_train_config
+
 
 def load_dataset(train_set_size, valid_set_size):
     train_data, valid_data, test_data = load_qm9(train_set_size=train_set_size)
@@ -32,6 +34,9 @@ def run(cfg: DictConfig):
     local_config = False
     if local_config:
         cfg = to_local_config(cfg)
+
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=19,
                                             load_dataset=load_dataset)

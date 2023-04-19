@@ -2,15 +2,21 @@ import chex
 import distrax
 import jax.numpy as jnp
 import haiku as hk
+import jax
 
 from nets.base import EGNN, NetsConfig
-from flow.distrax_with_extra import SplitCouplingWithExtra
+from flow.bijectors.generic_split_coupling import SplitCouplingWithExtra
+from flow.aug_flow_dist import GraphFeatures
 
 
-def make_conditioner(equivariant_fn, get_scaling_weight_fn, graph_features):
-    def conditioner(x):
-        shift = equivariant_fn(x, graph_features) * get_scaling_weight_fn()
+def make_conditioner(equivariant_fn, get_scaling_weight_fn):
+    def conditioner(x: chex.Array, graph_features: GraphFeatures):
+        scaling_weight = get_scaling_weight_fn()
+        shift = equivariant_fn(x, graph_features) * scaling_weight
         chex.assert_equal_shape([shift, x])
+        # Restrict shift to not change the centre of mass.
+        # This means the nice flow preserves the centre-of-mass distribution from the layer before.
+        shift = shift - jnp.mean(shift, axis=-3, keepdims=True)
         return shift
     return conditioner
 
@@ -33,15 +39,16 @@ def make_se_equivariant_nice(graph_features,
     # Used to for zero initialisation.
     get_scaling_weight_fn = lambda: hk.get_parameter(
         f"layer_{layer_number}_swap{swap}_scaling_weight",  shape=(), init=jnp.zeros if identity_init else
-        hk.initializers.Constant(0.0001))
+        hk.initializers.Constant(0.0001), dtype=float)
 
     def bijector_fn(params):
         shift = params
         return distrax.ScalarAffine(log_scale=jnp.zeros_like(shift), shift=shift)
 
-    conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn,
-                                   graph_features=graph_features)
-    return SplitCouplingWithExtra(
+    conditioner = make_conditioner(equivariant_fn, get_scaling_weight_fn=get_scaling_weight_fn)
+
+    nice_bijector = SplitCouplingWithExtra(
+        graph_features=graph_features,
         split_index=(n_aug + 1) // 2,
         event_ndims=3,  # [nodes, n_aug+1, dim]
         conditioner=conditioner,
@@ -49,3 +56,4 @@ def make_se_equivariant_nice(graph_features,
         swap=swap,
         split_axis=-2
     )
+    return nice_bijector

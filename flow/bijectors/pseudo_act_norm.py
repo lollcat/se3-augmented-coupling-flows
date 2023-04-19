@@ -2,7 +2,8 @@ import distrax
 import chex
 
 
-from flow.bijectors.shrink import make_shrink_aug_layer
+from flow.bijectors.shrink import build_shrink_layer
+from flow.bijectors.centre_of_mass_flow import build_unconditional_centre_of_mass_layer
 from flow.distrax_with_extra import ChainWithExtra
 
 
@@ -13,13 +14,20 @@ def make_act_norm(
         n_aug: int,
         identity_init: bool):
     bijectors = []
-    # for swap in (True, False):
-    swap = False
     bijectors.append(
-        make_shrink_aug_layer(
+        build_unconditional_centre_of_mass_layer(
+            graph_features=graph_features,
+            layer_number=layer_number,
+            dim=dim,
+            identity_init=identity_init,
+            n_aug=n_aug))
+
+    bijectors.append(
+        build_shrink_layer(
         graph_features=graph_features, layer_number=layer_number,
         dim=dim,
         identity_init=identity_init,
-        n_aug=n_aug, swap=swap)
+        n_aug=n_aug
+        )
     )
     return ChainWithExtra(bijectors)

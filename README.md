@@ -35,16 +35,9 @@ pip install -e .
 # TODO:
 
 ## Burning
-    - Spherical Flow
-        - Global Frame Layer (seems like it could transform distance in a useful way)
-    - Base distribution.
-        - Sample radius (e.g. from normal distribution)
-        - Sample direction randomly. 
-    - Act norm options: 
-        - Scaling towards centre of mass. 
-        - Scaling towards augmented pair. 
-        - Condition on graph (use transfomrer). 
-    - Make sure non-equivariant flow is working well.
+ - add option for base and target scale init
+ - add option to learn target scale
+ - add act norm style bijectors
 
 ## Less burning
 

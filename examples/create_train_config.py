@@ -14,7 +14,8 @@ import matplotlib as mpl
 from functools import partial
 import jax.numpy as jnp
 
-from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, training_step, eval_fn
+from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn
+from train.custom_step import training_step
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
 
@@ -24,7 +25,8 @@ from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConf
 from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
-from examples.configs import TrainingState, OptimizerConfig
+from examples.configs import TrainingState
+from utils.optimize import get_optimizer, OptimizerConfig
 from utils.pmap import get_from_first_device
 
 mpl.rcParams['figure.dpi'] = 150
@@ -47,31 +49,6 @@ def plot_and_maybe_save(plotter,
         else:
             plt.show()
         plt.close(figure)
-
-
-def get_optimizer_and_step_fn(optimizer_config: OptimizerConfig, n_iter_per_epoch, total_n_epoch):
-    if optimizer_config.use_schedule:
-        lr = optax.warmup_cosine_decay_schedule(
-            init_value=float(optimizer_config.init_lr),
-            peak_value=float(optimizer_config.peak_lr),
-            end_value=float(optimizer_config.end_lr),
-            warmup_steps=optimizer_config.warmup_n_epoch * n_iter_per_epoch,
-            decay_steps=n_iter_per_epoch*total_n_epoch
-                                                     )
-    else:
-        lr = float(optimizer_config.init_lr)
-
-    grad_transforms = [optax.zero_nans()]
-
-    if optimizer_config.max_global_norm:
-        clipping_fn = optax.clip_by_global_norm(float(optimizer_config.max_global_norm))
-        grad_transforms.append(clipping_fn)
-    else:
-        pass
-
-    grad_transforms.append(getattr(optax, optimizer_config.optimizer_name)(lr))
-    optimizer = optax.chain(*grad_transforms)
-    return optimizer, lr
 
 
 def setup_logger(cfg: DictConfig) -> Logger:
@@ -161,10 +138,16 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
-    optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
-    optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // cfg.training.batch_size,
-                                              total_n_epoch=cfg.training.n_epoch)
+
+    # Setup Optimizer.
+    opt_cfg = dict(training_config.pop("optimizer"))
+    n_iter_per_epoch = train_data.positions.shape[0] // cfg.training.batch_size
+    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
+    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    optimizer_config = OptimizerConfig(**opt_cfg,
+                                       n_iter_total=n_iter_total,
+                                       n_iter_warmup=n_iter_warmup)
+    optimizer, lr = get_optimizer(optimizer_config)
 
 
     if plotter is None and eval_and_plot_fn is None:

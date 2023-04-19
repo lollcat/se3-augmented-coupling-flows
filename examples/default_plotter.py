@@ -40,8 +40,7 @@ def make_default_plotter(
     def get_data_for_plotting(state: TrainingState, key: chex.PRNGKey, train_data=train_data, test_data=test_data):
         params = state.params
         key1, key2 = jax.random.split(key)
-        joint_samples_flow = jax.jit(flow.sample_apply, static_argnums=3)(params, train_data.features[0], key1,
-                                                                          (n_samples,))
+        joint_samples_flow = flow.sample_apply(params, train_data.features[0], key1, (n_samples,))
         features, positions_x, positions_a_flow = flow.joint_to_separate_samples(joint_samples_flow)
         a_minus_x_flow = positions_a_flow - positions_x[:, :, None]
         positions_a_target = flow.aux_target_sample_n_apply(params.aux_target, test_data[:n_samples], key2)
