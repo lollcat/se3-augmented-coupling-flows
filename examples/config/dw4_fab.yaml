@@ -92,7 +92,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 2000
+  n_epoch: 4000
   batch_size: 32
   plot_batch_size: 256
   eval_batch_size: 128
