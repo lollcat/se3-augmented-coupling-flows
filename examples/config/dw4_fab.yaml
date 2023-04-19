@@ -16,11 +16,12 @@ fab:
   transition_operator:
     hmc:
       n_outer_steps: 1
+      n_inner_steps: 2
       init_step_size: 1.
       target_p_accept: 0.65
-      tune_step_size: true
+      adapt_step_size: true
     metropolis:
-      n_outer_steps: 1
+      n_steps: 1
       init_step_size: 1.
       target_p_accept: 0.65
       tune_step_size: true

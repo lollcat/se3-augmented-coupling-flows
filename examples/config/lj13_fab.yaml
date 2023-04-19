@@ -16,11 +16,12 @@ fab:
   transition_operator:
     hmc:
       n_outer_steps: 1
+      n_inner_steps: 2
       init_step_size: 1.
       target_p_accept: 0.65
-      tune_step_size: true
+      adapt_step_size: true
     metropolis:
-      n_outer_steps: 1
+      n_steps: 1
       init_step_size: 1.
       target_p_accept: 0.65
       tune_step_size: true
@@ -28,7 +29,7 @@ fab:
   n_intermediate_distributions: 4
   spacing_type: linear
   eval_inner_batch_size: 100
-  eval_total_batch_size: 10000
+  eval_total_batch_size: 3200
 
 
 target:
