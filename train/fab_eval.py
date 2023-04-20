@@ -38,7 +38,7 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
     def inner_fn(carry: None, xs: chex.PRNGKey) -> Tuple[None, Tuple[chex.Array, chex.Array]]:
         """Perform SMC forward pass and grab just the importance weights."""
         key = xs
-        sample_flow, log_q_flow = flow.sample_and_log_prob_apply(state.params, features, key, (batch_size,))
+        sample_flow, log_q_flow = flow.sample_and_log_prob_apply(state.params, features, key, (inner_batch_size,))
         x0 = flatten(sample_flow.positions)
         point, log_w, smc_state, smc_info = smc.step(x0, state.smc_state, log_q_flat_fn, log_p_flat_fn)
         log_w_flow = joint_target_log_prob_fn(sample_flow.positions) - log_q_flow

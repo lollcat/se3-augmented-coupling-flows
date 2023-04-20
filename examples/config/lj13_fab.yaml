@@ -29,7 +29,7 @@ fab:
   n_intermediate_distributions: 4
   spacing_type: linear
   eval_inner_batch_size: 100
-  eval_total_batch_size: 1000
+  eval_total_batch_size: 10000
 
 
 target:
