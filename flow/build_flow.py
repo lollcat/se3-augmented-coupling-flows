@@ -2,16 +2,16 @@ import chex
 
 from flow.aug_flow_dist import AugmentedFlowRecipe, AugmentedFlow, create_flow
 
-from typing import NamedTuple, Sequence, Union
+from typing import NamedTuple, Sequence, Union, Iterable
 import distrax
 
 from flow.base_dist import JointBaseDistribution
+from flow.x_base_dist import CentreGravityGaussian, HarmoticPotential
 from flow.conditional_dist import build_aux_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
-from flow.bijectors.permute_aug import AugPermuteBijector
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -22,9 +22,14 @@ class ConditionalAuxDistConfig(NamedTuple):
     trainable_augmented_scale: bool = False
     scale_init: float = 1.0
 
+class XDistConfig(NamedTuple):
+    type: str = 'centre_gravity_gaussian'  # centre_gravity_gaussian or harmonic_potential
+    a: float = 1.0
+    edges: Iterable = []
+    trainable_mode_scale: bool = False
+
 class BaseConfig(NamedTuple):
-    train_x_scale: bool = True
-    x_scale_init: float = 1.0
+    x_dist: XDistConfig = XDistConfig()
     aug: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
 
 
@@ -58,11 +63,18 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         raise NotImplementedError("I have not got these working nicely yet, do not use these options.")
 
     def make_base() -> distrax.Distribution:
+        assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential']
+        if config.base.x_dist.type == 'centre_gravity_gaussian':
+            x_dist = CentreGravityGaussian(dim=config.dim, n_nodes=config.nodes)
+        elif config.base.x_dist.type == 'harmonic_potential':
+            x_dist = HarmoticPotential(dim=config.dim, n_nodes=config.nodes, a=config.base.x_dist.a,
+                                       edges=config.base.x_dist.edges,
+                                       trainable_mode_scale=config.base.x_dist.trainable_mode_scale)
         base = JointBaseDistribution(
             dim=config.dim,
             n_nodes=config.nodes,
             n_aux=config.n_aug,
-            x_scale_init=config.base.x_scale_init,
+            x_dist=x_dist,
             augmented_scale_init=config.base.aug.scale_init,
             augmented_conditioned=config.base.aug.conditioned_on_x
         )

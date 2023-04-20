@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 
-from utils.test import test_fn_is_invariant, get_minimal_nets_config, get_checks_for_flow_properties
+from molboil.utils.test import assert_is_invariant
+
+from utils.test import get_minimal_nets_config, get_checks_for_flow_properties
 from flow.build_flow import build_flow, ConditionalAuxDistConfig, FlowDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample
 from flow.distrax_with_extra import Extra
@@ -18,7 +20,7 @@ _FEATURE_DIM = 2
 _ACT_NORM = True
 
 
-def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
+def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -129,10 +131,10 @@ def tesst_distribution(dim: int = 3, n_aug: int = _N_AUG):
         log_probs = flow.log_prob_apply(params, x)
         return log_probs
 
-    test_fn_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
+    assert_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
 
 
-def tesst_target_reparam(dim: int = 3, n_aug: int = 3):
+def test_target_reparam(dim: int = 3, n_aug: int = 3):
     """Visualise samples from the distribution, and check that it's log prob is invariant to
     translation and rotation."""
     if jnp.ones(()).dtype == jnp.float64:
@@ -186,12 +188,12 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    tesst_distribution(dim=2)
+    test_distribution(dim=2)
     print("passed distribution dist 2D")
 
-    tesst_distribution(dim=3)
+    test_distribution(dim=3)
     print("passed distribution dist 3D")
 
-    tesst_target_reparam(dim=3)
+    test_target_reparam(dim=3)
     print("passed target reparam test")
 

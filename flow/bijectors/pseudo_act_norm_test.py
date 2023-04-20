@@ -5,7 +5,7 @@ from utils.test import bijector_test
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.distrax_with_extra import ChainWithExtra
 
-def tesst_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
+def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
                                    n_nodes: int = 4, n_aux: int = 3):
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
@@ -48,10 +48,10 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
 
-    tesst_bijector_pseudo_act_norm(dim=2)
+    test_bijector_pseudo_act_norm(dim=2)
     print('passed test in 2D')
 
-    tesst_bijector_pseudo_act_norm(dim=3)
+    test_bijector_pseudo_act_norm(dim=3)
     print('passed test in 3D')
 
 

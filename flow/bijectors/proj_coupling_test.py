@@ -6,7 +6,7 @@ from utils.test import bijector_test
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def tesst_bijector_with_proj(
+def test_bijector_with_proj(
         transform_type: str = 'spline',
         dim: int = 3, n_layers: int = 4, type='egnn',
                              n_nodes: int = 4, n_aux: int = 3):
@@ -60,10 +60,10 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
     for transform_type in ["spline", "real_nvp"]:
-        tesst_bijector_with_proj(transform_type=transform_type, dim=3)
+        test_bijector_with_proj(transform_type=transform_type, dim=3)
         print('passed test in 3D')
 
-        tesst_bijector_with_proj(transform_type=transform_type, dim=2)
+        test_bijector_with_proj(transform_type=transform_type, dim=2)
         print('passed test in 2D')
 
 

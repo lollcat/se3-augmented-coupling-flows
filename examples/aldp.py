@@ -2,7 +2,7 @@ from typing import Any
 
 from functools import partial
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 import jax.numpy as jnp
 import jax
 
@@ -18,11 +18,26 @@ from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
+
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
                          train_n_points=train_set_size, val_n_points=val_set_size)[:2]
 
     train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
+    # Add edges of aldp for harmonic potential
+    try:
+        if cfg['flow']['base']['x_dist']['type'] == 'harmonic_potential':
+            edges = [
+                [0, 1], [1, 2], [1, 3], [1, 4], [4, 5], [4, 6], [6, 7],
+                [6, 8], [8, 9], [8, 10], [10, 11], [10, 12], [10, 13], [8, 14],
+                [14, 15], [14, 16], [16, 17], [16, 18], [18, 19], [18, 20], [18, 21]
+            ]
+            with open_dict(cfg):
+                cfg.flow.base.x_dist.edges = edges
+    except:
+        pass
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
