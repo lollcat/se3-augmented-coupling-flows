@@ -22,7 +22,7 @@ from molboil.eval.base import get_eval_and_plot_fn
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig
-from utils.aug_flow_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
+from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState

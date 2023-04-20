@@ -5,10 +5,9 @@ from functools import partial
 
 from molboil.train.train import train
 from molboil.targets.data import load_dw4
-from examples.create_train_config import create_train_config
-from target.double_well import make_dataset
+from examples.create_fab_train_config import create_train_config
+from target.double_well import make_dataset, log_prob_fn
 from utils.data import positional_dataset_only_to_full_graph
-import jax
 
 def load_dataset_original(train_set_size: int, valid_set_size: int):
     train, valid, test = load_dw4(train_set_size)
@@ -29,23 +28,27 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
-    cfg.training.train_set_size = 100
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
-    cfg.training.n_epoch = 200
+    cfg.training.n_epoch = int(1e3)
     cfg.training.save = False
-    cfg.training.n_eval = 4
+    cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
-    cfg.training.K_marginal_log_lik = 10
+    cfg.training.K_marginal_log_lik = 2
+    cfg.fab.eval_fab_batch_size = 32
+    cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
+    cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
     cfg.logger = DictConfig({"list_logger": None})
-    cfg.training.use_64_bit = False
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
     cfg.flow.type = ['nice']
     cfg.flow.n_aug = 1
-    cfg.flow.n_layers = 1
-    cfg.flow.act_norm = True
+    cfg.flow.n_layers = 2
+
+    cfg.target.aux.trainable_augmented_scale = False
+    cfg.flow.base.aux.trainable_augmented_scale = False
+    cfg.flow.base.train_x_scale = False
 
 
     # Configure NNs
@@ -61,22 +64,21 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     return cfg
 
 
-@hydra.main(config_path="./config", config_name="dw4.yaml")
+@hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
+    # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
     local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
-
-    if cfg.training.use_64_bit:
-        jax.config.update("jax_enable_x64", True)
 
     if cfg.target.custom_samples:
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
         load_dataset = load_dataset_original
-    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset)
+    experiment_config = create_train_config(cfg, target_log_p_x_fn=log_prob_fn,
+                                            dim=2, n_nodes=4, load_dataset=load_dataset)
     train(experiment_config)
 
 

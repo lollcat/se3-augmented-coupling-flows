@@ -5,6 +5,31 @@ hydra:
   job:
     chdir: false
 
+fab:
+  with_buffer: true
+  buffer_max_length: 5000
+  buffer_min_length: 100
+  n_updates_per_smc_forward_pass: 4
+  w_adjust_clip: 10.
+  use_resampling: true
+  use_hmc: false
+  transition_operator:
+    hmc:
+      n_outer_steps: 1
+      init_step_size: 1e-3
+      target_p_accept: 0.65
+      tune_step_size: true
+    metropolis:
+      n_outer_steps: 1
+      init_step_size: 1.
+      target_p_accept: 0.65
+      tune_step_size: true
+  alpha: 2.  # alpha-divergence param
+  n_intermediate_distributions: 4
+  spacing_type: linear
+  eval_fab_batch_size: 1000
+
+
 target:
   aux:
     conditioned_on_x: true
@@ -12,51 +37,50 @@ target:
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
-  act_norm: false
+  n_aug: 1
+  act_norm: true
   base:
-    x_dist:
-      type: centre_gravity_gaussian
+    train_x_scale: true
+    x_scale_init: 1.0
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: ${target.aux.scale_init}
       trainable_augmented_scale: false
   dim: 3
-  nodes: 19
+  nodes: 13
   n_layers: 8
   identity_init: true
-  type: proj #  nice proj spherical
+  type: spherical #  nice proj spherical
   kwargs:
-    n_inner_transforms: 1
     spherical:
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      n_inner_transforms: 3
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      n_inner_transforms: 3
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -10.
-      upper: 10.
-      orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
+      lower: -2.
+      upper: 2.
+      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
-      mlp_units: [ 64, 64 ]
-      n_invariant_feat_hidden: 64
+      mlp_units: [ 32, 32 ]
+      n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
     e3gnn:
       name: e3gnn
       n_blocks: 3 # number of layers
-      mlp_units: [64, 64]
+      mlp_units: [32, 32]
       n_vectors_hidden_per_vec_in: 4
-      n_invariant_feat_hidden: 64
+      n_invariant_feat_hidden: 32
       get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [64, 64]
+      mlp_units: [32, 32]
       stable: true
 
 
@@ -66,7 +90,7 @@ training:
     optimizer_name: adam
     use_schedule: true
     peak_lr: 3e-4
-    end_lr: 6e-5 # can be null
+    end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
     max_global_norm: null
     max_param_grad: null
@@ -74,20 +98,20 @@ training:
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
-  plot_batch_size: 128
   eval_batch_size: 128
+  plot_batch_size: 128
   seed: 0
-  train_set_size: null
-  test_set_size: null
+  train_set_size: 1000
+  test_set_size: 1000
   n_checkpoints: 0
-  n_eval: 15
+  n_eval: 10
   K_marginal_log_lik: 20
   save: true
-  save_dir: qm9pos_results
+  save_dir: lj13_results
   resume: false
   runtime_limit: null
   use_flow_aux_loss: true
-  aux_loss_weight: 10.0
+  aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
 
@@ -96,7 +120,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_TrainableTarget${target.aux.trainable_augmented_scale}_AugConditioned${target.aux.conditioned_on_x}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}_actnorm${flow.act_norm}
+    name: lj13_${flow.type}_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,loll]
+    tags: [lj13]
+
