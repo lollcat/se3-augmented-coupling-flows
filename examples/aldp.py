@@ -24,14 +24,17 @@ def run(cfg: DictConfig):
 
     train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     # Add edges of aldp for harmonic potential
-    if cfg['flow']['base']['x_dist']['type'] == 'harmonic_potential':
-        edges = [
-            [0, 1], [1, 2], [1, 3], [1, 4], [4, 5], [4, 6], [6, 7],
-            [6, 8], [8, 9], [8, 10], [10, 11], [10, 12], [10, 13], [8, 14],
-            [14, 15], [14, 16], [16, 17], [16, 18], [18, 19], [18, 20], [18, 21]
-        ]
-        with open_dict(cfg):
-            cfg.flow.base.x_dist.edges = edges
+    try:
+        if cfg['flow']['base']['x_dist']['type'] == 'harmonic_potential':
+            edges = [
+                [0, 1], [1, 2], [1, 3], [1, 4], [4, 5], [4, 6], [6, 7],
+                [6, 8], [8, 9], [8, 10], [10, 11], [10, 12], [10, 13], [8, 14],
+                [14, 15], [14, 16], [16, 17], [16, 18], [18, 19], [18, 20], [18, 21]
+            ]
+            with open_dict(cfg):
+                cfg.flow.base.x_dist.edges = edges
+    except KeyError:
+        pass
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
