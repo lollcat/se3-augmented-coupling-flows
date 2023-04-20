@@ -35,6 +35,20 @@ class TrainStateNoBuffer(NamedTuple):
     smc_state: SMCState
 
 
+def get_joint_log_prob_target(params: AugmentedFlowParams, flow: AugmentedFlow, log_p_x: LogProbFn,
+                              features_with_multiplicity: GraphFeatures) -> LogProbFn:
+    def joint_log_prob(x: chex.Array):
+        x, a = jnp.split(x, [1, ], axis=-2)
+        x = jnp.squeeze(x, axis=-2)
+        log_prob_x = log_p_x(x)
+        log_prob_augmented = flow.aux_target_log_prob_apply(
+            params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
+        return log_prob_x + log_prob_augmented
+
+    return joint_log_prob
+
+
+
 def flat_log_prob_components(log_p_x: LogProbFn, flow: AugmentedFlow, params: AugmentedFlowParams,
                              features_with_multiplicity: chex.Array, event_shape: chex.Shape):
     def flow_log_prob_apply(params, x):
@@ -45,14 +59,11 @@ def flat_log_prob_components(log_p_x: LogProbFn, flow: AugmentedFlow, params: Au
 
     flatten, unflatten, log_q_flat_fn = setup_flat_log_prob(log_q_fn, event_shape)
 
+    joint_target_log_prob_fn = get_joint_log_prob_target(params, flow, log_p_x, features_with_multiplicity)
+
     def log_p_flat_fn(x: chex.Array):
         x = unflatten(x)
-        x, a = jnp.split(x, [1, ], axis=-2)
-        x = jnp.squeeze(x, axis=-2)
-        log_prob_x = log_p_x(x)
-        log_prob_augmented = flow.aux_target_log_prob_apply(
-            params.aux_target, FullGraphSample(features=features_with_multiplicity, positions=x), a)
-        return log_prob_x + log_prob_augmented
+        return joint_target_log_prob_fn(x)
 
     return flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply
 

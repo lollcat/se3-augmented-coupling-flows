@@ -3,7 +3,8 @@ import jax.numpy as jnp
 import jax
 import optax
 
-from molboil.utils.test import test_fn_is_equivariant, test_fn_is_invariant, random_rotate_translate_perumute
+from molboil.utils.test import assert_is_equivariant as test_fn_is_equivariant, assert_is_invariant as test_fn_is_invariant, \
+    random_rotate_translate_permute as random_rotate_translate_perumute
 
 from utils.numerical import param_count
 from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig

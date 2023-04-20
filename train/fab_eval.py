@@ -7,7 +7,7 @@ from fabjax.sampling.smc import SequentialMonteCarloSampler
 from fabjax.sampling.resampling import log_effective_sample_size
 
 from flow.aug_flow_dist import AugmentedFlow, GraphFeatures
-from train.fab_train_no_buffer import TrainStateNoBuffer, flat_log_prob_components
+from train.fab_train_no_buffer import TrainStateNoBuffer, flat_log_prob_components, get_joint_log_prob_target
 from train.fab_train_with_buffer import TrainStateWithBuffer
 
 
@@ -32,13 +32,16 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
         log_p_x=log_p_x, flow=flow, params=state.params, features_with_multiplicity=features_with_multiplicity,
         event_shape=event_shape
     )
+    joint_target_log_prob_fn = get_joint_log_prob_target(params=state.params, flow=flow, log_p_x=log_p_x,
+                                                  features_with_multiplicity=features_with_multiplicity)
+
     def inner_fn(carry: None, xs: chex.PRNGKey) -> Tuple[None, Tuple[chex.Array, chex.Array]]:
         """Perform SMC forward pass and grab just the importance weights."""
         key = xs
-        sample_flow = flow.sample_apply(state.params, features, key, (batch_size,))
+        sample_flow, log_q_flow = flow.sample_and_log_prob_apply(state.params, features, key, (batch_size,))
         x0 = flatten(sample_flow.positions)
         point, log_w, smc_state, smc_info = smc.step(x0, state.smc_state, log_q_flat_fn, log_p_flat_fn)
-        log_w_flow = point.log_p - point.log_q
+        log_w_flow = joint_target_log_prob_fn(sample_flow.positions) - log_q_flow
         return None, (log_w_flow, log_w)
 
     # Run scan function.

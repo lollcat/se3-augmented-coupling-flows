@@ -38,11 +38,11 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 10
     cfg.logger = DictConfig({"list_logger": None})
-    cfg.training.use_64_bit = False
+    cfg.training.use_64_bit = True
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['nice']
+    cfg.flow.type = ['proj']
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
     cfg.flow.act_norm = True
