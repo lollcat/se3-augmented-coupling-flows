@@ -64,6 +64,7 @@ class HarmoticPotential(distrax.Distribution):
         scale = jnp.concatenate([jnp.zeros(1), jnp.exp(self.log_mode_scale)])
         x = scale[:, None] * eps
         x = self.P @ (self.std[:, None] * x)
+        chex.assert_shape(x, shape)
         return remove_mean(x)
 
     def log_prob(self, value: Array) -> Array:
