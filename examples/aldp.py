@@ -18,6 +18,9 @@ from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
+
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
                          train_n_points=train_set_size, val_n_points=val_set_size)[:2]
