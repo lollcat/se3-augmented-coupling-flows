@@ -6,12 +6,12 @@ import jax.numpy as jnp
 from chex import PRNGKey, Array
 import distrax
 
-from flow.conditional_dist import ConditionalCentreofMassGaussian
+from flow.conditional_dist import ConditionalGaussian
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 
 
 class JointBaseDistribution(DistributionWithExtra):
-    """x ~ x_dist, a ~ x + CentreGravityGaussian."""
+    """x ~ x_dist, a ~ x + Gaussian."""
     def __init__(self,
                  dim,
                  n_nodes: int,
@@ -32,8 +32,8 @@ class JointBaseDistribution(DistributionWithExtra):
         self.augmented_conditioned = augmented_conditioned
 
 
-    def get_augmented_dist(self, x) -> ConditionalCentreofMassGaussian:
-        dist = ConditionalCentreofMassGaussian(
+    def get_augmented_dist(self, x) -> ConditionalGaussian:
+        dist = ConditionalGaussian(
             self.dim, self.n_nodes, self.n_aux, x, log_scale=self.augmented_log_scale,
             conditioned=self.augmented_conditioned
         )
