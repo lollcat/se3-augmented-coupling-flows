@@ -3,8 +3,7 @@ import jax.numpy as jnp
 import jax
 import optax
 
-from molboil.utils.test import assert_is_equivariant as test_fn_is_equivariant, assert_is_invariant as test_fn_is_invariant, \
-    random_rotate_translate_permute as random_rotate_translate_perumute
+from molboil.utils.test import assert_is_equivariant, assert_is_invariant, random_rotate_translate_permute
 
 from utils.numerical import param_count
 from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig
@@ -77,15 +76,15 @@ def bijector_test(bijector_forward, bijector_backward,
 
     # Test the transformation is equivariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
+    assert_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
+    assert_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
 
     # Check the change to the log det is invariant.
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
+    assert_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
     key, subkey = jax.random.split(key)
-    test_fn_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
+    assert_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
 
 
     # Forward reverse test but with a batch.
@@ -133,7 +132,7 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     key1, key2 = jax.random.split(key)
 
     def group_action(x_and_a):
-        return random_rotate_translate_perumute(x_and_a, key1, permute=permute, translate=True)
+        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)
 
 
     positions_rot = group_action(samples.positions)

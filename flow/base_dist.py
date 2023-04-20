@@ -4,39 +4,36 @@ import chex
 import jax
 import jax.numpy as jnp
 from chex import PRNGKey, Array
+import distrax
 
-from flow.conditional_dist import ConditionalCentreofMassGaussian
-from flow.centre_of_mass_gaussian import CentreGravityGaussian
+from flow.conditional_dist import ConditionalGaussian
 from flow.distrax_with_extra import DistributionWithExtra, Extra
 
 
 class JointBaseDistribution(DistributionWithExtra):
-    """x ~ CentreGravityGaussian, a ~ x + CentreGravityGaussian."""
+    """x ~ x_dist, a ~ x + Gaussian."""
     def __init__(self,
                  dim,
                  n_nodes: int,
                  n_aux: int,
-                 x_scale_init: float = 1.0,
-                 trainable_x_scale: bool = False,
+                 x_dist: distrax.Distribution,
                  augmented_scale_init: float = 1.0,
                  trainable_augmented_scale: bool = False,
                  augmented_conditioned: bool = True,
                  ):
-        if trainable_x_scale or trainable_augmented_scale:
-            raise NotImplementedError
-        if x_scale_init != 1.:
+        if trainable_augmented_scale:
             raise NotImplementedError
         self.n_aux = n_aux
         self.dim = dim
         self.n_nodes = n_nodes
-        self.x_dist = CentreGravityGaussian(dim=dim, n_nodes=n_nodes)
+        self.x_dist = x_dist
         self.augmented_log_scale = jnp.log(jnp.ones(self.n_aux)*augmented_scale_init)
         self.trainable_augmented_scale = trainable_augmented_scale
         self.augmented_conditioned = augmented_conditioned
 
 
-    def get_augmented_dist(self, x) -> ConditionalCentreofMassGaussian:
-        dist = ConditionalCentreofMassGaussian(
+    def get_augmented_dist(self, x) -> ConditionalGaussian:
+        dist = ConditionalGaussian(
             self.dim, self.n_nodes, self.n_aux, x, log_scale=self.augmented_log_scale,
             conditioned=self.augmented_conditioned
         )

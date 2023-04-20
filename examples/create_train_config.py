@@ -256,10 +256,15 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
-    optimizer_config = OptimizerConfig(**dict(training_config.pop("optimizer")))
-    optimizer, lr = get_optimizer_and_step_fn(optimizer_config,
-                                              n_iter_per_epoch=train_data.positions.shape[0] // (cfg.training.batch_size * n_devices),
-                                              total_n_epoch=cfg.training.n_epoch)
+
+    opt_cfg = dict(training_config.pop("optimizer"))
+    n_iter_per_epoch = train_data.positions.shape[0] // (cfg.training.batch_size * n_devices)
+    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
+    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    optimizer_config = OptimizerConfig(**opt_cfg,
+                                       n_iter_total=n_iter_total,
+                                       n_iter_warmup=n_iter_warmup)
+    optimizer, lr = get_optimizer(optimizer_config)
 
 
     if plotter is None and eval_and_plot_fn is None:

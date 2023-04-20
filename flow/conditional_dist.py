@@ -10,7 +10,7 @@ from flow.distrax_with_extra import DistributionWithExtra, Extra
 from flow.aug_flow_dist import FullGraphSample
 
 
-class ConditionalCentreofMassGaussian(DistributionWithExtra):
+class ConditionalGaussian(DistributionWithExtra):
     """
     Either:
         a ~ x + Normal
@@ -138,7 +138,7 @@ def build_aux_dist(n_aug: int,
             scale = jnp.ones(n_aug) * augmented_scale_init
             log_scale = jnp.log(scale)
 
-        dist = ConditionalCentreofMassGaussian(dim=dim, n_nodes=n_nodes, n_aug=n_aug, x=x,
-                                               log_scale=log_scale, conditioned=conditioned)
+        dist = ConditionalGaussian(dim=dim, n_nodes=n_nodes, n_aug=n_aug, x=x,
+                                   log_scale=log_scale, conditioned=conditioned)
         return dist
     return make_aux_target
