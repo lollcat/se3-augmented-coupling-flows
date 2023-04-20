@@ -33,7 +33,7 @@ def run(cfg: DictConfig):
             ]
             with open_dict(cfg):
                 cfg.flow.base.x_dist.edges = edges
-    except KeyError:
+    except:
         pass
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
