@@ -9,7 +9,7 @@ fab:
   with_buffer: true
   buffer_max_length: 3200 # batch size times 100
   buffer_min_length: 320  # batch size times 10
-  n_updates_per_smc_forward_pass: 8
+  n_updates_per_smc_forward_pass: 4
   w_adjust_clip: 10.
   use_resampling: true
   use_hmc: true
@@ -119,7 +119,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}
+    name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4,fab]
