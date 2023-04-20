@@ -53,7 +53,8 @@ class HarmoticPotential(distrax.Distribution):
             mode_scale = jnp.ones(n_nodes - 1)
         if trainable_mode_scale:
             self.log_mode_scale = hk.get_parameter('x_base_dist_log_mode_scale', shape=(n_nodes - 1,),
-                                                   init=hk.initializers.Constant(jnp.log(mode_scale)))
+                                                   init=hk.initializers.Constant(jnp.log(mode_scale)),
+                                                   dtype=float)
         else:
             self.log_mode_scale = jnp.log(mode_scale)
 
