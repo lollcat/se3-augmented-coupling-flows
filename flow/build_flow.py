@@ -152,7 +152,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         n_aug=config.n_aug,
         augmented_scale_init=config.target_aux_config.scale_init,
         trainable_scale=config.target_aux_config.trainable_augmented_scale,
-        name='aug_target_dist',
         conditioned=config.target_aux_config.conditioned_on_x
     )
 

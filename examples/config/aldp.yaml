@@ -11,8 +11,6 @@ target:
     val: target/data/aldp_500K_test_mini.h5
   aux:
     conditioned_on_x: true
-    scale_init: 1.0
-    trainable_augmented_scale: false
 
 flow:
   n_aug: 3
