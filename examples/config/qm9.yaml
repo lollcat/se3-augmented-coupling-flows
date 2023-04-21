@@ -12,7 +12,7 @@ target:
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 1
+  n_aug: 3
   act_norm: false
   base:
     x_dist:
