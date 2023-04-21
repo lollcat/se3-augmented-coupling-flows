@@ -164,7 +164,8 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                       flow=flow,
                       use_flow_aux_loss=cfg.training.use_flow_aux_loss,
                       aux_loss_weight=cfg.training.aux_loss_weight)
-    training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn)
+    training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
+                               verbose_info=cfg.training.verbose_info)
 
     scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
                                          data=train_data,
