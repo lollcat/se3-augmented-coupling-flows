@@ -12,7 +12,7 @@ target:
     trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
+  n_aug: 1
   act_norm: false
   base:
     x_dist:
@@ -27,7 +27,7 @@ flow:
   identity_init: true
   type: along_vector #  nice proj spherical along_vector
   kwargs:
-    n_inner_transforms: 2
+    n_inner_transforms: 3
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
