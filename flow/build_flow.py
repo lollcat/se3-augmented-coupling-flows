@@ -60,9 +60,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     for flow in flow_type:
         assert flow in ['nice', 'proj', 'spherical', 'along_vector']
 
-    if config.base.aug.trainable_augmented_scale:  # or config.target_aux_config.trainable_augmented_scale:
-        raise NotImplementedError("I have not got these working nicely yet, do not use these options.")
-
     def make_base() -> distrax.Distribution:
         assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential']
         if config.base.x_dist.type == 'centre_gravity_gaussian':
