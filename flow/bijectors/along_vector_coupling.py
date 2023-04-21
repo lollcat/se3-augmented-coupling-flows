@@ -89,7 +89,7 @@ class AlongVectorSplitCoupling(BijectorWithExtra):
       return projection_bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
-            Tuple[chex.Array, chex.Array, Extra]:
+            Tuple[chex.Array, chex.Array]:
         chex.assert_rank(x, 3)
         n_nodes, multiplicity, dim = x.shape
         # Calculate new basis for the affine transform
@@ -97,8 +97,7 @@ class AlongVectorSplitCoupling(BijectorWithExtra):
         chex.assert_shape(reference_vectors, (n_nodes, multiplicity, self.n_inner_transforms, dim))
         reference_points = x[:, :, None, :] + reference_vectors
 
-        extra = Extra()
-        return reference_points, h, extra
+        return reference_points, h
 
 
     def forward_and_log_det_single_with_extra(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
@@ -109,22 +108,27 @@ class AlongVectorSplitCoupling(BijectorWithExtra):
 
         x = self.adjust_centering_pre_proj(x)
         x1, x2 = self._split(x)
-        reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(x1, graph_features)
+        reference_points_all, bijector_feat_in = self.get_reference_points_and_h(x1, graph_features)
         n_nodes, multiplicity, n_transforms, dim_ = reference_points_all.shape
         assert n_transforms == self.n_inner_transforms
 
         log_det_total = jnp.zeros(())
+        extras = []
         for i in range(self.n_inner_transforms):
             reference_points = reference_points_all[:, :, i]
             bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
-            x2, log_det = bijector.forward_and_log_det(x2)
+            x2, log_det, extra = bijector.forward_and_log_det_with_extra(x2)
+            extras.append(extra)
             log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
+        extras = jax.tree_map(lambda *xs: jnp.stack(xs), *extras)
+        extras = extras._replace(aux_info=extras.aggregate_info(),
+                                 aux_loss=jnp.zeros(()))
         y2 = x2
         y = self._recombine(x1, y2)
         y = self.adjust_centering_post_proj(y)
-        return y, log_det_total, extra
+        return y, log_det_total, extras
 
     def inverse_and_log_det_single_with_extra(self, y: Array, graph_features: chex.Array) -> Tuple[Array, Array, Extra]:
         """Computes x = f^{-1}(y) and log|det J(f^{-1})(y)|."""
@@ -134,22 +138,27 @@ class AlongVectorSplitCoupling(BijectorWithExtra):
 
         y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
-        reference_points_all, bijector_feat_in, extra = self.get_reference_points_and_h(y1, graph_features)
+        reference_points_all, bijector_feat_in = self.get_reference_points_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, dim_ = reference_points_all.shape
         assert n_transforms == self.n_inner_transforms
 
         log_det_total = jnp.zeros(())
+        extras = []
         for i in reversed(range(self.n_inner_transforms)):
             reference_points = reference_points_all[:, :, i]
             bijector = self._inner_bijector(params=bijector_feat_in, reference=reference_points, vector_index=i)
-            y2, log_det = bijector.inverse_and_log_det(y2)
+            y2, log_det, extra = bijector.inverse_and_log_det_with_extra(y2)
+            extras.append(extra)
             log_det_total = log_det_total + log_det
             chex.assert_shape(log_det_total, ())
 
+        extras = jax.tree_map(lambda *xs: jnp.stack(xs), *extras)
+        extras = extras._replace(aux_info=extras.aggregate_info(),
+                                 aux_loss=jnp.zeros(()))
         x2 = y2
         x = self._recombine(y1, x2)
         x = self.adjust_centering_post_proj(x)
-        return x, log_det_total, extra
+        return x, log_det_total, extras
 
     def forward_and_log_det_single(self, x: Array, graph_features: chex.Array) -> Tuple[Array, Array]:
         return self.forward_and_log_det_single_with_extra(x, graph_features)[:2]

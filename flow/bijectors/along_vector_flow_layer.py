@@ -6,9 +6,10 @@ import jax.numpy as jnp
 import jax
 
 from utils.numerical import safe_norm
+from flow.distrax_with_extra import Extra, BijectorWithExtra
 
 
-class AlongVectorFlow(distrax.Bijector):
+class AlongVectorFlow(BijectorWithExtra):
     def __init__(self,
                  inner_bijector: distrax.Bijector,
                  reference: chex.Array
@@ -38,7 +39,7 @@ class AlongVectorFlow(distrax.Bijector):
         log_det = jnp.squeeze(log_det, axis=-1)
         return x_new, log_det
 
-    def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+    def forward_and_log_det_with_extra(self, x: chex.Array) -> Tuple[chex.Array, chex.Array, Extra]:
         n_nodes, multiplicity, dim = x.shape
         r, unit_vector, log_det_norm_fwd = self.to_radial_and_log_det(x)
         r_new, logdet_inner_bijector = self.inner_bijector.forward_and_log_det(r)
@@ -51,9 +52,15 @@ class AlongVectorFlow(distrax.Bijector):
         log_det = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det, (n_nodes, multiplicity))
 
-        return x, jnp.sum(log_det)
+        info = {"along_vec_flow_min_radius": jnp.min(r), "along_vec_flow_max_radius": jnp.max(r),
+                "along_vec_flow_mean_radius": jnp.mean(r)}
+        info_aggregator = {"along_vec_flow_min_radius": jnp.min, "along_vec_flow_max_radius": jnp.max,
+                "along_vec_flow_mean_radius": jnp.mean}
+        extra = Extra(aux_info=info, info_aggregator=info_aggregator)
 
-    def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        return x, jnp.sum(log_det), extra
+
+    def inverse_and_log_det_with_extra(self, y: chex.Array) -> Tuple[chex.Array, chex.Array, Extra]:
         n_nodes, multiplicity, dim = y.shape
         r, unit_vector, log_det_norm_fwd = self.to_radial_and_log_det(y)
         r_new, logdet_inner_bijector = self.inner_bijector.inverse_and_log_det(r)
@@ -66,4 +73,16 @@ class AlongVectorFlow(distrax.Bijector):
         log_det = logdet_inner_bijector + log_det_norm_fwd + log_det_norm_rv
         chex.assert_shape(log_det, (n_nodes, multiplicity))
 
-        return x, jnp.sum(log_det)
+        info = {"along_vec_flow_min_radius": jnp.min(r), "along_vec_flow_max_radius": jnp.max(r),
+                "along_vec_flow_mean_radius": jnp.mean(r)}
+        info_aggregator = {"along_vec_flow_min_radius": jnp.min, "along_vec_flow_max_radius": jnp.max,
+                "along_vec_flow_mean_radius": jnp.mean}
+        extra = Extra(aux_info=info, info_aggregator=info_aggregator)
+
+        return x, jnp.sum(log_det), extra
+
+    def forward_and_log_det(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        return self.forward_and_log_det_with_extra(x)[:2]
+
+    def inverse_and_log_det(self, y: chex.Array) -> Tuple[chex.Array, chex.Array]:
+        return self.inverse_and_log_det_with_extra(y)[:2]
