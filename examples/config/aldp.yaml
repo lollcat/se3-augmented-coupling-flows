@@ -30,16 +30,20 @@ flow:
   nodes: 22
   n_layers: 8
   identity_init: true
-  type: spherical #  nice proj spherical
+  type: along_vector #  nice proj spherical along_vector
   kwargs:
+    n_inner_transforms: 2
+    along_vector:
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      dist_spline_max: 10.
+      spline_num_bins: 8
     spherical:
-      n_inner_transforms: 3
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
-      n_inner_transforms: 3
-      origin_on_coupled_pair: false
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       num_bins: 8
       lower: -10.
       upper: 10.

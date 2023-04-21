@@ -54,9 +54,13 @@ flow:
   n_layers: 4
   act_norm: false
   identity_init: true
-  type: spherical #  nice proj spherical
+  type: along_vector #  nice proj spherical along_vector
   kwargs:
-    n_inner_transforms: 1
+    n_inner_transforms: 2
+    along_vector:
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      dist_spline_max: 10.
+      spline_num_bins: 8
     spherical:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.

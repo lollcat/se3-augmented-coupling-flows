@@ -12,6 +12,7 @@ from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
+from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
 from nets.base import NetsConfig
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -57,7 +58,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj', 'spherical']
+        assert flow in ['nice', 'proj', 'spherical', 'along_vector']
 
     if config.base.aug.trainable_augmented_scale:  # or config.target_aux_config.trainable_augmented_scale:
         raise NotImplementedError("I have not got these working nicely yet, do not use these options.")
@@ -94,13 +95,22 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 identity_init=config.identity_init)
             bijectors.append(bijector)
 
-        # if config.n_aug > 1:
-        #     bijectors.append(AugPermuteBijector(aug_only=True))
-
-
         for swap in (False, True):  # For swap False we condition augmented on original.
+            if 'along_vector' in flow_type:
+                kwargs_along_vector = config.kwargs['along_vector'] if 'along_vector' in config.kwargs.keys() else {}
+                bijector = make_along_vector_coupling_layer(
+                    graph_features=graph_features,
+                    n_aug=config.n_aug,
+                    layer_number=layer_number,
+                    dim=config.dim,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_along_vector
+                )
+                bijectors.append(bijector)
             if 'spherical' in flow_type:
-                kwargs_vec_proj_rnvp = config.kwargs['spherical'] if 'spherical' in config.kwargs.keys() else {}
+                kwargs_spherical = config.kwargs['spherical'] if 'spherical' in config.kwargs.keys() else {}
                 bijector = make_spherical_coupling_layer(
                     graph_features=graph_features,
                     n_aug=config.n_aug,
@@ -109,7 +119,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     swap=swap,
                     identity_init=config.identity_init,
                     nets_config=config.nets_config,
-                    **kwargs_vec_proj_rnvp
+                    **kwargs_spherical
                 )
                 bijectors.append(bijector)
 
