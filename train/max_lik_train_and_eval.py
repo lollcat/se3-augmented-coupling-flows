@@ -26,7 +26,7 @@ def general_ml_loss_fn(
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
     mean_log_prob_q = jnp.mean(log_q)
     # Train by maximum likelihood.
-    loss = mean_log_prob_q
+    loss = - mean_log_prob_q
     info = {"mean_log_prob_q_joint": mean_log_prob_q,
             }
     aux_loss = jnp.mean(extra.aux_loss)
