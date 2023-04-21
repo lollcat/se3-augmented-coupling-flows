@@ -86,7 +86,7 @@ class AlongVectorSplitCoupling(BijectorWithExtra):
       """Returns an inner bijector for the passed params."""
       inner_bijector = self._bijector(params, vector_index)
       projection_bijector = AlongVectorFlow(inner_bijector, reference)
-      return spherical_bijector
+      return projection_bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\
             Tuple[chex.Array, chex.Array, Extra]:
