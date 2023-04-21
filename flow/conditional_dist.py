@@ -122,21 +122,20 @@ class ConditionalGaussian(DistributionWithExtra):
         return (self.n_nodes, self.n_aux, self.dim)
 
 
-def build_aux_dist(n_aug: int,
-                   augmented_scale_init: float = 1.0,
-                   trainable_scale: bool = False,
-                   conditioned: bool = True,
-                   name: str = 'aux_dist'):
+def build_aux_target_dist(n_aug: int,
+                          augmented_scale_init: float = 1.0,
+                          trainable_scale: bool = False,
+                          conditioned: bool = True):
+
+    if trainable_scale:
+        raise NotImplementedError("This option is depricated, as it is equivalent to training "
+                                  "another layer of the flow.")
 
     def make_aux_target(sample: FullGraphSample):
         x = sample.positions
         n_nodes, dim = x.shape[-2:]
-        if trainable_scale:
-            log_scale = hk.get_parameter(name=name + '_augmented_scale_logit', shape=(n_aug,),
-                                         init=hk.initializers.Constant(jnp.log(augmented_scale_init)), dtype=float)
-        else:
-            scale = jnp.ones(n_aug) * augmented_scale_init
-            log_scale = jnp.log(scale)
+        scale = jnp.ones(n_aug) * augmented_scale_init
+        log_scale = jnp.log(scale)
 
         dist = ConditionalGaussian(dim=dim, n_nodes=n_nodes, n_aug=n_aug, x=x,
                                    log_scale=log_scale, conditioned=conditioned)

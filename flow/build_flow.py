@@ -7,7 +7,7 @@ import distrax
 
 from flow.base_dist import JointBaseDistribution
 from flow.x_base_dist import CentreGravityGaussian, HarmoticPotential
-from flow.conditional_dist import build_aux_dist
+from flow.conditional_dist import build_aux_target_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.pseudo_act_norm import make_act_norm
@@ -148,7 +148,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
         return ChainWithExtra(bijectors)
 
-    make_aug_target = build_aux_dist(
+    make_aug_target = build_aux_target_dist(
         n_aug=config.n_aug,
         augmented_scale_init=config.target_aux_config.scale_init,
         trainable_scale=config.target_aux_config.trainable_augmented_scale,
