@@ -6,11 +6,11 @@ import jax.numpy as jnp
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
-from flow.bijectors.spherical_coupling import SphericalSplitCoupling
+from flow.bijectors.along_vector_coupling import AlongVectorSplitCoupling
 from flow.bijectors.blockwise import Blockwise
 
 
-def make_spherical_coupling_layer(
+def make_along_vector_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -22,15 +22,14 @@ def make_spherical_coupling_layer(
         dist_spline_max: float = 10.,
         use_aux_loss: bool = True,
         n_inner_transforms: int = 1,
-        ) -> SphericalSplitCoupling:
+        ) -> AlongVectorSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
     base_name = f"layer_{layer_number}_swap{swap}"
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     params_per_dim = 3 * spline_num_bins + 1
-    n_invariant_params = multiplicity_within_coupling_split * dim * params_per_dim
-    n_vectors_per_inner_transform = dim
+    n_invariant_params = multiplicity_within_coupling_split * params_per_dim
 
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
@@ -46,42 +45,13 @@ def make_spherical_coupling_layer(
         )
         params = mlp_function(params)
         # reshape
-        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
-        d_bijector = distrax.RationalQuadraticSpline(
-            params[:, :, :1, :],
+        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, 1, params_per_dim))
+        bijector = distrax.RationalQuadraticSpline(
+            params,
             range_min=0.0,
             range_max=dist_spline_max,
             boundary_slopes='unconstrained',
             min_bin_size=(dist_spline_max - 0.0) * 1e-4)
-        if dim == 2:
-            theta_bijector = distrax.RationalQuadraticSpline(
-                params[:, :, 1:2, :],
-                range_min=-jnp.pi,
-                range_max=jnp.pi,
-                boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
-            bijector = Blockwise(
-                bijectors=[d_bijector, theta_bijector],
-                split_indices=[1, ],
-            )
-        else:
-            assert dim == 3
-            theta_bijector = distrax.RationalQuadraticSpline(
-                params[:, :, 1:2, :],
-                range_min=0,
-                range_max=jnp.pi,
-                boundary_slopes='unconstrained',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
-            torsional_bijector = distrax.RationalQuadraticSpline(
-                params[:, :, 2:3, :],
-                range_min=-jnp.pi,
-                range_max=jnp.pi,
-                boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
-            bijector = Blockwise(
-                bijectors=[d_bijector, theta_bijector, torsional_bijector],
-                split_indices=[1,2],
-            )
         return bijector
 
 
@@ -99,16 +69,15 @@ def make_spherical_coupling_layer(
         assert n_vec_multiplicity_in == multiplicity_within_coupling_split
         net = EGNN(name=base_name,
                       nets_config=nets_config,
-                      n_equivariant_vectors_out=n_vectors_per_inner_transform*multiplicity_within_coupling_split*n_inner_transforms,
+                      n_equivariant_vectors_out=multiplicity_within_coupling_split*n_inner_transforms,
                       n_invariant_feat_out=n_invariant_feat_out,
                       zero_init_invariant_feat=False)
         vectors, h = net(positions, features)
-        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_inner_transforms,
-                                        n_vectors_per_inner_transform, dim))
+        vectors = jnp.reshape(vectors, (n_nodes, multiplicity_within_coupling_split, n_inner_transforms, dim))
         return vectors, h
 
 
-    return SphericalSplitCoupling(
+    return AlongVectorSplitCoupling(
         split_index=(n_aug + 1) // 2,
         get_reference_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,

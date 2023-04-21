@@ -3,11 +3,11 @@ import haiku as hk
 import jax.numpy as jnp
 
 from utils.test import bijector_test
-from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
+from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
-                            n_nodes: int = 4, n_aux: int = 3):
+def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
+                           n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
@@ -16,7 +16,7 @@ def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_spherical_coupling_layer(
+            bijector = make_along_vector_coupling_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
@@ -52,10 +52,10 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
 
-    test_bijector_spherical(dim=2)
+    tesst_along_vector_flow(dim=2)
     print('passed test in 2D')
 
-    test_bijector_spherical(dim=3)
+    tesst_along_vector_flow(dim=3)
     print('passed test in 3D')
 
 

@@ -5,7 +5,7 @@ import jax
 from molboil.utils.numerical import rotate_translate_permute_general
 
 from flow.aug_flow_dist import FullGraphSample
-from flow.conditional_dist import build_aux_dist
+from flow.conditional_dist import build_aux_target_dist
 
 _N_NODES = 7
 _FEATURE_DIM = 1
@@ -16,8 +16,8 @@ def test_conditional_dist(dim: int = 3, n_aug: int = 3):
     batch_size = 5
     key = jax.random.PRNGKey(0)
 
-    make_aux_target = build_aux_dist(name='target', n_aug=n_aug, conditioned=True, augmented_scale_init=1.,
-                                     trainable_scale=False)
+    make_aux_target = build_aux_target_dist(name='target', n_aug=n_aug, conditioned=True, augmented_scale_init=1.,
+                                            trainable_scale=False)
 
     # Init params.
     key, subkey = jax.random.split(key)

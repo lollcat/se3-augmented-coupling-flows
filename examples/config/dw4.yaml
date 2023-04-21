@@ -8,8 +8,6 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
-    scale_init: 1.
-    trainable_augmented_scale: false
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
@@ -20,17 +18,21 @@ flow:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: false
+      scale_init: 1.0
+      trainable_augmented_scale: true
   dim: 2
   nodes: 4
   n_aug: 5
   n_layers: 4
   act_norm: false
   identity_init: true
-  type: proj #  nice proj spherical
+  type: along_vector #  nice proj spherical along_vector
   kwargs:
     n_inner_transforms: 2
+    along_vector:
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      dist_spline_max: 10.
+      spline_num_bins: 8
     spherical:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -86,6 +88,7 @@ training:
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
+  verbose_info: true
 
 
 logger:

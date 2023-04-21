@@ -22,16 +22,12 @@ def general_ml_loss_fn(
         use_flow_aux_loss: bool,
         aux_loss_weight: float) -> Tuple[chex.Array, dict]:
     aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
-    log_pi_a_given_x = flow.aux_target_log_prob_apply(jax.lax.stop_gradient(params.aux_target), x, aux_samples)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
-    chex.assert_equal_shape((log_q, log_pi_a_given_x))
     mean_log_prob_q = jnp.mean(log_q)
-    mean_log_p_a = jnp.mean(log_pi_a_given_x)
-    # Train on lower bound of the marginal log likelihood. (Allows for log_pi_a_given_x to be parameterized)
-    loss = mean_log_p_a - mean_log_prob_q
+    # Train by maximum likelihood.
+    loss = - mean_log_prob_q
     info = {"mean_log_prob_q_joint": mean_log_prob_q,
-            "mean_log_p_a": mean_log_p_a
             }
     aux_loss = jnp.mean(extra.aux_loss)
     info.update(flow.get_base_and_target_info(params))

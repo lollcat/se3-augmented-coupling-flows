@@ -11,8 +11,6 @@ target:
     val: target/data/aldp_500K_test_mini.h5
   aux:
     conditioned_on_x: true
-    scale_init: 1.0
-    trainable_augmented_scale: false
 
 flow:
   n_aug: 3
@@ -24,22 +22,26 @@ flow:
       trainable_mode_scale: false
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: false
+      scale_init: 1.0
+      trainable_augmented_scale: true
   dim: 3
   nodes: 22
   n_layers: 8
   identity_init: true
-  type: spherical #  nice proj spherical
+  type: along_vector #  nice proj spherical along_vector
   kwargs:
+    n_inner_transforms: 3
+    along_vector:
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      dist_spline_max: 10.
+      spline_num_bins: 8
     spherical:
-      n_inner_transforms: 3
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
-      n_inner_transforms: 3
-      origin_on_coupled_pair: false
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       num_bins: 8
       lower: -10.
       upper: 10.
@@ -87,6 +89,7 @@ training:
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
+  verbose_info: false
 
 
 eval:
