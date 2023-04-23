@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from molboil.utils.numerical import rotate_translate_permute_general
 
-from flow.x_base_dist import HarmoticPotential, assert_mean_zero
+from flow.x_base_dist import HarmonicPotential, assert_mean_zero
 
 
 def test_harmonic_potential():
@@ -18,7 +18,7 @@ def test_harmonic_potential():
 
     edges = list(zip(range(n_nodes - 1), range(1, n_nodes)))
 
-    dist = HarmoticPotential(dim=dim, n_nodes=n_nodes, edges=edges)
+    dist = HarmonicPotential(dim=dim, n_nodes=n_nodes, edges=edges)
 
     # Sample: Test that it does not smoke.
     sample = dist.sample(seed=key, sample_shape=batch_size)

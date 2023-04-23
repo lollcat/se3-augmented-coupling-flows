@@ -31,7 +31,7 @@ class CentreGravityGaussian(distrax.Distribution):
         return (self.n_nodes, self.dim)
 
 
-class HarmoticPotential(distrax.Distribution):
+class HarmonicPotential(distrax.Distribution):
     """Distribution having a harmonic potential based on a graph,
     similar to base distribution used in https://arxiv.org/abs/2304.02198"""
     def __init__(self, dim: int, n_nodes: int, edges: Iterable = [],
