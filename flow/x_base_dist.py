@@ -31,7 +31,7 @@ class CentreGravityGaussian(distrax.Distribution):
         return (self.n_nodes, self.dim)
 
 
-class HarmoticPotential(distrax.Distribution):
+class HarmonicPotential(distrax.Distribution):
     """Distribution having a harmonic potential based on a graph,
     similar to base distribution used in https://arxiv.org/abs/2304.02198"""
     def __init__(self, dim: int, n_nodes: int, edges: Iterable = [],
@@ -41,8 +41,8 @@ class HarmoticPotential(distrax.Distribution):
         self.n_nodes = n_nodes
         H = np.zeros((n_nodes, n_nodes))
         for i, j in edges:
-            H[i, j] = a
-            H[j, i] = a
+            H[i, j] = -a
+            H[j, i] = -a
             H[i, i] += a
             H[j, j] += a
         self.D, self.P = jnp.linalg.eigh(jnp.array(H))
