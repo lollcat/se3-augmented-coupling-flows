@@ -41,8 +41,8 @@ class HarmonicPotential(distrax.Distribution):
         self.n_nodes = n_nodes
         H = np.zeros((n_nodes, n_nodes))
         for i, j in edges:
-            H[i, j] = a
-            H[j, i] = a
+            H[i, j] = -a
+            H[j, i] = -a
             H[i, i] += a
             H[j, j] += a
         self.D, self.P = jnp.linalg.eigh(jnp.array(H))
