@@ -7,11 +7,11 @@ hydra:
 
 fab:
   with_buffer: true
-  buffer_max_length: 10000
+  buffer_max_length: 20000
   buffer_min_length: 1000
-  n_updates_per_smc_forward_pass: 16
+  n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
-  use_resampling: true
+  use_resampling: false
   use_hmc: true
   transition_operator:
     hmc:
@@ -45,10 +45,9 @@ flow:
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: 1.0
-      trainable_augmented_scale: true
   dim: 3
   nodes: 13
-  n_layers: 6
+  n_layers: 8
   identity_init: true
   type: along_vector #  nice proj spherical along_vector
   kwargs:

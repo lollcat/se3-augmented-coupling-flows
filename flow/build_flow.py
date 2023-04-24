@@ -74,7 +74,8 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             n_aux=config.n_aug,
             x_dist=x_dist,
             augmented_scale_init=config.base.aug.scale_init,
-            augmented_conditioned=config.base.aug.conditioned_on_x
+            augmented_conditioned=config.base.aug.conditioned_on_x,
+            trainable_augmented_scale=config.base.aug.trainable_augmented_scale
         )
         return base
 
