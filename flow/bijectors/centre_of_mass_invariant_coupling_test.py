@@ -6,7 +6,7 @@ from utils.testing import check_bijector_properties
 from flow.bijectors.build_centre_of_mass_invariant_coupling import make_centre_of_mass_invariant_coupling_layer
 from utils.testing import get_minimal_nets_config
 
-def tesst_bijector_centre_of_mass_only(dim: int = 3, n_layers: int = 1, n_nodes: int = 4, n_aux: int = 1,
+def test_bijector_centre_of_mass_only(dim: int = 3, n_layers: int = 1, n_nodes: int = 4, n_aux: int = 1,
                                       n_inner_transformer: int = 1):
     USE_64_BIT = True
     if USE_64_BIT:
@@ -53,8 +53,8 @@ def tesst_bijector_centre_of_mass_only(dim: int = 3, n_layers: int = 1, n_nodes:
 
 
 if __name__ == '__main__':
-    tesst_bijector_centre_of_mass_only(dim=2)
+    test_bijector_centre_of_mass_only(dim=2)
     print('passed test in 2D')
 
-    tesst_bijector_centre_of_mass_only(dim=3)
+    test_bijector_centre_of_mass_only(dim=3)
     print('passed test in 3D')

@@ -129,11 +129,13 @@ class ProjSplitCoupling(BijectorWithExtra):
 
     def _split(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
             x1, x2 = x2, x1
         return x1, x2
 
     def _recombine(self, x1: chex.Array, x2: chex.Array) -> chex.Array:
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)

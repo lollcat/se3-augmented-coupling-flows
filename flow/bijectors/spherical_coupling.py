@@ -54,11 +54,13 @@ class SphericalSplitCoupling(BijectorWithExtra):
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
           x1, x2 = x2, x1
         return x1, x2
 
     def _recombine(self, x1: Array, x2: Array) -> Array:
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
