@@ -69,7 +69,7 @@ class Transformer(hk.Module):
         n_nodes, multiplicity, dim = positions.shape
 
         # Flatten multiplicity and dim dimensions into each other.
-        positions = jnp.reshape(positions, (positions.shape[0], positions[1]*positions[2]))
+        positions = jnp.reshape(positions, (positions.shape[0], multiplicity*dim))
         features = jnp.squeeze(features, axis=1)
         x = jnp.concatenate([positions, features], axis=-1)
         # Use linear layer to project into space with same width as transformer.
@@ -89,6 +89,6 @@ class Transformer(hk.Module):
                                                     b_init=hk.initializers.VarianceScaling(0.01))
         x_out = final_layer(x_out)
         chex.assert_rank(x_out, 2)
-        chex.assert_axis_dimension(0, n_nodes)
+        chex.assert_axis_dimension(x_out, 0, n_nodes)
 
         return x_out

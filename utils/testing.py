@@ -6,7 +6,7 @@ import optax
 from molboil.utils.test import assert_is_equivariant, assert_is_invariant, random_rotate_translate_permute
 
 from utils.numerical import param_count
-from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, TransformerConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
@@ -26,11 +26,14 @@ def get_minimal_nets_config(type = 'egnn'):
                                  name='e3gnn_torso'
                              ),
                              mlp_head_config=MLPHeadConfig((4,)),
+                             non_equivariant_transformer_config=TransformerConfig(output_dim=6,
+                                                                                  key_size_per_node_dim_in=2,
+                                                                                  n_layers=2, mlp_units=(4,))
                              )
     return nets_config
 
-def bijector_test(bijector_forward, bijector_backward,
-                  dim: int, n_nodes: int, n_aux: int):
+def check_bijector_properties(bijector_forward, bijector_backward,
+                              dim: int, n_nodes: int, n_aux: int, test_rotation_equivariance: bool = True):
     """Test that the bijector is equivariant, and that it's log determinant is invariant.
     Assumes bijectors are haiku transforms."""
     assert dim in (2, 3)
@@ -74,17 +77,18 @@ def bijector_test(bijector_forward, bijector_backward,
     chex.assert_trees_all_close(1 + (x_and_a - x_and_a_old)/magnitude_of_bijector, jnp.ones_like(x_and_a),
                                 atol=0.01)
 
-    # Test the transformation is equivariant.
-    key, subkey = jax.random.split(key)
-    assert_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
-    key, subkey = jax.random.split(key)
-    assert_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
+    if test_rotation_equivariance:
+        # Test the transformation is equivariant.
+        key, subkey = jax.random.split(key)
+        assert_is_equivariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[0], subkey, event_shape)
+        key, subkey = jax.random.split(key)
+        assert_is_equivariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[0], subkey, event_shape)
 
-    # Check the change to the log det is invariant.
-    key, subkey = jax.random.split(key)
-    assert_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
-    key, subkey = jax.random.split(key)
-    assert_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
+        # Check the change to the log det is invariant.
+        key, subkey = jax.random.split(key)
+        assert_is_invariant(lambda x_and_a: bijector_forward.apply(params, x_and_a)[1], subkey, event_shape)
+        key, subkey = jax.random.split(key)
+        assert_is_invariant(lambda x_and_a: bijector_backward.apply(params, x_and_a)[1], subkey, event_shape)
 
 
     # Forward reverse test but with a batch.

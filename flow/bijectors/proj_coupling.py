@@ -241,7 +241,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         chex.assert_rank(y, 3)
         dim = y.shape[-1]
 
-        y = self.adjust_centering_post_proj(y)
+        y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape

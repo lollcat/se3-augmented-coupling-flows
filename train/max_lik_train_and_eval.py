@@ -4,7 +4,7 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from utils.test import get_checks_for_flow_properties
+from utils.testing import get_checks_for_flow_properties
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
 

@@ -2,9 +2,9 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.test import bijector_test
+from utils.testing import check_bijector_properties
 from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
-from utils.test import get_minimal_nets_config
+from utils.testing import get_minimal_nets_config
 
 def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
                            n_nodes: int = 4, n_aux: int = 3):
@@ -42,7 +42,7 @@ def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
         flow = make_flow()
         return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
+    check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':

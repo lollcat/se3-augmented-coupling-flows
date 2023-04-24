@@ -5,10 +5,11 @@ import jax.numpy as jnp
 
 from nets.conditioner_mlp import ConditionerHead
 from nets.base import MLPHeadConfig
+from nets.transformer import TransformerConfig, Transformer
 from flow.bijectors.centre_of_mass_invariant_coupling import CentreOfMassInvariantSplitCoupling
 
 
-def make_spherical_coupling_layer(
+def make_centre_of_mass_invariant_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -19,7 +20,6 @@ def make_spherical_coupling_layer(
         identity_init: bool = True,
         spline_num_bins: int = 4,
         spline_max_abs_min: float = 10.,
-        use_aux_loss: bool = True,
         n_inner_transforms: int = 1,
         ) -> CentreOfMassInvariantSplitCoupling:
     assert n_aug % 2 == 1
@@ -29,8 +29,6 @@ def make_spherical_coupling_layer(
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     params_per_dim = 3 * spline_num_bins + 1
     n_invariant_params = multiplicity_within_coupling_split * dim * params_per_dim
-    n_vectors_per_inner_transform = dim
-
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
         chex.assert_rank(params, 2)
@@ -59,14 +57,8 @@ def make_spherical_coupling_layer(
         chex.assert_rank(features, 3)
         n_nodes, n_vec_multiplicity_in, dim = positions.shape
         assert n_vec_multiplicity_in == multiplicity_within_coupling_split
-        # net = EGNN(name=base_name,
-        #               nets_config=nets_config,
-        #               n_equivariant_vectors_out=n_vectors_per_inner_transform*multiplicity_within_coupling_split*n_inner_transforms,
-        #               n_invariant_feat_out=n_invariant_feat_out,
-        #               zero_init_invariant_feat=False)
+        net = Transformer(name=base_name, config=transformer_config)
         h = net(positions, features)
-        h = jnp.reshape(h, (n_nodes, multiplicity_within_coupling_split, n_inner_transforms,
-                                        n_vectors_per_inner_transform, dim))
         return h
 
 

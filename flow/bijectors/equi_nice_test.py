@@ -1,9 +1,9 @@
 import haiku as hk
 import distrax
 
-from utils.test import bijector_test
+from utils.testing import check_bijector_properties
 from flow.bijectors.equi_nice import make_se_equivariant_nice
-from utils.test import get_minimal_nets_config
+from utils.testing import get_minimal_nets_config
 import jax.numpy as jnp
 
 
@@ -40,7 +40,7 @@ def test_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn', n_nodes: in
         flow = make_flow()
         return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
+    check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':

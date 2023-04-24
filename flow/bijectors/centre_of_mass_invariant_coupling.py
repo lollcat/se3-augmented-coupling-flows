@@ -95,7 +95,8 @@ class CentreOfMassInvariantSplitCoupling(BijectorWithExtra):
         x = self.adjust_centering_pre_proj(x)
         x1, x2 = self._split(x)
         bijector_feat_in = self._conditioner(x1, graph_features)
-        n_nodes, multiplicity, dim = bijector_feat_in.shape
+        chex.assert_rank(bijector_feat_in, 2)
+        n_nodes, multiplicity_dim = bijector_feat_in.shape
 
         log_det_total = jnp.zeros(())
         for i in range(self.n_inner_transforms):
@@ -114,11 +115,10 @@ class CentreOfMassInvariantSplitCoupling(BijectorWithExtra):
         chex.assert_rank(y, 3)
         dim = y.shape[-1]
 
-        y = self.adjust_centering_post_proj(y)
+        y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
         bijector_feat_in = self._conditioner(y1, graph_features)
-        n_nodes, multiplicity, dim = bijector_feat_in.shape
-
+        n_nodes, multiplicity_dim = bijector_feat_in.shape
 
         log_det_total = jnp.zeros(())
         for i in reversed(range(self.n_inner_transforms)):
