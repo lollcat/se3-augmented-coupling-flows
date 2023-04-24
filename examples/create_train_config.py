@@ -21,7 +21,7 @@ from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig
+from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig, TransformerConfig
 from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
@@ -71,11 +71,16 @@ def create_nets_config(nets_config: DictConfig):
     e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
     mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
                                                                              nets_config.keys() else None
+    non_equivariant_transformer_config = TransformerConfig(**nets_config.pop('non_equivariant_transformer_config')) \
+        if 'non_equivariant_transformer_config' in nets_config.keys() else None
     type = nets_config['type']
-    nets_config = NetsConfig(type=type,
+    nets_config = NetsConfig(
+                             type=type,
                              egnn_torso_config=egnn_cfg,
                              e3gnn_torso_config=e3gnn_config,
-                             mlp_head_config=mlp_head_config)
+                             mlp_head_config=mlp_head_config,
+                             non_equivariant_transformer_config=non_equivariant_transformer_config
+                             )
     return nets_config
 
 def create_flow_config(cfg: DictConfig):

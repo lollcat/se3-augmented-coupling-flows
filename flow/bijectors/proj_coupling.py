@@ -112,7 +112,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         change this constraint to be with respect to x2[:, 0, :] instead."""
         chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
         if self._swap:
-            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            centre_of_mass = jnp.mean(x[:, self._split_index], axis=0, keepdims=True)[:, None, :]
             return x - centre_of_mass
         else:
             return x

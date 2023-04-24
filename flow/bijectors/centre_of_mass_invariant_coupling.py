@@ -54,7 +54,7 @@ class CentreOfMassInvariantSplitCoupling(BijectorWithExtra):
         change this constraint to be with respect to x2[:, 0, :] instead."""
         chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
         if self._swap:
-            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            centre_of_mass = jnp.mean(x[:, self._split_index], axis=0, keepdims=True)[:, None, :]
             return x - centre_of_mass
         else:
             return x
@@ -96,12 +96,14 @@ class CentreOfMassInvariantSplitCoupling(BijectorWithExtra):
         x1, x2 = self._split(x)
         bijector_feat_in = self._conditioner(x1, graph_features)
         chex.assert_rank(bijector_feat_in, 2)
-        n_nodes, multiplicity_dim = bijector_feat_in.shape
+        n_nodes, feature_dim = bijector_feat_in.shape
 
         log_det_total = jnp.zeros(())
         for i in range(self.n_inner_transforms):
             inner_bijector = self._inner_bijector(bijector_feat_in, i)
             x2, log_det_inner = inner_bijector.forward_and_log_det(x2)
+            chex.assert_shape(log_det_inner, ())
+            chex.assert_equal_shape((x1, x2))
             log_det_total = log_det_total + log_det_inner
 
         y2 = x2
@@ -118,13 +120,15 @@ class CentreOfMassInvariantSplitCoupling(BijectorWithExtra):
         y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
         bijector_feat_in = self._conditioner(y1, graph_features)
-        n_nodes, multiplicity_dim = bijector_feat_in.shape
+        n_nodes, feature_dim = bijector_feat_in.shape
 
         log_det_total = jnp.zeros(())
         for i in reversed(range(self.n_inner_transforms)):
             inner_bijector = self._inner_bijector(bijector_feat_in, i)
             y2, log_det_inner = inner_bijector.inverse_and_log_det(y2)
             log_det_total = log_det_total + log_det_inner
+            chex.assert_shape(log_det_inner, ())
+            chex.assert_equal_shape((y1, y2))
 
         x2 = y2
         x = self._recombine(y1, x2)

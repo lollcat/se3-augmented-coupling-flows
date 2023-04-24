@@ -15,7 +15,7 @@ def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
     def make_flow():
         bijectors = []
         for i in range(n_layers):
-            swap = i % 2 == 0
+            swap = i % 2 != 0
             bijector = make_along_vector_coupling_layer(
                 graph_features=graph_features,
                 layer_number=i,
