@@ -11,7 +11,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     x_dist:
       type: centre_gravity_gaussian
@@ -49,6 +49,8 @@ flow:
       mlp_units: [ 32, 32 ]
       n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
+      centre_mass: false
+      norm_wrt_centre_feat: true
     e3gnn:
       name: e3gnn
       n_blocks: 3 # number of layers
