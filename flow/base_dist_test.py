@@ -4,7 +4,7 @@ import jax
 from molboil.utils.test import assert_is_invariant
 
 from flow.base_dist import JointBaseDistribution
-from flow.x_base_dist import CentreGravityGaussian, HarmoticPotential, assert_mean_zero
+from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential, assert_mean_zero
 
 
 def test_base_distribution():
@@ -19,7 +19,7 @@ def test_base_distribution():
 
     edges = list(zip(range(n_nodes - 1), range(1, n_nodes)))
     x_dists = [CentreGravityGaussian(dim=dim, n_nodes=n_nodes),
-               HarmoticPotential(dim=dim, n_nodes=n_nodes, edges=edges)]
+               HarmonicPotential(dim=dim, n_nodes=n_nodes, edges=edges)]
 
     for x_dist in x_dists:
         dist = JointBaseDistribution(dim=dim, n_nodes=n_nodes, n_aux=n_aux,

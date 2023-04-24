@@ -6,7 +6,7 @@ from typing import NamedTuple, Sequence, Union, Iterable
 import distrax
 
 from flow.base_dist import JointBaseDistribution
-from flow.x_base_dist import CentreGravityGaussian, HarmoticPotential
+from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential
 from flow.conditional_dist import build_aux_target_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
@@ -65,7 +65,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         if config.base.x_dist.type == 'centre_gravity_gaussian':
             x_dist = CentreGravityGaussian(dim=config.dim, n_nodes=config.nodes)
         elif config.base.x_dist.type == 'harmonic_potential':
-            x_dist = HarmoticPotential(dim=config.dim, n_nodes=config.nodes, a=config.base.x_dist.a,
+            x_dist = HarmonicPotential(dim=config.dim, n_nodes=config.nodes, a=config.base.x_dist.a,
                                        edges=config.base.x_dist.edges,
                                        trainable_mode_scale=config.base.x_dist.trainable_mode_scale)
         base = JointBaseDistribution(
