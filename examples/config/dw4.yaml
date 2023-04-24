@@ -19,7 +19,6 @@ flow:
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
       scale_init: 1.0
-      trainable_augmented_scale: true
   dim: 2
   nodes: 4
   n_aug: 5

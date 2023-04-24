@@ -29,8 +29,9 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
 
     def init(params: chex.ArrayTree) -> IgnoreNanOptState:
         opt_state = optimizer.init(params)
-        grad_norms = jnp.zeros(window_length)
-        grad_norms = grad_norms.at[0:3].set(1e30)
+        grad_norms = jnp.ones(window_length)*float('nan')
+        # After initialisation, for first third of window length take every gradient step.
+        grad_norms = grad_norms.at[0:int(window_length*2/3)].set(1e30)
         return IgnoreNanOptState(opt_state=opt_state, grad_norms=grad_norms)
 
     def update(grad: chex.ArrayTree, opt_state: IgnoreNanOptState, params: chex.ArrayTree) ->\
