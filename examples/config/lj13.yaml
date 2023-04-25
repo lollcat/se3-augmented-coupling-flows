@@ -26,6 +26,7 @@ flow:
   kwargs:
     n_inner_transforms: 2
     non_equivariant:
+      transform_type: real_nvp # spline or real_nvp
       spline_num_bins: 8
       spline_max_abs_min: 10.
       n_inner_transforms: 1

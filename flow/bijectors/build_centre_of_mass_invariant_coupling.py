@@ -6,6 +6,8 @@ import jax.numpy as jnp
 from nets.conditioner_mlp import ConditionerHead
 from nets.base import MLPHeadConfig
 from nets.transformer import TransformerConfig, Transformer
+from utils.numerical import inverse_softplus
+import jax
 from flow.bijectors.centre_of_mass_invariant_coupling import CentreOfMassInvariantSplitCoupling
 
 
@@ -17,6 +19,7 @@ def make_centre_of_mass_invariant_coupling_layer(
         swap: bool,
         mlp_head_config: MLPHeadConfig,
         transformer_config: TransformerConfig,
+        transform_type: str = 'real_nvp',  # real_nvp or spline
         identity_init: bool = True,
         spline_num_bins: int = 4,
         spline_max_abs_min: float = 10.,
@@ -27,7 +30,11 @@ def make_centre_of_mass_invariant_coupling_layer(
     base_name = f"layer_{layer_number}_swap{swap}"
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
-    params_per_dim = 3 * spline_num_bins + 1
+    if transform_type == 'spline':
+        params_per_dim = 3 * spline_num_bins + 1
+    else:
+        assert transform_type == 'real_nvp'
+        params_per_dim = 2
     n_invariant_params = multiplicity_within_coupling_split * dim * params_per_dim
 
     def bijector_fn(params: chex.Array, vector_index: int) -> distrax.Bijector:
@@ -42,14 +49,24 @@ def make_centre_of_mass_invariant_coupling_layer(
             stable_layer=mlp_head_config.stable
         )
         params = mlp_function(params)
-        # reshape
-        params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
-        bijector = distrax.RationalQuadraticSpline(
-            params,
-            range_min=-spline_max_abs_min,
-            range_max=spline_max_abs_min,
-            boundary_slopes='unconstrained',
-            min_bin_size=(spline_max_abs_min*2) * 1e-4)
+        if transform_type == 'spline':
+            # reshape
+            params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim, params_per_dim))
+            bijector = distrax.RationalQuadraticSpline(
+                params,
+                range_min=-spline_max_abs_min,
+                range_max=spline_max_abs_min,
+                boundary_slopes='unconstrained',
+                min_bin_size=(spline_max_abs_min*2) * 1e-4)
+        else:
+            # reshape
+            params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim*params_per_dim))
+            scale_logit, shift = jnp.split(params, axis=-1, indices_or_sections=2)
+            # If log_scale is initialised to 0 then this initialises the flow to the identity.
+            log_scale = scale_logit + inverse_softplus(jnp.array(1.))
+            scale = jax.nn.softplus(log_scale)
+
+            return distrax.ScalarAffine(scale=scale, shift=shift)
         return bijector
 
     def transformer_forward(positions: chex.Array, features: chex.Array) -> chex.Array:
