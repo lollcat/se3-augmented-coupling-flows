@@ -1,4 +1,4 @@
-from typing import Tuple, Iterable, Optional
+from typing import Tuple, Iterable, Optional, List
 
 import chex
 import jax
@@ -122,10 +122,10 @@ class AldpTransformedInternals(distrax.Distribution):
         self.transform = CompleteInternalCoordinateTransform(ndim, z_matrix, cart_indices,
                                                              transform_data, ind_circ_dih=ind_circ_dih)
 
-        ncarts = self.transform.transform.len_cart_inds
-        permute_inv = np.array(self.transform.transform.permute_inv)
-        dih_ind_ = np.array(self.transform.transform.ic_transform.dih_indices)
-        std_dih = np.array(self.transform.transform.ic_transform.std_dih)
+        ncarts = self.transform.len_cart_inds
+        permute_inv = np.array(self.transform.permute_inv)
+        dih_ind_ = np.array(self.transform.ic_transform.dih_indices)
+        std_dih = np.array(self.transform.ic_transform.std_dih)
 
         ind = np.arange(60)
         ind = np.concatenate([ind[:3 * ncarts - 6], -np.ones(6, dtype=np.int), ind[3 * ncarts - 6:]])
@@ -137,18 +137,16 @@ class AldpTransformedInternals(distrax.Distribution):
 
         scale = jnp.ones(60)
         scale = scale.at[ind_circ].set(bound_circ)
-        self.dist_internal = UniformGaussian(dim=ndim, ind_uniform=ind_circ, scale=scale)
+        self.dist_internal = UniformGaussian(dim=60, ind_uniform=ind_circ, scale=scale)
 
     def _sample_n(self, key: PRNGKey, n: int) -> Array:
-        z = self.dist_internal.sample(key, n)
-        x = self.transform.inverse(z)
+        z = self.dist_internal._sample_n(key, n)
+        x, _ = self.transform.inverse(z)
         x = x.reshape(-1, 22, 3)
         return remove_mean(x)
 
     def log_prob(self, value: Array) -> Array:
-        z, log_det = self.transform(value.reshape(-1, 22, 3))
-        if value.ndim == 2:
-            z, log_det = z[0, ...], log_det[0, ...]
+        z, log_det = self.transform.forward(value.reshape(*value.shape[:-2], 66))
         return self.dist_internal.log_prob(z) + log_det
 
     @property
