@@ -66,7 +66,7 @@ def make_centre_of_mass_invariant_coupling_layer(
             log_scale = scale_logit + inverse_softplus(jnp.array(1.))
             scale = jax.nn.softplus(log_scale)
 
-            return distrax.ScalarAffine(scale=scale, shift=shift)
+            bijector = distrax.ScalarAffine(scale=scale, shift=shift)
         return bijector
 
     def transformer_forward(positions: chex.Array, features: chex.Array) -> chex.Array:
