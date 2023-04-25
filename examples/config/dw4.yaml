@@ -28,6 +28,10 @@ flow:
   type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 2
+    non_equivariant:
+      spline_num_bins: 8
+      spline_max_abs_min: 10.
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -96,6 +100,7 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: true
+  data_augmentation_for_non_eq: true
 
 
 logger:

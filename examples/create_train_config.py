@@ -165,10 +165,14 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                        )
 
     # Setup training functions.
+    data_augmentation = cfg.flow.type == 'non_equivariant' and cfg.training.data_augmentation_for_non_eq
+    if data_augmentation:
+        print("using data augmentation")
     loss_fn = partial(general_ml_loss_fn,
                       flow=flow,
                       use_flow_aux_loss=cfg.training.use_flow_aux_loss,
-                      aux_loss_weight=cfg.training.aux_loss_weight)
+                      aux_loss_weight=cfg.training.aux_loss_weight,
+                      apply_random_rotation=data_augmentation)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
                                verbose_info=cfg.training.verbose_info)
 
