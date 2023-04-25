@@ -7,8 +7,8 @@ hydra:
 
 fab:
   with_buffer: true
-  buffer_max_length: 20000
-  buffer_min_length: 1000
+  buffer_max_length_batches: 512
+  buffer_min_length_batches: 8
   n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
   use_resampling: false
@@ -16,7 +16,7 @@ fab:
   transition_operator:
     hmc:
       n_outer_steps: 1
-      n_inner_steps: 2
+      n_inner_steps: 5
       init_step_size: 1.
       target_p_accept: 0.65
       adapt_step_size: true
@@ -26,9 +26,9 @@ fab:
       target_p_accept: 0.65
       tune_step_size: true
   alpha: 2.  # alpha-divergence param
-  n_intermediate_distributions: 4
+  n_intermediate_distributions: 16
   spacing_type: linear
-  eval_inner_batch_size: 100
+  eval_inner_batch_size: 200
   eval_total_batch_size: 10000
 
 
@@ -38,7 +38,7 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: true
+  act_norm: false
   base:
     x_dist:
       type: centre_gravity_gaussian
@@ -47,11 +47,16 @@ flow:
       scale_init: 1.0
   dim: 3
   nodes: 13
-  n_layers: 8
+  n_layers: 6
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector
+  type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:
-    n_inner_transforms: 3
+    n_inner_transforms: 2
+    non_equivariant:
+      transform_type: real_nvp # spline or real_nvp
+      spline_num_bins: 8
+      spline_max_abs_min: 10.
+      n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -73,9 +78,11 @@ flow:
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
-      mlp_units: [ 32, 32 ]
-      n_invariant_feat_hidden: 32
+      mlp_units: [ 64, 64 ]
+      n_invariant_feat_hidden: 64
       cross_multiplicity_shifts: true
+      centre_mass: false
+      norm_wrt_centre_feat: true
     e3gnn:
       name: e3gnn
       n_blocks: 3 # number of layers
@@ -84,7 +91,7 @@ flow:
       n_invariant_feat_hidden: 32
       get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [32,]
+      mlp_units: [64,]
 
 
 training:
@@ -107,7 +114,7 @@ training:
   train_set_size: 1000
   test_set_size: 1000
   n_checkpoints: 0
-  n_eval: 10
+  n_eval: 20
   K_marginal_log_lik: 20
   save: true
   save_dir: lj13_results
@@ -117,7 +124,8 @@ training:
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
-  verbose_info: true
+  verbose_info: false
+  data_augmentation_for_non_eq: true
 
 logger:
 #  list_logger: null

@@ -2,9 +2,9 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.test import bijector_test
+from utils.testing import check_bijector_properties
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
-from utils.test import get_minimal_nets_config
+from utils.testing import get_minimal_nets_config
 
 def test_bijector_with_proj(
         transform_type: str = 'spline',
@@ -50,7 +50,7 @@ def test_bijector_with_proj(
         flow = make_flow()
         return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
+    check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':

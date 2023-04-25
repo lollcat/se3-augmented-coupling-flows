@@ -11,6 +11,7 @@ from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
 from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
 from molboil.models.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
 
+from nets.transformer import TransformerConfig
 
 class MLPHeadConfig(NamedTuple):
     mlp_units: Sequence[int]
@@ -22,6 +23,7 @@ class NetsConfig(NamedTuple):
     egnn_torso_config: Optional[EGNNTorsoConfig] = None
     e3gnn_torso_config: Optional[E3GNNTorsoConfig] = None
     mlp_head_config: Optional[MLPHeadConfig] = None
+    non_equivariant_transformer_config: Optional[TransformerConfig] = None
     softmax_layer_invariant_feat: bool = True
 
 

@@ -3,7 +3,7 @@ import chex
 
 
 from flow.bijectors.shrink import build_shrink_layer
-from flow.bijectors.centre_of_mass_flow import build_unconditional_centre_of_mass_layer
+from flow.bijectors.centre_of_mass_only_flow import build_unconditional_centre_of_mass_layer
 from flow.distrax_with_extra import ChainWithExtra
 
 

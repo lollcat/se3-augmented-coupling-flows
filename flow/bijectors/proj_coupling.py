@@ -112,7 +112,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         change this constraint to be with respect to x2[:, 0, :] instead."""
         chex.assert_rank(x, 3)  # [n_nodes, multiplicity, dim]
         if self._swap:
-            centre_of_mass = jnp.mean(x[:, self._split_axis], axis=0, keepdims=True)[:, None, :]
+            centre_of_mass = jnp.mean(x[:, self._split_index], axis=0, keepdims=True)[:, None, :]
             return x - centre_of_mass
         else:
             return x
@@ -129,11 +129,13 @@ class ProjSplitCoupling(BijectorWithExtra):
 
     def _split(self, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
         x1, x2 = jnp.split(x, [self._split_index], self._split_axis)
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
             x1, x2 = x2, x1
         return x1, x2
 
     def _recombine(self, x1: chex.Array, x2: chex.Array) -> chex.Array:
+        chex.assert_equal_shape((x1, x2))  # Currently assume split always in the middle.
         if self._swap:
           x1, x2 = x2, x1
         return jnp.concatenate([x1, x2], self._split_axis)
@@ -241,7 +243,7 @@ class ProjSplitCoupling(BijectorWithExtra):
         chex.assert_rank(y, 3)
         dim = y.shape[-1]
 
-        y = self.adjust_centering_post_proj(y)
+        y = self.adjust_centering_pre_proj(y)
         y1, y2 = self._split(y)
         origins, change_of_basis_matrices, bijector_feat_in, extra = self.get_basis_and_h(y1, graph_features)
         n_nodes, multiplicity, n_transforms, n_vectors, dim = change_of_basis_matrices.shape
