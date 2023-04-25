@@ -165,7 +165,8 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                        )
 
     # Setup training functions.
-    data_augmentation = cfg.flow.type == 'non_equivariant' and cfg.training.data_augmentation_for_non_eq
+    data_augmentation = (cfg.flow.type == 'non_equivariant' or 'non_equivariant' in
+                         cfg.flow.type) and cfg.training.data_augmentation_for_non_eq
     if data_augmentation:
         print("using data augmentation")
     loss_fn = partial(general_ml_loss_fn,

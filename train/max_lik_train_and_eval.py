@@ -27,8 +27,7 @@ def general_ml_loss_fn(
 ) -> Tuple[chex.Array, dict]:
     if apply_random_rotation:
         key, subkey = jax.random.split(key)
-        rotated_positions = jax.vmap(random_rotate_translate_permute)(
-            x.positions, jax.random.split(subkey, x.positions.shape[0]))
+        rotated_positions = random_rotate_translate_permute(x.positions, subkey, translate=False, permute=False)
         x = x._replace(positions=rotated_positions)
     aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
