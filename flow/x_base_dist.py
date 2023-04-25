@@ -160,11 +160,8 @@ class UniformGaussian(distrax.Distribution):
     def __init__(self, dim: int, ind_uniform: List[int], scale: Optional[chex.Array] = None):
         self.dim = dim
         self.ind_uniform = jnp.array(ind_uniform)
-        ind_gaussian = []
-        for i in range(dim):
-            if i not in ind_uniform:
-                ind_gaussian.append(i)
-        self.ind_gaussian = jnp.array(ind_gaussian)
+        self.ind_gaussian = jnp.setdiff1d(jnp.arange(dim), self.ind_uniform,
+                                          assume_unique=True, size=dim - len(ind_uniform))
         perm = jnp.concatenate([self.ind_uniform, self.ind_gaussian])
         self.inv_perm = jnp.zeros_like(perm).at[perm].set(jnp.arange(dim))
         if scale is None:
