@@ -37,19 +37,15 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.K_marginal_log_lik = 2
     cfg.fab.eval_inner_batch_size = 32
     cfg.fab.eval_total_batch_size = 64
-    cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
-    cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
+    cfg.fab.buffer_min_length_batches = cfg.fab.n_updates_per_smc_forward_pass
+    cfg.fab.buffer_max_length_batches = cfg.fab.n_updates_per_smc_forward_pass*10
     cfg.logger = DictConfig({"list_logger": None})
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
     cfg.flow.type = ['nice']
     cfg.flow.n_aug = 1
-    cfg.flow.n_layers = 2
-
-    cfg.target.aux.trainable_augmented_scale = False
-    cfg.flow.base.aux.trainable_augmented_scale = False
-    cfg.flow.base.train_x_scale = False
+    cfg.flow.n_layers = 1
 
 
     # Configure NNs
