@@ -123,17 +123,18 @@ class AldpTransformedInternals(distrax.Distribution):
                                                              transform_data, ind_circ_dih=ind_circ_dih)
 
         ncarts = self.transform.len_cart_inds
-        permute_inv = np.array(self.transform.permute_inv)
-        dih_ind_ = np.array(self.transform.ic_transform.dih_indices)
-        std_dih = np.array(self.transform.ic_transform.std_dih)
+        permute_inv = self.transform.permute_inv
+        dih_ind_ = self.transform.ic_transform.dih_indices
+        std_dih = self.transform.ic_transform.std_dih
 
-        ind = np.arange(60)
-        ind = np.concatenate([ind[:3 * ncarts - 6], -np.ones(6, dtype=np.int), ind[3 * ncarts - 6:]])
+        ind = jnp.arange(60)
+        ind = jnp.concatenate([ind[:3 * ncarts - 6], -np.ones(6, dtype=np.int), ind[3 * ncarts - 6:]])
         ind = ind[permute_inv]
         dih_ind = ind[dih_ind_]
 
-        ind_circ = dih_ind[ind_circ_dih]
-        bound_circ = np.pi / std_dih[ind_circ_dih]
+        ind_circ_dih_ = jnp.array(ind_circ_dih)
+        ind_circ = dih_ind[ind_circ_dih_]
+        bound_circ = np.pi / std_dih[ind_circ_dih_]
 
         scale = jnp.ones(60)
         scale = scale.at[ind_circ].set(bound_circ)
