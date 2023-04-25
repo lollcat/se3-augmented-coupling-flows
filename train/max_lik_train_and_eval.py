@@ -4,7 +4,9 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from utils.test import get_checks_for_flow_properties
+from molboil.utils.test import random_rotate_translate_permute
+
+from utils.testing import get_checks_for_flow_properties
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
 
@@ -20,7 +22,13 @@ def general_ml_loss_fn(
         verbose_info: bool,
         flow: AugmentedFlow,
         use_flow_aux_loss: bool,
-        aux_loss_weight: float) -> Tuple[chex.Array, dict]:
+        aux_loss_weight: float,
+        apply_random_rotation: bool = False
+) -> Tuple[chex.Array, dict]:
+    if apply_random_rotation:
+        key, subkey = jax.random.split(key)
+        rotated_positions = random_rotate_translate_permute(x.positions, subkey, translate=False, permute=False)
+        x = x._replace(positions=rotated_positions)
     aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
     log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)

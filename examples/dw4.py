@@ -52,6 +52,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.mlp_head_config.mlp_units = (4,)
     cfg.flow.nets.egnn.mlp_units = (4,)
     cfg.flow.nets.egnn.n_blocks = 2
+    cfg.flow.nets.non_equivariant_transformer_config.output_dim = 3
+    cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,)
+    cfg.flow.nets.non_equivariant_transformer_config.n_layers = 2
+    cfg.flow.nets.non_equivariant_transformer_config.num_heads = 1
 
     debug = False
     if debug:

@@ -27,9 +27,14 @@ flow:
   nodes: 22
   n_layers: 8
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector
+  type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:
-    n_inner_transforms: 3
+    n_inner_transforms: 2
+    non_equivariant:
+      transform_type: real_nvp # spline or real_nvp
+      spline_num_bins: 8
+      spline_max_abs_min: 10.
+      n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -53,6 +58,8 @@ flow:
       mlp_units: [ 32, 32 ]
       n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
+      centre_mass: false
+      norm_wrt_centre_feat: true
     mlp_head_config:
       mlp_units: [64,64]
       stable: true
@@ -89,6 +96,7 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: false
+  data_augmentation_for_non_eq: true
 
 
 eval:

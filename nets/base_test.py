@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import haiku as hk
 import chex
 
-from utils.test import get_minimal_nets_config
+from utils.testing import get_minimal_nets_config
 from nets.base import EGNN
 
 def test_net_does_not_smoke(type="egnn"):

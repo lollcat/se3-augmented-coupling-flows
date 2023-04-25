@@ -1,7 +1,7 @@
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.test import bijector_test
+from utils.testing import check_bijector_properties
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.distrax_with_extra import ChainWithExtra
 
@@ -36,7 +36,7 @@ def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
         flow = make_flow()
         return flow.inverse_and_log_det_with_extra(x)[:2]
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
+    check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 

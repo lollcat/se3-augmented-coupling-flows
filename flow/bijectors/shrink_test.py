@@ -1,7 +1,7 @@
 import haiku as hk
 import distrax
 
-from utils.test import bijector_test
+from utils.testing import check_bijector_properties
 from flow.bijectors.shrink import make_shrink_aug_layer
 import jax.numpy as jnp
 
@@ -36,7 +36,7 @@ def test_bijector_shrink(dim: int = 3, n_layers: int = 4, n_nodes: int = 4, n_au
         flow = make_flow()
         return flow.inverse_and_log_det(x)
 
-    bijector_test(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
+    check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
 if __name__ == '__main__':

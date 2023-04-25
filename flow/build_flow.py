@@ -13,8 +13,11 @@ from flow.bijectors.equi_nice import make_se_equivariant_nice
 from flow.bijectors.pseudo_act_norm import make_act_norm
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
-from nets.base import NetsConfig
+from flow.bijectors.build_centre_of_mass_invariant_coupling import make_centre_of_mass_invariant_coupling_layer
 from flow.distrax_with_extra import ChainWithExtra
+
+from nets.base import NetsConfig
+
 
 
 
@@ -59,7 +62,10 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj', 'spherical', 'along_vector']
+        assert flow in ['nice', 'proj', 'spherical', 'along_vector', 'non_equivariant']
+        if 'non_equivariant' in flow:
+            assert len(flow_type) == 1
+            assert config.act_norm is False
 
     def make_base() -> distrax.Distribution:
         assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential',
@@ -98,6 +104,22 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             bijectors.append(bijector)
 
         for swap in (False, True):  # For swap False we condition augmented on original.
+            if 'non_equivariant' in flow_type:
+                kwargs_non_equivariant = config.kwargs['non_equivariant'] if \
+                    'non_equivariant' in config.kwargs.keys() else {}
+                bijector = make_centre_of_mass_invariant_coupling_layer(
+                    graph_features=graph_features,
+                    n_aug=config.n_aug,
+                    layer_number=layer_number,
+                    dim=config.dim,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    mlp_head_config=config.nets_config.mlp_head_config,
+                    transformer_config=config.nets_config.non_equivariant_transformer_config,
+                    **kwargs_non_equivariant
+                )
+                bijectors.append(bijector)
+
             if 'along_vector' in flow_type:
                 kwargs_along_vector = config.kwargs['along_vector'] if 'along_vector' in config.kwargs.keys() else {}
                 bijector = make_along_vector_coupling_layer(
