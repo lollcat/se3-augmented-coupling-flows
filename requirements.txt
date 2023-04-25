@@ -8,6 +8,7 @@ tqdm
 pandas
 jupyterlab
 wandb
+pytest
 hydra-core
 hydra-joblib-launcher
 joblib

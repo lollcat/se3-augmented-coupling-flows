@@ -1,8 +1,10 @@
 import chex
 import jax
 
-from flow.base_dist import CentreGravitryGaussianAndCondtionalGuassian, assert_mean_zero
-from utils.test import test_fn_is_invariant
+from molboil.utils.test import assert_is_invariant
+
+from flow.base_dist import JointBaseDistribution
+from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential, assert_mean_zero
 
 
 def test_base_distribution():
@@ -14,27 +16,29 @@ def test_base_distribution():
     n_aux = 3
     batch_size = 7
     shape = (batch_size, n_nodes,  n_aux + 1, dim)
-    global_centering = False
 
-    dist = CentreGravitryGaussianAndCondtionalGuassian(
-        dim=dim, n_nodes=n_nodes, n_aux=n_aux, global_centering=global_centering,
-        trainable_augmented_scale=False,
-    )
+    edges = list(zip(range(n_nodes - 1), range(1, n_nodes)))
+    x_dists = [CentreGravityGaussian(dim=dim, n_nodes=n_nodes),
+               HarmonicPotential(dim=dim, n_nodes=n_nodes, edges=edges)]
 
-    # Sample: Test that it does not smoke.
-    sample = dist.sample(seed=key, sample_shape=batch_size)
-    chex.assert_shape(sample, shape)
-    assert_mean_zero(sample[..., 0, :])
+    for x_dist in x_dists:
+        dist = JointBaseDistribution(dim=dim, n_nodes=n_nodes, n_aux=n_aux,
+                                     x_dist=x_dist)
 
-    # Log prob: Test that it is invariant to translation and rotation.
-    log_prob = dist.log_prob(sample)
-    chex.assert_shape(log_prob, (batch_size,))
-    test_fn_is_invariant(dist.log_prob, key, shape[1:])
+        # Sample: Test that it does not smoke.
+        sample = dist.sample(seed=key, sample_shape=batch_size)
+        chex.assert_shape(sample, shape)
+        assert_mean_zero(sample[:, :, 0], node_axis=1)
+
+        # Log prob: Test that it is invariant to translation and rotation.
+        log_prob = dist.log_prob(sample)
+        chex.assert_shape(log_prob, (batch_size,))
+        assert_is_invariant(invariant_fn=dist.log_prob, key=key, event_shape=shape[1:])
 
 
-    # Single sample and log prob: Test that it does not smoke.
-    sample = dist.sample(seed=key)
-    log_prob = dist.log_prob(sample)
+        # Single sample and log prob: Test that it does not smoke.
+        sample = dist.sample(seed=key)
+        log_prob = dist.log_prob(sample)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ from typing import Any
 
 from functools import partial
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 import jax.numpy as jnp
 import jax
 
@@ -13,16 +13,31 @@ from molboil.eval.aldp import eval_and_plot_fn
 
 from flow.build_flow import build_flow
 from examples.create_train_config import create_train_config, create_flow_config
-from utils.aug_flow_train_and_eval import get_eval_on_test_batch
+from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
+    if cfg.training.use_64_bit:
+        jax.config.update("jax_enable_x64", True)
+
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
                          train_n_points=train_set_size, val_n_points=val_set_size)[:2]
 
     train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
+    # Add edges of aldp for harmonic potential
+    try:
+        if cfg['flow']['base']['x_dist']['type'] == 'harmonic_potential':
+            edges = [
+                [0, 1], [1, 2], [1, 3], [1, 4], [4, 5], [4, 6], [6, 7],
+                [6, 8], [8, 9], [8, 10], [10, 11], [10, 12], [10, 13], [8, 14],
+                [14, 15], [14, 16], [16, 17], [16, 18], [18, 19], [18, 20], [18, 21]
+            ]
+            with open_dict(cfg):
+                cfg.flow.base.x_dist.edges = edges
+    except:
+        pass
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
@@ -38,7 +53,7 @@ def run(cfg: DictConfig):
     # Create eval function
     eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                     flow=flow, K=cfg.training.K_marginal_log_lik,
-                                    test_invariances=False)
+                                    test_invariances=True)
     eval_fn_ = partial(eval_fn, eval_on_test_batch_fn=eval_on_test_batch_fn,
                        eval_batch_free_fn=None, batch_size=cfg.training.plot_batch_size)
     eval_and_plot_fn_ = partial(eval_and_plot_fn, sample_fn=sample_fn, train_data=train_set, test_data=val_set,

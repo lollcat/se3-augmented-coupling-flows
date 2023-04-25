@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+inverse_softplus = lambda x: jnp.log(jnp.exp(x) - 1.)
 
 def param_count(x: chex.ArrayTree) -> int:
     """Count the number of parameters in a PyTree of parameters."""

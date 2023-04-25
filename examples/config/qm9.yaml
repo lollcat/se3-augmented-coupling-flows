@@ -7,37 +7,40 @@ hydra:
 
 target:
   aux:
-    global_centering: false
-    scale_init: 0.2
-    trainable_augmented_scale: false
+    conditioned_on_x: true
 
 flow:
-  n_aug: 1
-  act_norm: true
+  n_aug: 3
+  act_norm: false
   base:
-    train_x_scale: false
-    x_scale_init: 1.0
+    x_dist:
+      type: centre_gravity_gaussian
     aux:
-      global_centering: false
-      scale_init: ${target.aux.scale_init}
-      trainable_augmented_scale: false
+      conditioned_on_x: ${target.aux.conditioned_on_x}
+      scale_init: 1.0
   dim: 3
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: spherical #  nice proj spherical
+  type: along_vector #  nice proj spherical along_vector
   kwargs:
+    n_inner_transforms: 3
+    along_vector:
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      dist_spline_max: 10.
+      spline_num_bins: 8
     spherical:
-      n_inner_transforms: 3
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: spline # spline or real_nvp
-      n_inner_transforms: 3
+      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -10.
+      upper: 10.
+      orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
   nets:
     type: egnn
     egnn:
@@ -64,9 +67,11 @@ training:
     optimizer_name: adam
     use_schedule: true
     peak_lr: 3e-4
-    end_lr: 1e-4 # can be null
+    end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
-    max_global_norm: 5000.0
+    max_global_norm: null
+    max_param_grad: null
+    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
   batch_size: 32
@@ -86,13 +91,14 @@ training:
   aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
+  verbose_info: true
 
 logger:
 #  list_logger: null
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_${target.aux.trainable_augmented_scale} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
+    name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}_actnorm${flow.act_norm}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

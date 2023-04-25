@@ -3,25 +3,20 @@ import haiku as hk
 import jax.numpy as jnp
 
 from utils.test import bijector_test
-from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
+from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
 from utils.test import get_minimal_nets_config
 
-def test_bijector_with_proj(
-        transform_type: str = 'spline',
-        dim: int = 3, n_layers: int = 4, type='egnn',
-                             n_nodes: int = 4, n_aux: int = 3):
+def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
+                           n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
-
-    orth_type = ['loewdin', 'gram-schmidt'][0]
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_coupling_layer(
-                transform_type=transform_type,
+            bijector = make_along_vector_coupling_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
@@ -29,10 +24,7 @@ def test_bijector_with_proj(
                 swap=swap,
                 identity_init=False,
                 nets_config=nets_config,
-                add_small_identity=False,
-                num_bins=4,
-                n_inner_transforms=1,
-                orthogonalization_method=orth_type
+                n_inner_transforms=2
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)
@@ -59,14 +51,12 @@ if __name__ == '__main__':
         from jax.config import config
         config.update("jax_enable_x64", True)
 
-    for transform_type in ["spline", "real_nvp"]:
-        test_bijector_with_proj(transform_type=transform_type, dim=3)
-        print('passed test in 3D')
 
-        test_bijector_with_proj(transform_type=transform_type, dim=2)
-        print('passed test in 2D')
+    tesst_along_vector_flow(dim=2)
+    print('passed test in 2D')
 
-
+    tesst_along_vector_flow(dim=3)
+    print('passed test in 3D')
 
 
 

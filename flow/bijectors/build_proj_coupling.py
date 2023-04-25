@@ -3,10 +3,15 @@ from typing import Tuple
 import chex
 import distrax
 import jax.numpy as jnp
+import jax
 
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.proj_coupling import ProjSplitCoupling
+from utils.numerical import inverse_softplus
+
+
+_N_ADDITIONAL_BASIS_VECTORS_LOEWDIN = 1
 
 def make_proj_coupling_layer(
         graph_features: chex.Array,
@@ -16,8 +21,9 @@ def make_proj_coupling_layer(
         swap: bool,
         nets_config: NetsConfig,
         identity_init: bool = True,
-        origin_on_coupled_pair: bool = True,
+        origin_on_coupled_pair: bool = False,
         add_small_identity: bool = True,
+        orthogonalization_method: str = 'gram-schmidt',  # or loewdin
         transform_type: str = 'real_nvp',
         num_bins: int = 10,
         lower: float = -10.,
@@ -30,6 +36,7 @@ def make_proj_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
+    n_heads = n_heads + _N_ADDITIONAL_BASIS_VECTORS_LOEWDIN if orthogonalization_method == 'loewdin' else n_heads
     if transform_type == "real_nvp":
         params_per_dim_channel = dim * 2
         n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split
@@ -56,7 +63,12 @@ def make_proj_coupling_layer(
             # reshape
             params = jnp.reshape(params, (n_nodes, (n_aug + 1) // 2, dim*2))
             log_scale, shift = jnp.split(params, axis=-1, indices_or_sections=2)
-            return distrax.ScalarAffine(log_scale=log_scale, shift=shift)
+
+            # If log_scale is initialised to 0 then this initialises the flow to the identity.
+            log_scale = log_scale + inverse_softplus(jnp.array(1.))
+            scale = jax.nn.softplus(log_scale)
+
+            return distrax.ScalarAffine(scale=scale, shift=shift)
         else:
             params = jnp.reshape(params,
                                  (n_nodes, multiplicity_within_coupling_split, dim, params_per_dim_per_var_group))
@@ -93,13 +105,14 @@ def make_proj_coupling_layer(
 
     return ProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
-        event_ndims=3,  # [nodes, n_aug+1, dim]
         origin_on_coupled_pair=origin_on_coupled_pair,
         get_basis_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        split_axis=-2,
         add_small_identity=add_small_identity,
-        n_inner_transforms=n_inner_transforms
+        orthogonalization_method=orthogonalization_method,
+        n_inner_transforms=n_inner_transforms,
+        event_ndims=3,  # [nodes, n_aug+1, dim]
+        split_axis=-2,
     )
