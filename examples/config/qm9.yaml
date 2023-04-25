@@ -24,10 +24,10 @@ flow:
   identity_init: true
   type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:
-    n_inner_transforms: 2
+    n_inner_transforms: 1
     non_equivariant:
       spline_num_bins: 8
-      spline_max_abs_min: 10.
+      spline_max_abs_min: 20.
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
