@@ -1,5 +1,4 @@
-"""Following https://github.com/vgsatorras/en_flows/blob/main/flows/utils.py."""
-from typing import Tuple, Iterable, Optional
+from typing import Tuple, Iterable, Optional, List
 
 import chex
 import jax
@@ -8,10 +7,15 @@ import numpy as np
 from chex import PRNGKey, Array
 import distrax
 import haiku as hk
+import mdtraj
+
+from molboil.utils.coordinate_transform.internal import CompleteInternalCoordinateTransform
+
 
 class CentreGravityGaussian(distrax.Distribution):
     """Gaussian distribution over nodes in space, with a zero centre of gravity.
-    See https://arxiv.org/pdf/2105.09016.pdf."""
+    Following https://github.com/vgsatorras/en_flows/blob/main/flows/utils.py,
+    see also https://arxiv.org/pdf/2105.09016.pdf."""
     def __init__(self, dim: int, n_nodes: int):
 
         self.dim = dim
@@ -80,6 +84,110 @@ class HarmonicPotential(distrax.Distribution):
     def event_shape(self) -> Tuple[int, ...]:
         return (self.n_nodes, self.dim)
 
+
+class AldpTransformedInternals(distrax.Distribution):
+    def __init__(self, data_path: str):
+        traj = mdtraj.load(data_path)
+
+        ndim = 66
+        if jax.config.jax_enable_x64:
+            dtype = jnp.float64
+        else:
+            dtype = jnp.float32
+        transform_data = jnp.array(np.array(traj.xyz).reshape(-1, ndim),
+                                   dtype=dtype)
+        z_matrix = [
+            (0, [1, 4, 6]),
+            (1, [4, 6, 8]),
+            (2, [1, 4, 0]),
+            (3, [1, 4, 0]),
+            (4, [6, 8, 14]),
+            (5, [4, 6, 8]),
+            (7, [6, 8, 4]),
+            (9, [8, 6, 4]),
+            (10, [8, 6, 4]),
+            (11, [10, 8, 6]),
+            (12, [10, 8, 11]),
+            (13, [10, 8, 11]),
+            (15, [14, 8, 16]),
+            (16, [14, 8, 6]),
+            (17, [16, 14, 15]),
+            (18, [16, 14, 8]),
+            (19, [18, 16, 14]),
+            (20, [18, 16, 19]),
+            (21, [18, 16, 19])
+        ]
+        cart_indices = [8, 6, 14]
+        ind_circ_dih = [0, 1, 2, 3, 4, 5, 8, 9, 10, 13, 15, 16]
+        self.transform = CompleteInternalCoordinateTransform(ndim, z_matrix, cart_indices,
+                                                             transform_data, ind_circ_dih=ind_circ_dih)
+
+        ncarts = self.transform.len_cart_inds
+        permute_inv = self.transform.permute_inv
+        dih_ind_ = self.transform.ic_transform.dih_indices
+        std_dih = self.transform.ic_transform.std_dih
+
+        ind = jnp.arange(60)
+        ind = jnp.concatenate([ind[:3 * ncarts - 6], -np.ones(6, dtype=np.int), ind[3 * ncarts - 6:]])
+        ind = ind[permute_inv]
+        dih_ind = ind[dih_ind_]
+
+        ind_circ_dih_ = jnp.array(ind_circ_dih)
+        ind_circ = dih_ind[ind_circ_dih_]
+        bound_circ = np.pi / std_dih[ind_circ_dih_]
+
+        scale = jnp.ones(60)
+        scale = scale.at[ind_circ].set(bound_circ)
+        self.dist_internal = UniformGaussian(dim=60, ind_uniform=ind_circ, scale=scale)
+
+    def _sample_n(self, key: PRNGKey, n: int) -> Array:
+        z = self.dist_internal._sample_n(key, n)
+        x, _ = self.transform.inverse(z)
+        x = x.reshape(-1, 22, 3)
+        return remove_mean(x)
+
+    def log_prob(self, value: Array) -> Array:
+        z, log_det = self.transform.forward(value.reshape(*value.shape[:-2], 66))
+        return self.dist_internal.log_prob(z) + log_det
+
+    @property
+    def event_shape(self) -> Tuple[int]:
+        return (22, 3)
+
+
+
+class UniformGaussian(distrax.Distribution):
+    def __init__(self, dim: int, ind_uniform: List[int], scale: Optional[chex.Array] = None):
+        self.dim = dim
+        self.ind_uniform = jnp.array(ind_uniform)
+        self.ind_gaussian = jnp.setdiff1d(jnp.arange(dim), self.ind_uniform,
+                                          assume_unique=True, size=dim - len(ind_uniform))
+        perm = jnp.concatenate([self.ind_uniform, self.ind_gaussian])
+        self.inv_perm = jnp.zeros_like(perm).at[perm].set(jnp.arange(dim))
+        if scale is None:
+            self.scale = jnp.ones((dim,))
+        else:
+            self.scale = scale
+
+    def _sample_n(self, key: PRNGKey, n: int) -> Array:
+        key_u, key_g = jax.random.split(key)
+        eps_u = jax.random.uniform(key_u, shape=(n, self.ind_uniform.shape[0]), minval=-1, maxval=1)
+        eps_g = jax.random.normal(key_g, shape=(n, self.ind_gaussian.shape[0]))
+        z = jnp.concatenate([eps_u, eps_g], axis=-1)
+        z = z[:, self.inv_perm]
+        return z * self.scale
+
+    def log_prob(self, value: Array) -> Array:
+        log_prob_u = jnp.broadcast_to(-jnp.log(2 * self.scale[self.ind_uniform]),
+                                      value.shape[:-1] + self.ind_uniform.shape[:1])
+        log_prob_g = - 0.5 * np.log(2 * np.pi) \
+                     - jnp.log(self.scale[self.ind_gaussian]) \
+                     - 0.5 * (value[..., self.ind_gaussian] / self.scale[self.ind_gaussian]) ** 2
+        return jnp.sum(log_prob_u, -1) + jnp.sum(log_prob_g, -1)
+
+    @property
+    def event_shape(self) -> Tuple[int, ...]:
+        return (self.dim,)
 
 
 def assert_mean_zero(x: chex.Array, node_axis=-2):

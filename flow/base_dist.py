@@ -84,4 +84,3 @@ class JointBaseDistribution(DistributionWithExtra):
     @property
     def event_shape(self) -> Tuple[int, ...]:
         return (self.n_nodes, self.n_aux+1, self.dim)
-

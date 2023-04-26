@@ -6,7 +6,7 @@ from typing import NamedTuple, Sequence, Union, Iterable
 import distrax
 
 from flow.base_dist import JointBaseDistribution
-from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential
+from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential, AldpTransformedInternals
 from flow.conditional_dist import build_aux_target_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
@@ -20,16 +20,18 @@ from nets.base import NetsConfig
 
 
 
+
 class ConditionalAuxDistConfig(NamedTuple):
     conditioned_on_x: bool = False
     trainable_augmented_scale: bool = False
     scale_init: float = 1.0
 
 class XDistConfig(NamedTuple):
-    type: str = 'centre_gravity_gaussian'  # centre_gravity_gaussian or harmonic_potential
+    type: str = 'centre_gravity_gaussian'  # centre_gravity_gaussian, harmonic_potential, or aldp_internal_coordinates
     a: float = 1.0
     edges: Iterable = []
     trainable_mode_scale: bool = False
+    data_path: str = ''
 
 class BaseConfig(NamedTuple):
     x_dist: XDistConfig = XDistConfig()
@@ -64,16 +66,19 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         assert flow in ['nice', 'proj', 'spherical', 'along_vector', 'non_equivariant']
         if 'non_equivariant' in flow:
             assert len(flow_type) == 1
-            assert config.scaling_layer is False
+            assert config.act_norm is False
 
     def make_base() -> distrax.Distribution:
-        assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential']
+        assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential',
+                                           'aldp_internal_coordinates']
         if config.base.x_dist.type == 'centre_gravity_gaussian':
             x_dist = CentreGravityGaussian(dim=config.dim, n_nodes=config.nodes)
         elif config.base.x_dist.type == 'harmonic_potential':
             x_dist = HarmonicPotential(dim=config.dim, n_nodes=config.nodes, a=config.base.x_dist.a,
                                        edges=config.base.x_dist.edges,
                                        trainable_mode_scale=config.base.x_dist.trainable_mode_scale)
+        elif config.base.x_dist.type == 'aldp_internal_coordinates':
+            x_dist = AldpTransformedInternals(data_path=config.base.x_dist.data_path)
         base = JointBaseDistribution(
             dim=config.dim,
             n_nodes=config.nodes,

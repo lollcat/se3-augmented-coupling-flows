@@ -3,8 +3,10 @@ import jax
 import jax.numpy as jnp
 
 from molboil.utils.numerical import rotate_translate_permute_general
+from molboil.targets.data import load_aldp
 
-from flow.x_base_dist import HarmonicPotential, assert_mean_zero
+from flow.x_base_dist import HarmonicPotential, AldpTransformedInternals, \
+    assert_mean_zero
 
 
 def test_harmonic_potential():
@@ -47,6 +49,46 @@ def test_harmonic_potential():
     # Single sample and log prob: Test that it does not smoke.
     sample = dist.sample(seed=key)
     log_prob = dist.log_prob(sample)
+    chex.assert_shape(sample, shape[1:])
+    chex.assert_shape(log_prob.shape, ())
+
+
+def test_aldp_transformed_internals():
+    data_path = 'target/data/aldp_500K_train_mini.h5'
+
+    dist = AldpTransformedInternals(data_path)
+
+    # Log prob
+    data, _, _ = load_aldp(train_path=data_path)
+    batch_size = 7
+    x = jnp.array(data.positions[:batch_size])
+    log_prob = dist.log_prob(x)
+    chex.assert_shape(log_prob, (batch_size,))
+
+    # Log prob: Test that it is invariant to rotation and translation.
+    key = jax.random.PRNGKey(0)
+    key1, key2 = jax.random.split(key, 2)
+    theta = jax.random.uniform(key1, shape=(batch_size,)) * 2 * jnp.pi
+    translation = jnp.zeros((batch_size, 3))
+    phi = jax.random.uniform(key2, shape=(batch_size,)) * 2 * jnp.pi
+    x_rot = jax.vmap(rotate_translate_permute_general)(x, translation, theta, phi)
+
+    log_prob = dist.log_prob(x)
+    log_prob_rot = dist.log_prob(x_rot)
+
+    rtol = 1e-5 if x.dtype == jnp.float64 else 1e-3
+    chex.assert_trees_all_close(log_prob, log_prob_rot, rtol=rtol)
+
+    # Sample: Test that it does not smoke.
+    sample = dist.sample(seed=key, sample_shape=batch_size)
+    chex.assert_shape(sample, (batch_size, 22, 3))
+    assert_mean_zero(sample, node_axis=1)
+
+    # Single sample and log prob
+    sample = dist.sample(seed=key)
+    log_prob = dist.log_prob(sample)
+    chex.assert_shape(sample, (22, 3))
+    chex.assert_shape(log_prob.shape, ())
 
 
 if __name__ == '__main__':
