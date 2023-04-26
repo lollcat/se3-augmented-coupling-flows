@@ -2,7 +2,7 @@ import haiku as hk
 import jax.numpy as jnp
 
 from utils.testing import check_bijector_properties
-from flow.bijectors.pseudo_act_norm import make_act_norm
+from flow.bijectors.scaling_block import make_scaling_block
 from flow.distrax_with_extra import ChainWithExtra
 
 def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
@@ -13,7 +13,7 @@ def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
     def make_flow():
         bijectors = []
         for i in range(n_layers):
-            bijector = make_act_norm(
+            bijector = make_scaling_block(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,

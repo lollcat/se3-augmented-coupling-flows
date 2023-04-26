@@ -10,14 +10,13 @@ from flow.x_base_dist import CentreGravityGaussian, HarmonicPotential
 from flow.conditional_dist import build_aux_target_dist
 from flow.bijectors.build_proj_coupling import make_proj_coupling_layer
 from flow.bijectors.equi_nice import make_se_equivariant_nice
-from flow.bijectors.pseudo_act_norm import make_act_norm
+from flow.bijectors.scaling_block import make_scaling_block
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
 from flow.bijectors.build_centre_of_mass_invariant_coupling import make_centre_of_mass_invariant_coupling_layer
 from flow.distrax_with_extra import ChainWithExtra
 
 from nets.base import NetsConfig
-
 
 
 
@@ -46,7 +45,8 @@ class FlowDistConfig(NamedTuple):
     type: Union[str, Sequence[str]]
     identity_init: bool = True
     compile_n_unroll: int = 2
-    act_norm: bool = False
+    scaling_layer: bool = False
+    scaling_layer_conditioned: bool = True
     kwargs: dict = {}
     base: BaseConfig = BaseConfig()
     target_aux_config: ConditionalAuxDistConfig = ConditionalAuxDistConfig()
@@ -64,7 +64,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         assert flow in ['nice', 'proj', 'spherical', 'along_vector', 'non_equivariant']
         if 'non_equivariant' in flow:
             assert len(flow_type) == 1
-            assert config.act_norm is False
+            assert config.scaling_layer is False
 
     def make_base() -> distrax.Distribution:
         assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential']
@@ -90,13 +90,15 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         bijectors = []
         layer_number = 0
 
-        if config.act_norm:
-            bijector = make_act_norm(
+        if config.scaling_layer:
+            bijector = make_scaling_block(
                 layer_number=layer_number,
                 graph_features=graph_features,
                 dim=config.dim,
                 n_aug=config.n_aug,
-                identity_init=config.identity_init)
+                identity_init=config.identity_init,
+                condition=config.scaling_layer_conditioned
+            )
             bijectors.append(bijector)
 
         for swap in (False, True):  # For swap False we condition augmented on original.
@@ -165,6 +167,21 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     identity_init=config.identity_init,
                     nets_config=config.nets_config)
                 bijectors.append(bijector)
+
+
+        if config.scaling_layer:
+            # Sandwhich scaling layer on both sides of the flow.
+            # This is unecessarily expensive (will have two of these in a row).
+            # But these layers are cheap, so this is not a big problem.
+            bijector = make_scaling_block(
+                layer_number=layer_number,
+                graph_features=graph_features,
+                dim=config.dim,
+                n_aug=config.n_aug,
+                identity_init=config.identity_init,
+                condition=config.scaling_layer_conditioned
+            )
+            bijectors.append(bijector)
 
         return ChainWithExtra(bijectors)
 

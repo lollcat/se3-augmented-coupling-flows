@@ -23,7 +23,8 @@ flow:
   nodes: 4
   n_aug: 5
   n_layers: 4
-  act_norm: false
+  scaling_layer: true
+  scaling_layer_conditioned: true
   identity_init: true
   type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:

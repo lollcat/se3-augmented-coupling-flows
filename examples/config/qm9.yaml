@@ -11,7 +11,8 @@ target:
 
 flow:
   n_aug: 3
-  act_norm: false
+  scaling_layer: true
+  scaling_layer_conditioned: true
   base:
     x_dist:
       type: centre_gravity_gaussian
