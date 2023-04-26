@@ -66,7 +66,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
         assert flow in ['nice', 'proj', 'spherical', 'along_vector', 'non_equivariant']
         if 'non_equivariant' in flow:
             assert len(flow_type) == 1
-            assert config.act_norm is False
 
     def make_base() -> distrax.Distribution:
         assert config.base.x_dist.type in ['centre_gravity_gaussian', 'harmonic_potential',
