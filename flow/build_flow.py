@@ -174,7 +174,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
             # This is unecessarily expensive (will have two of these in a row).
             # But these layers are cheap, so this is not a big problem.
             bijector = make_scaling_block(
-                layer_number=layer_number,
+                layer_number=layer_number+1,
                 graph_features=graph_features,
                 dim=config.dim,
                 n_aug=config.n_aug,
