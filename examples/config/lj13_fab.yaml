@@ -92,6 +92,12 @@ flow:
       get_shifts_via_tensor_product: false
     mlp_head_config:
       mlp_units: [64,]
+    non_equivariant_transformer_config:
+      output_dim: 64
+      key_size_per_node_dim_in: 8  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      n_layers: 3
+      mlp_units: [ 64, 64 ]
+      num_heads: 8
 
 
 training:
