@@ -71,8 +71,8 @@ def generic_loss(params: AugmentedFlowParams,
     info.update(fab_loss=fab_loss)
     if equivariance_regularisation:
         eq_loss = equivariance_regularisation_loss(params, log_q, x, key, log_q_fn_apply)
-        info.update(eq_loss=eq_loss)
         fab_loss = fab_loss + eq_loss
+        info.update(eq_loss=eq_loss, total_loss=fab_loss)
     return fab_loss, (log_w_adjust, log_q, info)
 
 
@@ -166,7 +166,8 @@ def build_fab_with_buffer_init_step_fns(
         info.update(log10_grad_norm=jnp.log10(grad_norm))  # Makes scale nice for plotting
         info.update(log10_max_param_grad=jnp.log(jnp.max(ravel_pytree(grad)[0])))
         if isinstance(opt_state, IgnoreNanOptState):
-            info.update(ignored_grad_count=opt_state.ignored_grads_count)
+            info.update(ignored_grad_count=opt_state.ignored_grads_count,
+                        total_optimizer_steps=opt_state.total_steps)
         return (new_params, new_opt_state), (info, log_w_adjust, log_q)
 
     @jax.jit
