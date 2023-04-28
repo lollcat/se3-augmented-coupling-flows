@@ -78,7 +78,7 @@ def polar_to_cartesian_and_log_det(x_polar, reference):
 def _to_spherical_and_log_det(
         x: chex.Array,
         reference: chex.Array,
-        enforce_parity_invariance: bool = False,
+        enforce_parity_invariance: bool = True,
                               ) -> Tuple[chex.Array, chex.Array]:
     """Note that if `enforce_parity_invariance` is True we use z - (0, 0, 0) to obtain another vector.
     This only works if we assume that (0, 0, 0) is our centre of mass (i.e. this will only work within a flow layer
@@ -119,7 +119,7 @@ def _to_spherical_and_log_det(
 
 
 def _to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array,
-                              enforce_parity_invariance: bool = False) -> \
+                              enforce_parity_invariance: bool = True) -> \
         Tuple[chex.Array, chex.Array]:
     """Note that if `enforce_parity_invariance` is True we use z - (0, 0, 0) to obtain another vector.
     This only works if we assume that (0, 0, 0) is our centre of mass (i.e. this will only work within a flow layer
