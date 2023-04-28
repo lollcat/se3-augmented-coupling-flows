@@ -48,7 +48,7 @@ flow:
       scale_init: 1.0
   dim: 3
   nodes: 13
-  n_layers: 6
+  n_layers: 12
   identity_init: true
   type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:

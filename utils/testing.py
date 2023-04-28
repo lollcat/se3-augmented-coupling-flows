@@ -167,6 +167,18 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
             mean_abs_diff_log_prob_after_reflection=mean_abs_diff)
 
 
+    # Reflection 2.
+    flip = jnp.ones((1, 1, 1, dim))  # batch, n_nodes, mult, dim
+    flip = flip.at[:, :, :, 1].set(-1.)
+    samples_flip = FullGraphSample(features=samples.features, positions=samples.positions*flip)
+    log_prob_flip_ = log_prob_samples_only_fn(samples_flip)
+    abs_diff = jnp.abs(log_prob_flip - log_prob_flip_)
+    max_abs_diff = jnp.max(abs_diff)
+    mean_abs_diff = jnp.mean(abs_diff)
+    info.update(max_abs_diff_log_prob_two_reflections=max_abs_diff,
+            mean_abs_diff_log_prob_two_reflections=mean_abs_diff)
+
+
     # Test bijector forward vs reverse.
     # Recent test samples.
     samples = samples._replace(
