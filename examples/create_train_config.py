@@ -73,9 +73,8 @@ def create_nets_config(nets_config: DictConfig):
                                                                              nets_config.keys() else None
     non_equivariant_transformer_config = TransformerConfig(**nets_config.pop('non_equivariant_transformer_config')) \
         if 'non_equivariant_transformer_config' in nets_config.keys() else None
-    type = nets_config['type']
     nets_config = NetsConfig(
-                             type=type,
+                             **nets_config,
                              egnn_torso_config=egnn_cfg,
                              e3gnn_torso_config=e3gnn_config,
                              mlp_head_config=mlp_head_config,

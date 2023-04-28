@@ -25,6 +25,9 @@ class NetsConfig(NamedTuple):
     mlp_head_config: Optional[MLPHeadConfig] = None
     non_equivariant_transformer_config: Optional[TransformerConfig] = None
     softmax_layer_invariant_feat: bool = True
+    embedding_for_non_positional_feat: bool = True
+    embedding_dim: int = 32
+    num_discrete_feat: Optional[int] = None  # E.g. number of atom types
 
 
 def build_torso(name: str, config: NetsConfig,
@@ -74,6 +77,21 @@ class EGNN(hk.Module):
         chex.assert_rank(h, 2)
         n_nodes, vec_multiplicity_in, dim = x.shape[-3:]
         assert h.shape[0] == x.shape[0]  # n_nodes
+        if self.nets_config.embedding_for_non_positional_feat:
+            # Create an embedding of the non-positional features.
+            chex.assert_axis_dimension(h, 1, 1)
+            h = jnp.squeeze(h, axis=-1)
+            assert self.nets_config.num_discrete_feat is not None
+            full_embedding = hk.get_parameter("embedding", shape=(self.nets_config.num_discrete_feat,
+                                                                  self.nets_config.embedding_dim,), dtype=float,
+                                              init=hk.initializers.RandomNormal())
+            h = full_embedding[h]
+            chex.assert_shape(h, (n_nodes, self.nets_config.embedding_dim))
+        else:
+            # Turn h into a float. We often use this option when
+            # no non-positional features exist.
+            h = jnp.asarray(h, dtype=float)
+
         torso = build_torso(self.name, self.nets_config, self.n_equivariant_vectors_out, vec_multiplicity_in)
         vectors, h = torso(x, h, senders, receivers)
 
@@ -103,6 +121,7 @@ class EGNN(hk.Module):
             positions: chex.Array,
             features: chex.Array
     ):
+        chex.assert_type(features, int)
         n_nodes, multiplicity, dim = positions.shape[-3:]
         chex.assert_axis_dimension(features, -2, 1)
         features = jnp.squeeze(features, axis=-2)
