@@ -74,7 +74,7 @@ def polar_to_cartesian_and_log_det(x_polar, reference):
     return x, log_det
 
 
-def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
+def _to_spherical_and_log_det(x, reference, parity_invariant: bool = True) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(x, 1)
     dim = x.shape[0]
     origin, z, o = jnp.split(reference, (1,2), axis=-2)
@@ -89,6 +89,8 @@ def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if parity_invariant:
+        y_axis_vector = y_axis_vector * jnp.sign(jnp.dot(y_axis_vector, z_axis_vector))
 
     vector = x - origin
     r = safe_norm(vector)
@@ -105,7 +107,7 @@ def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     return x, jnp.squeeze(log_det)
 
 
-def _to_cartesian_and_log_det(sph_x, reference) -> \
+def _to_cartesian_and_log_det(sph_x, reference, parity_invariant: bool = True) -> \
         Tuple[chex.Array, chex.Array]:
     chex.assert_rank(sph_x, 1)
     origin, z, o = jnp.split(reference, (1,2), axis=-2)
@@ -120,6 +122,8 @@ def _to_cartesian_and_log_det(sph_x, reference) -> \
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if parity_invariant:
+        y_axis_vector = y_axis_vector * jnp.sign(jnp.dot(y_axis_vector, z_axis_vector))
 
     r, theta, torsion = jnp.split(sph_x, 3)
     r, theta, torsion = jax.tree_map(jnp.squeeze, (r, theta, torsion))
@@ -131,4 +135,3 @@ def _to_cartesian_and_log_det(sph_x, reference) -> \
 
     log_det = (2*jnp.log(r) + jnp.log(jnp.sin(theta)))
     return x_cartesian, jnp.squeeze(log_det)
-
