@@ -12,6 +12,9 @@ from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowPara
 
 def get_minimal_nets_config(type = 'egnn'):
     nets_config = NetsConfig(type=type,
+                            embedding_for_non_positional_feat=True,
+                            embedding_dim = 32,
+                            num_discrete_feat=2,
                              egnn_torso_config=EGNNTorsoConfig(
                                     n_blocks=2,
                                     mlp_units=(4,),
@@ -29,6 +32,7 @@ def get_minimal_nets_config(type = 'egnn'):
                              non_equivariant_transformer_config=TransformerConfig(output_dim=6,
                                                                                   key_size_per_node_dim_in=2,
                                                                                   n_layers=2, mlp_units=(4,))
+
                              )
     return nets_config
 

@@ -6,7 +6,7 @@ import chex
 from utils.testing import get_minimal_nets_config
 from nets.base import EGNN
 
-def test_net_does_not_smoke(type="egnn"):
+def tesst_net_does_not_smoke(type="egnn"):
     nets_config = get_minimal_nets_config(type=type)
     zero_init_invariant_feat = False
     n_invariant_feat_out = 5
@@ -30,7 +30,7 @@ def test_net_does_not_smoke(type="egnn"):
 
     key = jax.random.PRNGKey(0)
     positions = jax.random.normal(key, (n_nodes, multiplicity, dim))
-    features = jnp.zeros((n_nodes, 1, 2))
+    features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     params = forward.init(key, positions, features)
 
@@ -40,4 +40,4 @@ def test_net_does_not_smoke(type="egnn"):
 
 
 if __name__ == '__main__':
-    test_net_does_not_smoke()
+    tesst_net_does_not_smoke()
