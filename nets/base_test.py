@@ -6,7 +6,7 @@ import chex
 from utils.testing import get_minimal_nets_config
 from nets.base import EGNN
 
-def tesst_net_does_not_smoke(type="egnn"):
+def test_net_does_not_smoke(type="egnn"):
     nets_config = get_minimal_nets_config(type=type)
     zero_init_invariant_feat = False
     n_invariant_feat_out = 5
@@ -40,4 +40,4 @@ def tesst_net_does_not_smoke(type="egnn"):
 
 
 if __name__ == '__main__':
-    tesst_net_does_not_smoke()
+    test_net_does_not_smoke()
