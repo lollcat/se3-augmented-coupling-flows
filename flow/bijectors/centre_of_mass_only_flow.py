@@ -110,6 +110,7 @@ def build_unconditional_centre_of_mass_layer(
         n_aug: int,
         identity_init: bool,
 ) -> BijectorWithExtra:
+    """A layer that transforms just the centre of mass in an unconditioned manner."""
 
     # TODO: Could use graph features by passing them through a transformer.
 

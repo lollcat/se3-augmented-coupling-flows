@@ -49,7 +49,8 @@ flow:
   nodes: 4
   n_aug: 1
   n_layers: 8
-  act_norm: false
+  scaling_layer: true
+  scaling_layer_conditioned: true
   identity_init: true
   type: along_vector #  nice proj spherical along_vector non_equivariant
   kwargs:
@@ -76,6 +77,7 @@ flow:
       upper: 2.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
+    embedding_for_non_positional_feat: false
     type: egnn
     egnn:
         name: egnn
@@ -88,6 +90,12 @@ flow:
     mlp_head_config:
       mlp_units: [32,]
       stable: true
+    non_equivariant_transformer_config:
+      output_dim: 32
+      key_size_per_node_dim_in: 2  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      n_layers: 3
+      mlp_units: [ 32, 32 ]
+      num_heads: 3
 
 
 training:

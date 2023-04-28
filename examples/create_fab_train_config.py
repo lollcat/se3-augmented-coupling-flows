@@ -93,6 +93,11 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
 
     features = train_data.features[0]
 
+    data_augmentation = (cfg.flow.type == 'non_equivariant' or 'non_equivariant' in
+                         cfg.flow.type) and cfg.training.data_augmentation_for_non_eq
+    if data_augmentation:
+        print("using equivariance regularisation in the loss function.")
+
     if cfg.fab.with_buffer:
         print("running fab with buffer")
         assert cfg.fab.n_updates_per_smc_forward_pass <= cfg.fab.buffer_min_length_batches
@@ -103,10 +108,12 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
             smc=smc, optimizer=optimizer,
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
-            buffer=buffer
+            buffer=buffer,
+            equivariance_regularisation=data_augmentation
         )
     else:
         print("running fab without buffer")
+        raise Exception("We aren't using this setup for the paper.")
         init_fn, update_fn = build_fab_no_buffer_init_step_fns(
             flow=flow, log_p_x=target_log_p_x_fn, features=features,
             smc=smc, optimizer=optimizer, batch_size=cfg.training.batch_size,

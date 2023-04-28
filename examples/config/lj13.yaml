@@ -11,7 +11,8 @@ target:
 
 flow:
   n_aug: 1
-  act_norm: false
+  scaling_layer: true
+  scaling_layer_conditioned: true
   base:
     x_dist:
       type: centre_gravity_gaussian
@@ -48,6 +49,7 @@ flow:
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
+    embedding_for_non_positional_feat: false  # No non-positional features.
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
@@ -66,6 +68,12 @@ flow:
     mlp_head_config:
       mlp_units: [32, 32]
       stable: true
+    non_equivariant_transformer_config:
+      output_dim: 32
+      key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      n_layers: 3
+      mlp_units: [ 32, 32 ]
+      num_heads: 4
 
 
 training:

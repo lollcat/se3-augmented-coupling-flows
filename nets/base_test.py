@@ -30,7 +30,7 @@ def test_net_does_not_smoke(type="egnn"):
 
     key = jax.random.PRNGKey(0)
     positions = jax.random.normal(key, (n_nodes, multiplicity, dim))
-    features = jnp.zeros((n_nodes, 1, 2))
+    features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     params = forward.init(key, positions, features)
 

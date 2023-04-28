@@ -12,6 +12,9 @@ from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowPara
 
 def get_minimal_nets_config(type = 'egnn'):
     nets_config = NetsConfig(type=type,
+                            embedding_for_non_positional_feat=True,
+                            embedding_dim = 32,
+                            num_discrete_feat=2,
                              egnn_torso_config=EGNNTorsoConfig(
                                     n_blocks=2,
                                     mlp_units=(4,),
@@ -29,6 +32,7 @@ def get_minimal_nets_config(type = 'egnn'):
                              non_equivariant_transformer_config=TransformerConfig(output_dim=6,
                                                                                   key_size_per_node_dim_in=2,
                                                                                   n_layers=2, mlp_units=(4,))
+
                              )
     return nets_config
 
@@ -131,12 +135,15 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     """Tests invariance of the flow log prob. Also check that the
      forward and reverse of the bijector is consistent.
     """
+    batch_size, n_nodes, mult, dim = samples.positions.shape
+
     log_prob_samples_only_fn = lambda x: flow.log_prob_apply(params, x)
 
-    key1, key2 = jax.random.split(key)
+    key1, key2, key3 = jax.random.split(key, 3)
 
+    # Rotation.
     def group_action(x_and_a):
-        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)
+        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)  # , reflect=False)
 
 
     positions_rot = group_action(samples.positions)
@@ -152,6 +159,30 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
             "mean_abs_diff_log_prob_after_group_action": mean_abs_diff}
 
 
+    # Reflection.
+    flip = jnp.ones((1, 1, 1, dim))  # batch, n_nodes, mult, dim
+    flip = flip.at[:, :, :, 0].set(-1.)
+    samples_flip = FullGraphSample(features=samples.features, positions=samples.positions*flip)
+    log_prob_flip = log_prob_samples_only_fn(samples_flip)
+    abs_diff = jnp.abs(log_prob_flip - log_prob)
+    max_abs_diff = jnp.max(abs_diff)
+    mean_abs_diff = jnp.mean(abs_diff)
+    info.update(max_abs_diff_log_prob_after_reflection=max_abs_diff,
+            mean_abs_diff_log_prob_after_reflection=mean_abs_diff)
+
+
+    # Reflection 2.
+    flip = jnp.ones((1, 1, 1, dim))  # batch, n_nodes, mult, dim
+    flip = flip.at[:, :, :, 1].set(-1.)
+    samples_flip = FullGraphSample(features=samples.features, positions=samples.positions*flip)
+    log_prob_flip_ = log_prob_samples_only_fn(samples_flip)
+    abs_diff = jnp.abs(log_prob_flip - log_prob_flip_)
+    max_abs_diff = jnp.max(abs_diff)
+    mean_abs_diff = jnp.mean(abs_diff)
+    info.update(max_abs_diff_log_prob_two_reflections=max_abs_diff,
+            mean_abs_diff_log_prob_two_reflections=mean_abs_diff)
+
+
     # Test bijector forward vs reverse.
     # Recent test samples.
     samples = samples._replace(
@@ -164,7 +195,7 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - samples.positions)))
 
     # Test 0 mean subspace restriction.
-    samples = flow.sample_apply(params, samples.features[0, :, 0], key2, samples.positions.shape[0:1])
+    samples = flow.sample_apply(params, samples.features[0, :, 0], key3, samples.positions.shape[0:1])
     info.update(mean_abs_x_centre_of_mass=jnp.mean(jnp.abs(jnp.mean(samples.positions[:, :, 0], axis=1))))
     info.update(latent_x_mean_abs_centre_of_mass=
                 jnp.mean(jnp.abs(jnp.mean(sample_latent.positions[:, :, 0, :], axis=1))))
