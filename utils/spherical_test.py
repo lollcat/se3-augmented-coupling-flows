@@ -56,24 +56,24 @@ def test_to_spherical_is_invariant():
     assert_is_invariant(invariant_fn = invariant_fn, key=key, event_shape=event_shape, translate=True)
 
 
-def test_to_spherical_and_back_is_equivariant():
+def tesst_to_spherical_and_back_is_equivariant(reflection_invariant: bool = True):
     # Currently for 3D.
     key = jax.random.PRNGKey(0)
+    event_shape = (4, 1, 3)
 
     def equivariant_fn(x_and_ref):
         # Note: Invariant to rotations to both x and reference, hence package them as single input for this test.
-        chex.assert_shape(x_and_ref, (4, 1, 3))  # Need multiplicity axis for `assert_is_invariant`.
+        chex.assert_shape(x_and_ref, event_shape)  # Need multiplicity axis for `assert_is_invariant`.
         x_and_ref = jnp.squeeze(x_and_ref, axis=1)
         x, reference = jnp.split(x_and_ref, [1,], axis=0)
         x = jnp.squeeze(x, axis=0)
-        sph_x = to_spherical_and_log_det(x, reference)[0]
+        sph_x = to_spherical_and_log_det(x, reference, parity_invariant=reflection_invariant)[0]
         sph_x_new = sph_x + 0.01  # Perform some transform to the spherical cooridnates.
-        x_new = to_cartesian_and_log_det(sph_x_new, reference)[0]
+        x_new = to_cartesian_and_log_det(sph_x_new, reference, parity_invariant=reflection_invariant)[0]
         return x_new[None, None, :]  # Need to have same rank as input.
 
-
-    event_shape = (4, 1, 3)
-    assert_is_equivariant(equivariant_fn=equivariant_fn, key=key, event_shape=event_shape, translate=True)
+    assert_is_equivariant(equivariant_fn=equivariant_fn, key=key, event_shape=event_shape, translate=True,
+                          reflect=reflection_invariant)
 
 
 
@@ -86,5 +86,6 @@ if __name__ == '__main__':
     test_polar_does_not_smoke_and_invertible()
     test_does_not_smoke_and_invertible()
     test_to_spherical_is_invariant()
-    test_to_spherical_and_back_is_equivariant()
+    tesst_to_spherical_and_back_is_equivariant(True)
+    tesst_to_spherical_and_back_is_equivariant(False)
     print("All tests passed")
