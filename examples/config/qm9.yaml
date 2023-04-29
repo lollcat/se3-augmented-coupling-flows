@@ -23,7 +23,7 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 3
     non_equivariant:
@@ -106,7 +106,7 @@ training:
   aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
-  verbose_info: true
+  verbose_info: false
   data_augmentation_for_non_eq: true
 
 logger:
