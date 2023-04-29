@@ -32,7 +32,9 @@ def to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array, parity_in
 
 
 
-def _to_polar_and_log_det(x, reference):
+def _to_polar_and_log_det(x: chex.Array,
+                          reference: chex.Array
+                          ) -> Tuple[chex.Array, chex.Array]:
     chex.assert_shape(x, (2,))
     origin, y = jnp.split(reference, (1,), axis=-2)
     y, origin = jnp.squeeze(y), jnp.squeeze(origin)
@@ -59,7 +61,9 @@ def _to_polar_and_log_det(x, reference):
     return x_polar, log_det
 
 
-def polar_to_cartesian_and_log_det(x_polar, reference):
+def polar_to_cartesian_and_log_det(x_polar: chex.Array,
+                                   reference: chex.Array,
+                                   ) -> Tuple[chex.Array, chex.Array]:
     chex.assert_shape(x_polar, (2,))
     origin, y = jnp.split(reference, (1,), axis=-2)
     y, origin = jnp.squeeze(y), jnp.squeeze(origin)

@@ -13,19 +13,31 @@ def load_dataset(train_set_size: int, valid_set_size: int):
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.training.train_set_size = 100
-    cfg.flow.nets.type = "e3gnn"
+    cfg.training.train_set_size = 4
+    cfg.training.test_set_size = 4
+    cfg.flow.nets.type = "egnn"
     cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
     cfg.training.batch_size = 2
-    cfg.flow.type = 'proj'
+    cfg.flow.type = 'spherical'
+    cfg.flow.kwargs.spherical.spline_num_bins = 3
+    cfg.flow.kwargs.n_inner_transforms = 1
     cfg.flow.n_aug = 1
 
     cfg.training.n_epoch = 32
     cfg.training.save = False
+    cfg.flow.scaling_layer = False
     cfg.training.plot_batch_size = 4
     cfg.logger = DictConfig({"list_logger": None})
+
+    cfg.flow.nets.mlp_head_config.mlp_units = (4,)
+    cfg.flow.nets.egnn.mlp_units = (4,)
+    cfg.flow.nets.egnn.n_blocks = 2
+    cfg.flow.nets.non_equivariant_transformer_config.output_dim = 3
+    cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,)
+    cfg.flow.nets.non_equivariant_transformer_config.n_layers = 2
+    cfg.flow.nets.non_equivariant_transformer_config.num_heads = 1
 
     debug = False
     if debug:

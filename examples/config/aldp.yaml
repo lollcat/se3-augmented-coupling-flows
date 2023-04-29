@@ -41,6 +41,7 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
+      reflection_invariant: true
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8

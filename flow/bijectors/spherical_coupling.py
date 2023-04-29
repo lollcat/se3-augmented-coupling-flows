@@ -18,6 +18,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  graph_features: chex.Array,
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
+                 reflection_invariant: bool = True,
                  swap: bool = False,
                  use_aux_loss: bool = True,
                  n_inner_transforms: int = 1,
@@ -50,6 +51,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
         self._graph_features = graph_features
         self.use_aux_loss = use_aux_loss
         self.n_inner_transforms = n_inner_transforms
+        self.reflection_invariant = reflection_invariant
         super().__init__(event_ndims_in=event_ndims)
 
     def _split(self, x: Array) -> Tuple[Array, Array]:
@@ -88,7 +90,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                         vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
       inner_bijector = self._bijector(params, vector_index)
-      spherical_bijector = SphericalFlow(inner_bijector, reference)
+      spherical_bijector = SphericalFlow(inner_bijector, reference, self.reflection_invariant)
       return spherical_bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\

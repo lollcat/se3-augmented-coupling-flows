@@ -5,6 +5,7 @@ import jax
 from molboil.targets.data import load_qm9
 from molboil.train.train import train
 from examples.create_train_config import create_train_config
+from examples.lj13 import to_local_config
 
 
 def load_dataset(train_set_size, valid_set_size):
@@ -12,26 +13,9 @@ def load_dataset(train_set_size, valid_set_size):
     return train_data, valid_data[:valid_set_size]
 
 
-def to_local_config(cfg: DictConfig) -> DictConfig:
-    """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
-    cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
-    cfg.flow.n_layers = 1
-    cfg.training.batch_size = 4
-    cfg.flow.type = 'nice'
-    cfg.training.batch_size = 2
-    cfg.training.n_epoch = 32
-    cfg.training.save = False
-    cfg.training.plot_batch_size = 2
-    cfg.training.train_set_size = 1000
-    cfg.training.test_set_size = 1000
-    cfg.logger = DictConfig({"list_logger": None})
-    return cfg
-
-
 @hydra.main(config_path="./config", config_name="qm9.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 
