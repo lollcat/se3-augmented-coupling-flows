@@ -172,21 +172,6 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                     nets_config=config.nets_config)
                 bijectors.append(bijector)
 
-
-        if config.scaling_layer:
-            # Sandwhich scaling layer on both sides of the flow.
-            # This is unecessarily expensive (will have two of these in a row).
-            # But these layers are cheap, so this is not a big problem.
-            bijector = make_scaling_block(
-                layer_number=layer_number+1,
-                graph_features=graph_features,
-                dim=config.dim,
-                n_aug=config.n_aug,
-                identity_init=config.identity_init,
-                condition=config.scaling_layer_conditioned
-            )
-            bijectors.append(bijector)
-
         return ChainWithExtra(bijectors)
 
     make_aug_target = build_aux_target_dist(
