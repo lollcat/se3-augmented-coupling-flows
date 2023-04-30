@@ -15,7 +15,7 @@ def load_dataset(train_set_size, valid_set_size):
 
 @hydra.main(config_path="./config", config_name="qm9.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 

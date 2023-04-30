@@ -101,10 +101,10 @@ def _to_spherical_and_log_det(
     x_vector = o_vector - z_axis_vector * jnp.dot(o_vector, z_axis_vector)  # vector rejection.
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
-    if enforce_parity_invariance:
-        pseudo_scalar = jnp.sign(jnp.dot(y_vector, z))
-        y_vector = y_vector * pseudo_scalar
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if enforce_parity_invariance:
+        pseudo_scalar = jnp.sign(jnp.dot(y_axis_vector, z))
+        y_axis_vector = y_axis_vector * pseudo_scalar
 
 
     vector = x - origin
@@ -141,11 +141,10 @@ def _to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array,
     x_vector = o_vector - z_axis_vector * jnp.dot(o_vector, z_axis_vector)  # vector rejection.
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
-    if enforce_parity_invariance:
-        pseudo_scalar = jnp.sign(jnp.dot(y_vector, z))
-        y_vector = y_vector * pseudo_scalar
-
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if enforce_parity_invariance:
+        pseudo_scalar = jnp.sign(jnp.dot(y_axis_vector, z))
+        y_axis_vector = y_axis_vector * pseudo_scalar
 
     r, theta, torsion = jnp.split(sph_x, 3)
     r, theta, torsion = jax.tree_map(jnp.squeeze, (r, theta, torsion))
