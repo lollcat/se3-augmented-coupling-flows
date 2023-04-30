@@ -143,14 +143,14 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
-    debug = True
-    if debug:
-        x = test_data[:10]
-        key = jax.random.PRNGKey(0)
-        flow_params = flow.init(key, train_data[0])
-        aux_samples = flow.aux_target_sample_n_apply(flow_params.aux_target, x, key)
-        joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
-        test_log_prob = flow.log_prob_apply(flow_params, joint_samples)
+    # debug = True
+    # if debug:
+    #     x = test_data[:10]
+    #     key = jax.random.PRNGKey(0)
+    #     flow_params = flow.init(key, train_data[0])
+    #     aux_samples = flow.aux_target_sample_n_apply(flow_params.aux_target, x, key)
+    #     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
+    #     test_log_prob = flow.log_prob_apply(flow_params, joint_samples)
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))
