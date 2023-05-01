@@ -18,7 +18,7 @@ class SphericalSplitCoupling(BijectorWithExtra):
                  graph_features: chex.Array,
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
-                 reflection_invariant: bool = True,
+                 reflection_invariant: bool = False,
                  swap: bool = False,
                  use_aux_loss: bool = True,
                  n_inner_transforms: int = 1,

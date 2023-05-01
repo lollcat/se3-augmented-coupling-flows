@@ -8,7 +8,7 @@ from molboil.utils.numerical import safe_norm
 from molboil.utils.numerical import rotate_2d
 
 def to_spherical_and_log_det(x: chex.Array, reference: chex.Array,
-                             parity_invariant: bool = True) -> Tuple[chex.Array, chex.Array]:
+                             parity_invariant: bool = False) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(x, 1)
     chex.assert_rank(reference, 2)
     dim = x.shape[0]
@@ -20,7 +20,7 @@ def to_spherical_and_log_det(x: chex.Array, reference: chex.Array,
 
 
 
-def to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array, parity_invariant: bool = True) -> \
+def to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array, parity_invariant: bool = False) -> \
         Tuple[chex.Array, chex.Array]:
     chex.assert_rank(sph_x, 1)
     chex.assert_rank(reference, 2)
