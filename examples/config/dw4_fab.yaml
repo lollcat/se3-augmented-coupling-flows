@@ -130,7 +130,7 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: true
-  data_augmentation_for_non_eq: true
+  data_augmentation_for_non_eq: false
 
 
 logger:
