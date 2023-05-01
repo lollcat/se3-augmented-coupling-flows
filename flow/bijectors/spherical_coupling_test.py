@@ -6,7 +6,7 @@ from utils.testing import check_bijector_properties
 from flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
 from utils.testing import get_minimal_nets_config
 
-def tesst_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
+def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
                             n_nodes: int = 19, n_aux: int = 1):
     nets_config = get_minimal_nets_config(type=type)
 
@@ -53,10 +53,10 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
 
-    tesst_bijector_spherical(dim=2)
+    test_bijector_spherical(dim=2)
     print('passed test in 2D')
 
-    tesst_bijector_spherical(dim=3)
+    test_bijector_spherical(dim=3)
     print('passed test in 3D')
 
 

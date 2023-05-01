@@ -38,7 +38,7 @@ target:
 
 flow:
   n_aug: 1
-  scaling_layer: true
+  scaling_layer: false
   scaling_layer_conditioned: true
   base:
     x_dist:
@@ -48,9 +48,9 @@ flow:
       scale_init: 1.0
   dim: 3
   nodes: 13
-  n_layers: 16
+  n_layers: 12
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 3
     non_equivariant:
