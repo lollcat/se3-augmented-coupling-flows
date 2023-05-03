@@ -52,7 +52,7 @@ flow:
   scaling_layer: true
   scaling_layer_conditioned: true
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 2
     non_equivariant:
@@ -65,6 +65,7 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
+      reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
@@ -129,7 +130,7 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: true
-  data_augmentation_for_non_eq: true
+  data_augmentation_for_non_eq: false
 
 
 logger:
