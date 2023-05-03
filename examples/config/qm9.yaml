@@ -10,8 +10,9 @@ target:
     conditioned_on_x: true
 
 flow:
-  n_aug: 3
-  act_norm: false
+  n_aug: 1
+  scaling_layer: false
+  scaling_layer_conditioned: true
   base:
     x_dist:
       type: centre_gravity_gaussian
@@ -22,9 +23,9 @@ flow:
   nodes: 19
   n_layers: 8
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
-    n_inner_transforms: 1
+    n_inner_transforms: 3
     non_equivariant:
       transform_type: real_nvp # spline or real_nvp
       spline_num_bins: 8
@@ -35,6 +36,7 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
+      reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
@@ -47,6 +49,7 @@ flow:
       upper: 10.
       orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
   nets:
+    embedding_for_non_positional_feat: false  # No non-positional features.
     type: egnn
     egnn:
       name: egnn
@@ -104,7 +107,7 @@ training:
   aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
-  verbose_info: true
+  verbose_info: false
   data_augmentation_for_non_eq: true
 
 logger:
@@ -112,7 +115,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}_actnorm${flow.act_norm}
+    name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,loll]

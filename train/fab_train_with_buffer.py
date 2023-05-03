@@ -11,6 +11,7 @@ import numpy as np
 
 from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.buffer import PrioritisedBuffer, PrioritisedBufferState
+from molboil.utils.test import random_rotate_translate_permute
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
 from utils.optimize import IgnoreNanOptState
@@ -40,6 +41,41 @@ def fab_loss_buffer_samples(
     return - jnp.mean(w_adjust * log_q), (log_w_adjust, log_q)
 
 
+def equivariance_regularisation_loss(
+        params: AugmentedFlowParams,
+        log_q: chex.Array,
+        x: chex.Array,
+        key: chex.PRNGKey,
+        log_q_fn_apply: ParameterizedLogProbFn):
+    """Apply regularisation to encourage equivariance."""
+    x_rot = random_rotate_translate_permute(x, key, translate=False, permute=False)
+    log_q_rot = log_q_fn_apply(params, x_rot)
+    chex.assert_equal_shape((log_q, log_q_rot))
+    loss = jnp.mean((log_q - log_q_rot)**2)
+    return loss
+
+
+def generic_loss(params: AugmentedFlowParams,
+        x: chex.Array,
+        key: chex.PRNGKey,
+        log_q_old: chex.Array,
+        alpha: chex.Array,
+        log_q_fn_apply: ParameterizedLogProbFn,
+        w_adjust_clip: float,
+        equivariance_regularisation: bool = False,
+        ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array, dict]]:
+    """Generic loss function for training, with option for equivariance regularisation."""
+    info = {}
+    fab_loss, (log_w_adjust, log_q) = fab_loss_buffer_samples(params, x, log_q_old, alpha, log_q_fn_apply,
+                                                              w_adjust_clip)
+    info.update(fab_loss=fab_loss)
+    if equivariance_regularisation:
+        eq_loss = equivariance_regularisation_loss(params, log_q, x, key, log_q_fn_apply)
+        fab_loss = fab_loss + eq_loss
+        info.update(eq_loss=eq_loss, total_loss=fab_loss)
+    return fab_loss, (log_w_adjust, log_q, info)
+
+
 
 class TrainStateWithBuffer(NamedTuple):
     params: AugmentedFlowParams
@@ -61,6 +97,7 @@ def build_fab_with_buffer_init_step_fns(
         n_updates_per_smc_forward_pass: int,
         alpha: float = 2.,
         w_adjust_clip: float = 10.,
+        equivariance_regularisation: bool = False
 ):
     """Create the `init` and `step` functions that define the FAB algorithm."""
     assert smc.alpha == alpha
@@ -106,10 +143,11 @@ def build_fab_with_buffer_init_step_fns(
         return TrainStateWithBuffer(params=flow_params, key=key4, opt_state=opt_state,
                                     smc_state=smc_state, buffer_state=buffer_state)
 
-    def one_gradient_update(carry: Tuple[AugmentedFlowParams, optax.OptState], xs: Tuple[chex.Array, chex.Array]):
+    def one_gradient_update(carry: Tuple[AugmentedFlowParams, optax.OptState],
+                            xs: Tuple[chex.Array, chex.Array, chex.PRNGKey]):
         """Perform on update to the flow parameters with a batch of data from the buffer."""
         flow_params, opt_state = carry
-        x, log_q_old = xs
+        x, log_q_old, key = xs
         info = {}
 
         flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
@@ -119,16 +157,17 @@ def build_fab_with_buffer_init_step_fns(
 
         x = unflatten(x)
         # Estimate loss and update flow params.
-        (loss, (log_w_adjust, log_q)), grad = jax.value_and_grad(fab_loss_buffer_samples, has_aux=True)(
-            flow_params, x, log_q_old, alpha, flow_log_prob_apply, w_adjust_clip)
+        grad, (log_w_adjust, log_q, loss_info) = jax.grad(generic_loss, has_aux=True)(
+            flow_params, x, key, log_q_old, alpha, flow_log_prob_apply, w_adjust_clip, equivariance_regularisation)
         updates, new_opt_state = optimizer.update(grad, opt_state, params=flow_params)
         new_params = optax.apply_updates(flow_params, updates)
         grad_norm = optax.global_norm(grad)
-        info.update(loss=loss)
+        info.update(loss_info)
         info.update(log10_grad_norm=jnp.log10(grad_norm))  # Makes scale nice for plotting
         info.update(log10_max_param_grad=jnp.log(jnp.max(ravel_pytree(grad)[0])))
         if isinstance(opt_state, IgnoreNanOptState):
-            info.update(ignored_grad_count=opt_state.ignored_grads_count)
+            info.update(ignored_grad_count=opt_state.ignored_grads_count,
+                        total_optimizer_steps=opt_state.total_steps)
         return (new_params, new_opt_state), (info, log_w_adjust, log_q)
 
     @jax.jit
@@ -142,8 +181,10 @@ def build_fab_with_buffer_init_step_fns(
         x_buffer, log_q_old_buffer, indices = buffer.sample_n_batches(subkey, state.buffer_state, batch_size,
                                                                       n_updates_per_smc_forward_pass)
         # Perform sgd steps on flow.
+        key, subkey = jax.random.split(state.key)
         (new_flow_params, new_opt_state), (infos, log_w_adjust, log_q_old) = jax.lax.scan(
-            one_gradient_update, init=(state.params, state.opt_state), xs=(x_buffer, log_q_old_buffer),
+            one_gradient_update, init=(state.params, state.opt_state),
+            xs=(x_buffer, log_q_old_buffer, jax.random.split(subkey, n_updates_per_smc_forward_pass)),
             length=n_updates_per_smc_forward_pass
         )
         # Adjust samples in the buffer.

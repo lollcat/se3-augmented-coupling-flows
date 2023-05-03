@@ -1,4 +1,3 @@
-import distrax
 import chex
 
 
@@ -7,12 +6,15 @@ from flow.bijectors.centre_of_mass_only_flow import build_unconditional_centre_o
 from flow.distrax_with_extra import ChainWithExtra
 
 
-def make_act_norm(
+def make_scaling_block(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
         n_aug: int,
-        identity_init: bool):
+        identity_init: bool,
+        condition: bool
+) -> ChainWithExtra:
+    
     bijectors = []
     bijectors.append(
         build_unconditional_centre_of_mass_layer(
@@ -27,7 +29,8 @@ def make_act_norm(
         graph_features=graph_features, layer_number=layer_number,
         dim=dim,
         identity_init=identity_init,
-        n_aug=n_aug
+        n_aug=n_aug,
+        condition=condition
         )
     )
     return ChainWithExtra(bijectors)

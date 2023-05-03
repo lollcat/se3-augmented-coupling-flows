@@ -14,7 +14,7 @@ def test_bijector_with_proj(
 
     graph_features = jnp.zeros((n_nodes, 1, 1))
 
-    orth_type = ['loewdin', 'gram-schmidt'][0]
+    orth_type = ['loewdin', 'gram-schmidt'][1]
 
     def make_flow():
         bijectors = []

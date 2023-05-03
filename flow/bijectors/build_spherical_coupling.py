@@ -22,6 +22,7 @@ def make_spherical_coupling_layer(
         dist_spline_max: float = 10.,
         use_aux_loss: bool = True,
         n_inner_transforms: int = 1,
+        reflection_invariant: bool = False
         ) -> SphericalSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
@@ -118,4 +119,5 @@ def make_spherical_coupling_layer(
         n_inner_transforms=n_inner_transforms,
         event_ndims=3,  # [nodes, n_aug+1, dim]
         split_axis=-2,
+        reflection_invariant=reflection_invariant
     )

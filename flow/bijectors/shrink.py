@@ -127,6 +127,7 @@ def build_shrink_layer(
         identity_init: bool,
         condition: bool = True
 ) -> BijectorWithExtra:
+    """Perform isotropic scaling of the zero-mean variables, conditioning on the augmented centre of masses."""
     # TODO: Could use graph features by passing them through a transformer.
 
     mlp_units: Tuple[int, ...] = (16, 16)  # Fix as a small MLP.

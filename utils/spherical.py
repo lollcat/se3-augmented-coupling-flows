@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import chex
 import jax
@@ -7,31 +7,35 @@ import jax.numpy as jnp
 from molboil.utils.numerical import safe_norm
 from molboil.utils.numerical import rotate_2d
 
-def to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
+def to_spherical_and_log_det(x: chex.Array, reference: chex.Array,
+                             parity_invariant: bool = False) -> Tuple[chex.Array, chex.Array]:
     chex.assert_rank(x, 1)
     chex.assert_rank(reference, 2)
     dim = x.shape[0]
     if dim == 3:
-        return _to_spherical_and_log_det(x, reference)
+        return _to_spherical_and_log_det(x, reference, parity_invariant)
     else:
         assert dim == 2
         return _to_polar_and_log_det(x, reference)
 
 
-def to_cartesian_and_log_det(sph_x, reference) -> \
+
+def to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array, parity_invariant: bool = False) -> \
         Tuple[chex.Array, chex.Array]:
     chex.assert_rank(sph_x, 1)
     chex.assert_rank(reference, 2)
     dim = sph_x.shape[0]
     if dim == 3:
-        return _to_cartesian_and_log_det(sph_x, reference)
+        return _to_cartesian_and_log_det(sph_x, reference, parity_invariant)
     else:
         assert dim == 2
         return polar_to_cartesian_and_log_det(sph_x, reference)
 
 
 
-def _to_polar_and_log_det(x, reference):
+def _to_polar_and_log_det(x: chex.Array,
+                          reference: chex.Array,
+                          ) -> Tuple[chex.Array, chex.Array]:
     chex.assert_shape(x, (2,))
     origin, y = jnp.split(reference, (1,), axis=-2)
     y, origin = jnp.squeeze(y), jnp.squeeze(origin)
@@ -49,7 +53,9 @@ def _to_polar_and_log_det(x, reference):
     norm_y = safe_norm(y, axis=-1)
     unit_vector_y_axis = vector_y / norm_y
     x_proj_norm = jnp.dot(unit_vector_x, unit_vector_y_axis)
+    # Norm in direction perpendicular to x.
     perp_line = jnp.cross(unit_vector_y_axis, unit_vector_x)
+
     theta = jnp.arctan2(perp_line, x_proj_norm)
     log_det = - jnp.log(r)
 
@@ -58,7 +64,9 @@ def _to_polar_and_log_det(x, reference):
     return x_polar, log_det
 
 
-def polar_to_cartesian_and_log_det(x_polar, reference):
+def polar_to_cartesian_and_log_det(
+        x_polar: chex.Array,
+        reference: chex.Array) -> Tuple[chex.Array, chex.Array]:
     chex.assert_shape(x_polar, (2,))
     origin, y = jnp.split(reference, (1,), axis=-2)
     y, origin = jnp.squeeze(y), jnp.squeeze(origin)
@@ -74,7 +82,15 @@ def polar_to_cartesian_and_log_det(x_polar, reference):
     return x, log_det
 
 
-def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
+def _to_spherical_and_log_det(
+        x: chex.Array,
+        reference: chex.Array,
+        enforce_parity_invariance: bool = False,
+                              ) -> Tuple[chex.Array, chex.Array]:
+    """Note that if `enforce_parity_invariance` is True we use z - (0, 0, 0) to obtain another vector.
+    This only works if we assume that (0, 0, 0) is our centre of mass (i.e. this will only work within a flow layer
+    that ensures that z - (0,0,0) is an equivariant quantity)."""
+
     chex.assert_rank(x, 1)
     dim = x.shape[0]
     origin, z, o = jnp.split(reference, (1,2), axis=-2)
@@ -89,6 +105,17 @@ def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if enforce_parity_invariance:
+        # The cross product returns a pseudo-vector. Multiplying this by
+        # A pseudo-scalar then converts this back into a normal (polar) vector.
+        # To get the pseudo-scalar we take the sign of the dot product between the pseudo-vector
+        # and a polar vector. The polar vector can be anything, as long as it is not orthogonal to
+        # the pseudo-vector. We use the vector from the z reference point to centre (0,0,0) as
+        # the polar vector (we can't use `x_axis_vector` or `z_axis_vector` as these are orthogonal to
+        # `y_axis_vector`).
+        pseudo_scalar = jnp.sign(jnp.dot(y_axis_vector, z))
+        y_axis_vector = y_axis_vector * pseudo_scalar
+
 
     vector = x - origin
     r = safe_norm(vector)
@@ -105,10 +132,15 @@ def _to_spherical_and_log_det(x, reference) -> Tuple[chex.Array, chex.Array]:
     return x, jnp.squeeze(log_det)
 
 
-def _to_cartesian_and_log_det(sph_x, reference) -> \
+def _to_cartesian_and_log_det(sph_x: chex.Array, reference: chex.Array,
+                              enforce_parity_invariance: bool = False) -> \
         Tuple[chex.Array, chex.Array]:
+    """Note that if `enforce_parity_invariance` is True we use z - (0, 0, 0) to obtain another vector.
+    This only works if we assume that (0, 0, 0) is our centre of mass (i.e. this will only work within a flow layer
+    that ensures that z - (0,0,0) is an equivariant quantity)."""
+
     chex.assert_rank(sph_x, 1)
-    origin, z, o = jnp.split(reference, (1,2), axis=-2)
+    origin, z, o = jnp.split(reference, (1, 2), axis=-2)
     origin, z, o = jnp.squeeze(origin, axis=-2), jnp.squeeze(z, axis=-2), jnp.squeeze(o, axis=-2)
     chex.assert_equal_shape([sph_x, origin, z, o])
 
@@ -120,6 +152,16 @@ def _to_cartesian_and_log_det(sph_x, reference) -> \
     x_axis_vector = x_vector / safe_norm(x_vector)
     y_vector = jnp.cross(x_axis_vector, z_axis_vector)
     y_axis_vector = y_vector / safe_norm(y_vector)
+    if enforce_parity_invariance:
+        # The cross product returns a pseudo-vector. Multiplying this by
+        # A pseudo-scalar then converts this back into a normal (polar) vector.
+        # To get the pseudo-scalar we take the sign of the dot product between the pseudo-vector
+        # and a polar vector. The polar vector can be anything, as long as it is not orthogonal to
+        # the pseudo-vector. We use the vector from the z reference point to centre (0,0,0) as
+        # the polar vector (we can't use `x_axis_vector` or `z_axis_vector` as these are orthogonal to
+        # `y_axis_vector`).
+        pseudo_scalar = jnp.sign(jnp.dot(y_axis_vector, z))
+        y_axis_vector = y_axis_vector * pseudo_scalar
 
     r, theta, torsion = jnp.split(sph_x, 3)
     r, theta, torsion = jax.tree_map(jnp.squeeze, (r, theta, torsion))
@@ -131,4 +173,3 @@ def _to_cartesian_and_log_det(sph_x, reference) -> \
 
     log_det = (2*jnp.log(r) + jnp.log(jnp.sin(theta)))
     return x_cartesian, jnp.squeeze(log_det)
-

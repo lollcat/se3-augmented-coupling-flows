@@ -73,9 +73,8 @@ def create_nets_config(nets_config: DictConfig):
                                                                              nets_config.keys() else None
     non_equivariant_transformer_config = TransformerConfig(**nets_config.pop('non_equivariant_transformer_config')) \
         if 'non_equivariant_transformer_config' in nets_config.keys() else None
-    type = nets_config['type']
     nets_config = NetsConfig(
-                             type=type,
+                             **nets_config,
                              egnn_torso_config=egnn_cfg,
                              e3gnn_torso_config=e3gnn_config,
                              mlp_head_config=mlp_head_config,
@@ -143,6 +142,15 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
+
+    # debug = True
+    # if debug:
+    #     x = test_data[:10]
+    #     key = jax.random.PRNGKey(0)
+    #     flow_params = flow.init(key, train_data[0])
+    #     aux_samples = flow.aux_target_sample_n_apply(flow_params.aux_target, x, key)
+    #     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
+    #     test_log_prob = flow.log_prob_apply(flow_params, joint_samples)
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))

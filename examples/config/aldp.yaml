@@ -14,7 +14,8 @@ target:
 
 flow:
   n_aug: 3
-  act_norm: false
+  scaling_layer: true
+  scaling_layer_conditioned: true
   base:
     x_dist:
       type: centre_gravity_gaussian
@@ -40,6 +41,7 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
+      reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
@@ -52,6 +54,9 @@ flow:
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
+    embedding_for_non_positional_feat: true  # No non-positional features.
+    embedding_dim: 32
+    num_discrete_feat: 22  # Number of atoms.
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
