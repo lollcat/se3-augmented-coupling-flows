@@ -9,7 +9,7 @@ fab:
   with_buffer: true
   buffer_max_length_batches: 512
   buffer_min_length_batches: 16
-  n_updates_per_smc_forward_pass: 16
+  n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
   use_resampling: false
   use_hmc: true
@@ -115,7 +115,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 60000
+  n_epoch: 20000
   batch_size: 128
   eval_batch_size: 128
   plot_batch_size: 128
@@ -144,5 +144,5 @@ logger:
     name: lj13_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,fab]
+    tags: [lj13,fab,results_attempt1]
 
