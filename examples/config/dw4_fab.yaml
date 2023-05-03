@@ -52,7 +52,7 @@ flow:
   scaling_layer: true
   scaling_layer_conditioned: true
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 2
     non_equivariant:

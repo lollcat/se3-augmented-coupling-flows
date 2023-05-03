@@ -21,12 +21,12 @@ flow:
       scale_init: 1.0
   dim: 2
   nodes: 4
-  n_aug: 5
-  n_layers: 4
+  n_aug: 3
+  n_layers: 8
   scaling_layer: true
   scaling_layer_conditioned: true
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 2
     non_equivariant:

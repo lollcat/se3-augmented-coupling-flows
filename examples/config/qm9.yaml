@@ -10,8 +10,8 @@ target:
     conditioned_on_x: true
 
 flow:
-  n_aug: 3
-  scaling_layer: true
+  n_aug: 1
+  scaling_layer: false
   scaling_layer_conditioned: true
   base:
     x_dist:
