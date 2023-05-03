@@ -79,9 +79,9 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-4
+    init_lr: 2e-4
     optimizer_name: adam
-    use_schedule: true
+    use_schedule: false
     peak_lr: 3e-4
     end_lr: 6e-5 # can be null
     warmup_n_epoch: 10 # can be null
@@ -118,4 +118,4 @@ logger:
     name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,loll]
+    tags: [qm9pos,paper_results_round_1]
