@@ -8,6 +8,7 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
 
 flow:
   n_aug: 1

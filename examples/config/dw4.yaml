@@ -8,6 +8,7 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
@@ -18,7 +19,7 @@ flow:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 2
   nodes: 4
   n_aug: 1
@@ -96,7 +97,7 @@ training:
   test_set_size: 1000
   n_checkpoints: 2
   n_eval: 20
-  K_marginal_log_lik: 50
+  K_marginal_log_lik: 20
   save: true
   save_dir: dw4_results
   resume: false
@@ -117,5 +118,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,paper_results_round_3]
+    tags: [dw4,paper_results_round_4]
 
