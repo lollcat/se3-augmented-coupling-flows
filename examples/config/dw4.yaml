@@ -21,8 +21,8 @@ flow:
       scale_init: 1.0
   dim: 2
   nodes: 4
-  n_aug: 3
-  n_layers: 8
+  n_aug: 1
+  n_layers: 12
   scaling_layer: true
   scaling_layer_conditioned: true
   identity_init: true
@@ -87,7 +87,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 200
+  n_epoch: 400
   batch_size: 100
   plot_batch_size: 256
   eval_batch_size: 128
@@ -117,5 +117,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,paper_results_round_1]
+    tags: [dw4,paper_results_round_2]
 
