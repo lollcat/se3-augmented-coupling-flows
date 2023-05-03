@@ -48,7 +48,7 @@ flow:
   dim: 2
   nodes: 4
   n_aug: 1
-  n_layers: 8
+  n_layers: 12
   scaling_layer: true
   scaling_layer_conditioned: true
   identity_init: true
@@ -112,7 +112,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 30000
-  batch_size: 32
+  batch_size: 128
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
