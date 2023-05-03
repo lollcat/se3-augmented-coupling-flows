@@ -11,7 +11,7 @@ target:
 
 flow:
   n_aug: 1
-  scaling_layer: true
+  scaling_layer: false
   scaling_layer_conditioned: true
   base:
     x_dist:
