@@ -44,7 +44,7 @@ for script in SCRIPT_NAMES:
                                 line = (f'{SCRIPT_FOLDER + script}_fab.py '
                                         f'flow.type={flow_type} '
                                         f'flow.n_layers={n_layers} '
-                                        f'fab.smc_updates_per_smc_forward_pass={smc_updates_per_smc_forward_pass} '
+                                        f'fab.n_updates_per_smc_forward_pass={smc_updates_per_smc_forward_pass} '
                                         f'training.seed={random_seed} '
                                         f'training.optimizer.init_lr={lr} '
                                         f'training.batch_size={batch_size} '
