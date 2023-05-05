@@ -62,11 +62,15 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
+    n_epoch = cfg.training.n_epoch
+    if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
+        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+
 
     opt_cfg = dict(training_config.pop("optimizer"))
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')
     optimizer_config = OptimizerConfig(**opt_cfg,
-                                       n_iter_total=cfg.training.n_epoch,
+                                       n_iter_total=n_epoch,
                                        n_iter_warmup=n_iter_warmup)
     optimizer, lr = get_optimizer(optimizer_config)
 
@@ -151,7 +155,7 @@ def create_train_config(cfg: DictConfig, target_log_p_x_fn, load_dataset, dim, n
 
 
     return TrainConfig(
-        n_iteration=cfg.training.n_epoch,
+        n_iteration=n_epoch,
         logger=logger,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,

@@ -2,7 +2,6 @@ from typing import Tuple, Optional
 
 import chex
 import jax
-import optax
 import wandb
 import matplotlib.pyplot as plt
 import os
@@ -143,20 +142,15 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
-    # debug = True
-    # if debug:
-    #     x = test_data[:10]
-    #     key = jax.random.PRNGKey(0)
-    #     flow_params = flow.init(key, train_data[0])
-    #     aux_samples = flow.aux_target_sample_n_apply(flow_params.aux_target, x, key)
-    #     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
-    #     test_log_prob = flow.log_prob_apply(flow_params, joint_samples)
+    n_epoch = cfg.training.n_epoch
+    if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
+        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))
     n_iter_per_epoch = train_data.positions.shape[0] // cfg.training.batch_size
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
-    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    n_iter_total = n_epoch * n_iter_per_epoch
     optimizer_config = OptimizerConfig(**opt_cfg,
                                        n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
@@ -229,7 +223,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
 
     return TrainConfig(
-        n_iteration=cfg.training.n_epoch,
+        n_iteration=n_epoch,
         logger=logger,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,
@@ -276,10 +270,14 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
+    n_epoch = cfg.training.n_epoch
+    if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
+        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+
     opt_cfg = dict(training_config.pop("optimizer"))
     n_iter_per_epoch = train_data.positions.shape[0] // (cfg.training.batch_size * n_devices)
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
-    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    n_iter_total = n_epoch * n_iter_per_epoch
     optimizer_config = OptimizerConfig(**opt_cfg,
                                        n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
@@ -386,7 +384,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
 
     return TrainConfig(
-        n_iteration=cfg.training.n_epoch,
+        n_iteration=n_epoch,
         logger=logger,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,

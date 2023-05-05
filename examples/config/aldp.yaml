@@ -102,6 +102,7 @@ training:
   debug: false
   verbose_info: false
   data_augmentation_for_non_eq: true
+  factor_to_train_non_eq_flow: 4
 
 
 eval:
