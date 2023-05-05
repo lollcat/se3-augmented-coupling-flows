@@ -22,7 +22,7 @@ flow:
       scale_init: 1.0
   dim: 3
   nodes: 19
-  n_layers: 8
+  n_layers: 12
   identity_init: true
   type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
@@ -91,13 +91,13 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
-  batch_size: 32
+  batch_size: 100
   plot_batch_size: 128
   eval_batch_size: 128
   seed: 0
   train_set_size: null
   test_set_size: null
-  n_checkpoints: 0
+  n_checkpoints: 2
   n_eval: 15
   K_marginal_log_lik: 20
   save: true
