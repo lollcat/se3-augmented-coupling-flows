@@ -9,10 +9,10 @@ SCRIPT_NAMES = ['lj13']  #  ['dw4' , 'lj13']
 FLOW_TYPES=['spherical'] # ['spherical', 'along_vector', 'proj','non_equivariant']
 SCRIPT_FOLDER = 'examples/' #  f'home/lim24/rds/hpc-work/lim24/augmented-equivariant-flows/examples/'
 RANDOM_SEEDS = [0,]
-N_UPDATES_PER_SMC_FORWARD_PASS = [8, 16, 32]
-LR_s = [4e-4, 2e-4, 1e-4]
-N_LAYERS=[12, 16]
-BATCH_SIZES=[64,128]
+N_UPDATES_PER_SMC_FORWARD_PASS = [8]
+LR_s = [1e-4]
+N_LAYERS=[16]
+BATCH_SIZES=[256,512]
 ################################################################################
 
 times = {
