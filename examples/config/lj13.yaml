@@ -21,7 +21,7 @@ flow:
       scale_init: 1.0
   dim: 3
   nodes: 13
-  n_layers: 8
+  n_layers: 12
   identity_init: true
   type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
@@ -90,7 +90,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 64
-  batch_size: 32
+  batch_size: 100
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
@@ -116,8 +116,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_${flow.type}_${flow.type}
+    name: lj13_${flow.type}_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,paper_results_round_1]
+    tags: [lj13,post_kigali_1]
 
