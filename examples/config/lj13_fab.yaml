@@ -81,8 +81,8 @@ flow:
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
-      mlp_units: [ 64, 64 ]
-      n_invariant_feat_hidden: 64
+      mlp_units: [ 32, 32 ]
+      n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
       centre_mass: false
       norm_wrt_centre_feat: true
@@ -94,13 +94,14 @@ flow:
       n_invariant_feat_hidden: 32
       get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [64,]
+      mlp_units: [32, 32]
+      stable: true
     non_equivariant_transformer_config:
-      output_dim: 64
-      key_size_per_node_dim_in: 8  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      output_dim: 32
+      key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
       n_layers: 3
-      mlp_units: [ 64, 64 ]
-      num_heads: 8
+      mlp_units: [ 32, 32 ]
+      num_heads: 4
 
 
 training:
