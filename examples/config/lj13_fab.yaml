@@ -106,7 +106,7 @@ flow:
 
 training:
   optimizer:
-    init_lr: 3e-4
+    init_lr: 2e-4
     optimizer_name: adam
     use_schedule: false
     peak_lr: 3e-4
@@ -129,7 +129,7 @@ training:
   save: true
   save_dir: lj13_results
   resume: false
-  runtime_limit: 32.
+  runtime_limit: 30.
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
