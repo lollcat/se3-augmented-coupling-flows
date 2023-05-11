@@ -1,4 +1,3 @@
-cd ..
 echo $PWD
 export PYTHONPATH=$PWD
 
