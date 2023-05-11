@@ -8,7 +8,7 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
-    scale_init: 1.0
+    scale_init: 0.1
 
 flow:
   n_aug: 1
@@ -91,7 +91,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 256
-  batch_size: 32
+  batch_size: 64
   plot_batch_size: 128
   eval_batch_size: 128
   seed: 0
@@ -120,4 +120,4 @@ logger:
     name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,post_kigali_2]
+    tags: [qm9pos,post_kigali_3]

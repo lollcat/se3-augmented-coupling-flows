@@ -35,6 +35,7 @@ fab:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
 
 flow:
   n_aug: 1
@@ -56,11 +57,11 @@ flow:
     non_equivariant:
       transform_type: real_nvp # spline or real_nvp
       spline_num_bins: 8
-      spline_max_abs_min: 20.
+      spline_max_abs_min: 10.
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
       reflection_invariant: false
@@ -72,8 +73,8 @@ flow:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -20.
-      upper: 20.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     type: egnn

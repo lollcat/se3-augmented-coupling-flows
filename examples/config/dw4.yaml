@@ -9,7 +9,7 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
-    scale_init: 1.0
+    scale_init: 0.1
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
@@ -38,20 +38,20 @@ flow:
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
       reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -20.
-      upper: 20.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     embedding_for_non_positional_feat: false  # No non-positional features.
@@ -90,7 +90,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 100
-  batch_size: 32
+  batch_size: 64
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
@@ -120,5 +120,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,post_kigali_2]
+    tags: [dw4,post_kigali_3]
 

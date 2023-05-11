@@ -34,6 +34,7 @@ fab:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
@@ -62,20 +63,20 @@ flow:
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
       reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     proj:
       transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -20..
-      upper: 20.
+      lower: -10..
+      upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     embedding_for_non_positional_feat: false

@@ -22,13 +22,15 @@ def evaluate_dw4(flow,
                                     flow=flow, K=K, test_invariances=True)
     eval_batch_free_fn = partial(
         eval_non_batched,
-        features=test_data.features[0],
+        single_feature=test_data.features[0],
         flow=flow,
-        batch_size=n_samples_eval,
+        n_samples=n_samples_eval,
+        inner_batch_size=min(eval_batch_size, n_samples_eval),
         target_log_prob=log_prob_fn)
 
     def evaluation_fn(state, key) -> dict:
-        eval_info = eval_fn(test_data, key, state.params,
+        eval_fn_no_jit = eval_fn._fun
+        eval_info = eval_fn_no_jit(test_data, key, state.params,
                             eval_on_test_batch_fn=eval_on_test_batch_fn,
                             eval_batch_free_fn=eval_batch_free_fn,
                             batch_size=eval_batch_size)
