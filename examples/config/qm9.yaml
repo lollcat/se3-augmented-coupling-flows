@@ -34,20 +34,20 @@ flow:
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
       reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 20.
+      dist_spline_max: 10.
       spline_num_bins: 8
     proj:
-      transform_type: spline # spline or real_nvp
+      transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -20.
-      upper: 20.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
   nets:
     embedding_for_non_positional_feat: false  # No non-positional features.
@@ -120,4 +120,4 @@ logger:
     name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,post_kigali_3]
+    tags: [qm9pos,post_kigali_4]

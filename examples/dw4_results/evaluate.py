@@ -52,7 +52,7 @@ if __name__ == '__main__':
                                                  val_set_size=1000)
 
     data = pd.DataFrame()
-
+    i = 0
     for flow_type in flow_types:
         for seed in seeds:
             checkpoint_path = f"examples/dw4_results/models/{flow_type}_seed0.pkl"
@@ -61,10 +61,8 @@ if __name__ == '__main__':
             flow, state = load_flow(cfg, checkpoint_path)
 
             info = evaluate_dw4(flow, state, test_data, K=8, n_samples_eval=10)
+            info.update(flow_type=flow_type, seed=seed)
+            data.join(pd.Series(data, name=i), how="outer")
+            print(f"evaluated flow {flow_type} seed {seed}")
 
-
-
-
-
-
-
+            i += 1

@@ -33,9 +33,6 @@ flow:
     n_inner_transforms: 2
     non_equivariant:
       transform_type: real_nvp # spline or real_nvp
-      spline_num_bins: 8
-      spline_max_abs_min: 20.
-      n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
@@ -89,7 +86,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 400
+  n_epoch: 200
   batch_size: 64
   plot_batch_size: 256
   eval_batch_size: 128
@@ -120,5 +117,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,post_kigali_3]
+    tags: [dw4,post_kigali_4]
 

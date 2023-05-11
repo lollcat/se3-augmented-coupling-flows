@@ -147,5 +147,5 @@ logger:
     name: lj13_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}_${training.optimizer.init_lr}_bs${training.batch_size}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,fab,post_kigali_2]
+    tags: [lj13,fab,post_kigali_4]
 

@@ -42,7 +42,7 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
-      transform_type: spline # spline or real_nvp
+      transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
@@ -120,5 +120,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,post_kigali_3]
+    tags: [lj13,post_kigali_4]
 
