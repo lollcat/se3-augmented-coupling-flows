@@ -90,7 +90,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 256
-  batch_size: 64
+  batch_size: 32
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
