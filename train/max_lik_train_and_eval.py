@@ -76,9 +76,12 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     log_w = log_q - log_p_a
 
     info = {}
-    info.update(eval_log_lik = jnp.mean(log_q))
+    info.update(eval_log_lik=jnp.mean(log_q))
     marginal_log_lik = jnp.mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)), axis=0)
     info.update(marginal_log_lik=marginal_log_lik)
+
+    lower_bound_marginal_gap = marginal_log_lik - jnp.mean(log_w)
+    info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
 
     info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
     info.update(ess_aug_conditional=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
