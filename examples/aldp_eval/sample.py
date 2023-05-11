@@ -16,8 +16,19 @@ from flow.build_flow import build_flow
 from examples.create_train_config import create_flow_config
 
 
-@hydra.main(config_path="./config", config_name="aldp_sample.yaml")
+@hydra.main(config_path="./config", config_name="aldp.yaml")
 def run(cfg: DictConfig):
+    # Get parameters
+    seed = 0
+    n_batches = 1000
+    n_samples = 10000
+    if 'FLOW_SEED' in os.environ:
+        seed = int(os.environ['FLOW_SEED'])
+    if 'FLOW_N_BATCHES' in os.environ:
+        n_batches = int(os.environ['FLOW_N_BATCHES'])
+    if 'FLOW_N_SAMPLES' in os.environ:
+        n_samples = int(os.environ['FLOW_N_SAMPLES'])
+
     if cfg.training.use_64_bit:
         jax.config.update("jax_enable_x64", True)
 
@@ -52,14 +63,14 @@ def run(cfg: DictConfig):
         state = pickle.load(f)
 
     # Sample
-    prng_seq = hk.PRNGSequence(cfg.eval.seed)
+    prng_seq = hk.PRNGSequence(seed)
     features = jnp.arange(22, dtype=int)[:, None]
     positions_x = []
     positions_a = []
     log_q = []
-    for _ in range(cfg.eval.n_batches):
+    for _ in range(n_batches):
         positions_x_, positions_a_, log_q_ = sample_fn(state.params, features,
-                                                       next(prng_seq), cfg.eval.n_samples)
+                                                       next(prng_seq), n_samples)
         positions_x.append(np.array(positions_x_))
         positions_a.append(np.array(positions_a_))
         log_q.append(np.array(log_q_))
@@ -70,7 +81,7 @@ def run(cfg: DictConfig):
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"samples")
     pathlib.Path(sample_dir).mkdir(exist_ok=True)
-    np.savez(os.path.join(sample_dir, f"sample_%04i.npz" % cfg.eval.seed),
+    np.savez(os.path.join(sample_dir, f"sample_%04i.npz" % seed),
              positions_x=positions_x, positions_a=positions_a, log_q=log_q)
 
 
