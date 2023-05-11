@@ -9,4 +9,4 @@
 *.npy
 *.log
 /outputs
-/examples/dw4_results/models/
+/examples/*./models/

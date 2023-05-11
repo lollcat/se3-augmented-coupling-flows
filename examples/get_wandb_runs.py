@@ -14,25 +14,13 @@ def get_wandb_run(flow_type, tags, seed):
     filters = {"$and": filter_list}
     runs = api.runs(path='flow-ais-bootstrap/fab',
                     filters=filters)
-    # assert len(runs) == 1  # Should only have 1 match.
+    if len(runs) > 1:
+        print(f"Found multiple runs for flow_type {flow_type}, tags {tags}, seed {seed}. "
+              f"Taking the most recent.")
+    elif len(runs) == 0:
+        raise Exception(f"No runs for for flow_type {flow_type}, tags {tags}, seed {seed} found!")
 
     return runs[0]  # Get latest run.
-    # runs_list = []
-    # i = 0
-    # key = 'marginal_log_lik'
-    # while not len(runs_list) == 1:
-    #     if i >= (len(runs)):
-    #         print(f"not enough seeds:")
-    #         print(f"only {len(runs_list)} seeds \n")
-    #         break
-    #     run = runs[i]
-    #     history = run.history(keys=[key])
-    #     if "finished" not in str(run) or key not in history.keys():
-    #         i += 1
-    #         continue
-    #     runs_list.append(run)
-    #     i += 1
-    return runs
 
 
 def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
