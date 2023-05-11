@@ -68,7 +68,7 @@ def run(cfg: DictConfig):
     log_q = jnp.concatenate(log_q, axis=0)
 
     # Save results
-    sample_dir = os.path.join(cfg.eval.save_dir, f"samples")
+    sample_dir = os.path.join(cfg.training.save_dir, f"samples")
     pathlib.Path(sample_dir).mkdir(exist_ok=True)
     save_dict = {"positions_x": np.array(positions_x), "positions_a": np.array(positions_a),
                 "log_q": np.array(log_q)}
