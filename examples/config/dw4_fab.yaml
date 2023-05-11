@@ -62,20 +62,20 @@ flow:
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
+      dist_spline_max: 20.
       spline_num_bins: 8
     spherical:
       reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
+      dist_spline_max: 20.
       spline_num_bins: 8
     proj:
       transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -20..
+      upper: 20.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     embedding_for_non_positional_feat: false

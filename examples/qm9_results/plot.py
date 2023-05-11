@@ -9,8 +9,8 @@ from molboil.targets.data import load_qm9
 
 
 mpl.rcParams['figure.dpi'] = 300
-rc('font', **{'family': 'serif', 'serif': ['Times']})
-rc('text', usetex=False)
+# rc('font', **{'family': 'serif', 'serif': ['Times']})
+# rc('text', usetex=False)
 rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
 rc('legend', fontsize=24)
 rc('xtick', labelsize=20)
@@ -63,8 +63,9 @@ if __name__ == '__main__':
 
     flow, state = load_flow(cfg, checkpoint_path)
 
-    train_data, valid_data, test_data = load_qm9()
+    train_data, valid_data, test_data = load_qm9(train_set_size=2000)  # None)
     n_samples_from_flow_plotting = train_data.positions.shape[0]
+    print(f"plotting qm9 with {n_samples_from_flow_plotting} samples")
 
 
     get_data_for_plotting, count_list, bins_x = make_get_data_for_plotting(train_data=train_data, test_data=test_data,
@@ -83,6 +84,8 @@ if __name__ == '__main__':
     axs[0].set_ylabel("normalized count")
     axs[0].set_xlabel("interatomic distance")
     plt.title("QM9")
+    axs[0].set_xlim(0.5, 9.)
     fig1.tight_layout()
     fig1.savefig("examples/plots/qm9.png")
     # plt.show()
+    print("done")

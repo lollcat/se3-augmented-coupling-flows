@@ -12,8 +12,8 @@ from molboil.targets.data import load_dw4
 
 
 mpl.rcParams['figure.dpi'] = 300
-rc('font', **{'family': 'serif', 'serif': ['Times']})
-rc('text', usetex=False)
+# rc('font', **{'family': 'serif', 'serif': ['Times']})
+# rc('text', usetex=False)
 rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
 rc('legend', fontsize=24)
 rc('xtick', labelsize=20)
@@ -139,7 +139,8 @@ if __name__ == '__main__':
     axs[0].legend(loc="upper left")
     axs[0].set_ylabel("normalized count")
     axs[0].set_xlabel("interatomic distance")
+    axs[0].set_xlim(1, 6.3)
     plt.title("DW4")
     fig1.tight_layout()
-    fig1.savefig("examples/dw4_results/plots/dw4.png")
+    fig1.savefig("examples/plots/dw4.png")
     plt.show()

@@ -9,8 +9,8 @@ from molboil.targets.data import load_lj13
 
 
 mpl.rcParams['figure.dpi'] = 300
-rc('font', **{'family': 'serif', 'serif': ['Times']})
-rc('text', usetex=False)
+# rc('font', **{'family': 'serif', 'serif': ['Times']})
+# rc('text', usetex=False)
 rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
 rc('legend', fontsize=24)
 rc('xtick', labelsize=20)
@@ -83,6 +83,7 @@ if __name__ == '__main__':
     axs[0].set_ylabel("normalized count")
     axs[0].set_xlabel("interatomic distance")
     plt.title("LJ13")
+    axs[0].set_xlim(0.6, 4.)
     fig1.tight_layout()
     fig1.savefig("examples/plots/lj13.png")
     plt.show()
