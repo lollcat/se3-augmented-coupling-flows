@@ -13,7 +13,7 @@ from molboil.targets.data import load_dw4
 
 mpl.rcParams['figure.dpi'] = 300
 rc('font', **{'family': 'serif', 'serif': ['Times']})
-rc('text', usetex=True)
+rc('text', usetex=False)
 rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
 rc('legend', fontsize=24)
 rc('xtick', labelsize=20)
