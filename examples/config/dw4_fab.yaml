@@ -7,8 +7,8 @@ hydra:
 
 fab:
   with_buffer: true
-  buffer_max_length_batches: 100
-  buffer_min_length_batches: 8
+  buffer_max_length_batches: 512
+  buffer_min_length_batches: 64
   n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
   use_resampling: false
@@ -16,7 +16,7 @@ fab:
   transition_operator:
     hmc:
       n_outer_steps: 1
-      n_inner_steps: 2
+      n_inner_steps: 5
       init_step_size: 1.
       target_p_accept: 0.65
       adapt_step_size: true
@@ -101,7 +101,7 @@ flow:
 
 training:
   optimizer:
-    init_lr: 3e-4
+    init_lr: 2e-4
     optimizer_name: adam
     use_schedule: false
     peak_lr: 1e-3 # can be null
@@ -111,8 +111,8 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 30000
-  batch_size: 128
+  n_epoch: 20000
+  batch_size: 512
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
@@ -124,7 +124,7 @@ training:
   save: true
   save_dir: dw4_results
   resume: false
-  runtime_limit: 3.
+  runtime_limit: 6.
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   last_iter_info_only: true
