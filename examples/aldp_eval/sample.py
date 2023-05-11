@@ -70,9 +70,8 @@ def run(cfg: DictConfig):
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"samples")
     pathlib.Path(sample_dir).mkdir(exist_ok=True)
-    save_dict = {"positions_x": np.array(positions_x), "positions_a": np.array(positions_a),
-                "log_q": np.array(log_q)}
-    np.savez(os.path.join(sample_dir, f"sample_%04i.npz" % cfg.eval.seed), save_dict)
+    np.savez(os.path.join(sample_dir, f"sample_%04i.npz" % cfg.eval.seed),
+             positions_x=positions_x, positions_a=positions_a, log_q=log_q)
 
 
 
