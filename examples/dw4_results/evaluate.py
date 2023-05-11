@@ -1,7 +1,9 @@
+from functools import partial
+
 import jax.random
 from omegaconf import DictConfig
 import yaml
-from functools import partial
+import pandas as pd
 
 from target.double_well import log_prob_fn
 from molboil.targets.data import load_dw4
@@ -49,6 +51,8 @@ if __name__ == '__main__':
                                                  test_set_size=100,
                                                  val_set_size=1000)
 
+    data = pd.DataFrame()
+
     for flow_type in flow_types:
         for seed in seeds:
             checkpoint_path = f"examples/dw4_results/models/{flow_type}_seed0.pkl"
@@ -57,6 +61,7 @@ if __name__ == '__main__':
             flow, state = load_flow(cfg, checkpoint_path)
 
             info = evaluate_dw4(flow, state, test_data, K=8, n_samples_eval=10)
+
 
 
 
