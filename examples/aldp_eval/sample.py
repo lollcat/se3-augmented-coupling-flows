@@ -60,12 +60,12 @@ def run(cfg: DictConfig):
     for _ in range(cfg.eval.n_batches):
         positions_x_, positions_a_, log_q_ = sample_fn(state.params, features,
                                                        next(prng_seq), cfg.eval.n_samples)
-        positions_x.append(positions_x_)
-        positions_a.append(positions_a_)
-        log_q.append(log_q_)
-    positions_x = jnp.concatenate(positions_x, axis=0)
-    positions_a = jnp.concatenate(positions_a, axis=0)
-    log_q = jnp.concatenate(log_q, axis=0)
+        positions_x.append(np.array(positions_x_))
+        positions_a.append(np.array(positions_a_))
+        log_q.append(np.array(log_q_))
+    positions_x = np.concatenate(positions_x)
+    positions_a = np.concatenate(positions_a)
+    log_q = np.concatenate(log_q)
 
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"samples")
