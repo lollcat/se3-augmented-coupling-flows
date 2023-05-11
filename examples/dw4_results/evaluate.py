@@ -44,7 +44,7 @@ if __name__ == '__main__':
     seeds = [0]
 
     train_data, valid_data, test_data = load_dw4(train_set_size=1000,
-                                                 test_set_size=1000,
+                                                 test_set_size=100,
                                                  val_set_size=1000)
 
     for flow_type in flow_types:

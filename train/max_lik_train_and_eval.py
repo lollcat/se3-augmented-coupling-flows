@@ -81,7 +81,7 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     info.update(marginal_log_lik=marginal_log_lik)
 
     info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
-    info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
+    info.update(ess_aug_conditional=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
 
     if test_invariances:
         key, subkey = jax.random.split(key)
