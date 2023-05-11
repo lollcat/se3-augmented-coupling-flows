@@ -106,9 +106,8 @@ def make_get_data_for_plotting(
 
 
 if __name__ == '__main__':
-    checkpoint_path = "examples/dw4_results/models/spherical_flow_checkpoint.pkl"
+    checkpoint_path = "examples/dw4_results/models/spherical_seed0.pkl"
     cfg = DictConfig(yaml.safe_load(open(f"examples/config/dw4.yaml")))
-    cfg.flow.type = 'proj'
     n_samples_from_flow_plotting = 1000
     key = jax.random.PRNGKey(0)
 
@@ -136,7 +135,7 @@ if __name__ == '__main__':
     axs = [axs]
     plot_histogram(counts_flow_x, bins_x, axs[0], label="flow")
     plot_histogram(count_list[0], bins_x, axs[0],  label="data")
-    axs[0].legend(loc="upper left")
+    axs[0].legend(loc="upper right")
     axs[0].set_ylabel("normalized count")
     axs[0].set_xlabel("interatomic distance")
     axs[0].set_xlim(1, 6.3)
