@@ -70,7 +70,7 @@ def run(cfg: DictConfig):
         state = pickle.load(f)
 
     # Get test set
-    test_data = load_aldp(test_path=test_path)[2][:n_points]
+    test_data = load_aldp(test_path=test_path, test_n_points=n_points)[2]
 
     # Run eval fn
     key = jax.random.PRNGKey(seed)
