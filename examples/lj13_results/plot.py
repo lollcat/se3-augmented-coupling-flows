@@ -55,7 +55,7 @@ def make_get_data_for_plotting(
 
 
 if __name__ == '__main__':
-    flow_type = 'proj'
+    flow_type = 'spherical'
     checkpoint_path = f"examples/lj13_results/models/{flow_type}_seed0.pkl"
     cfg = DictConfig(yaml.safe_load(open(f"examples/config/lj13.yaml")))
     cfg.flow.type = flow_type
@@ -84,5 +84,5 @@ if __name__ == '__main__':
     axs[0].set_xlabel("interatomic distance")
     plt.title("LJ13")
     fig1.tight_layout()
-    # fig1.savefig("examples/plots/lj13.png")
+    fig1.savefig("examples/plots/lj13.png")
     plt.show()
