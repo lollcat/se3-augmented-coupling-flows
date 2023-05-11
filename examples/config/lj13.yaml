@@ -90,7 +90,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 256
-  batch_size: 100
+  batch_size: 32
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
@@ -103,7 +103,7 @@ training:
   save_dir: lj13_results
   resume: false
   runtime_limit: 4.
-  use_flow_aux_loss: false
+  use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
@@ -116,7 +116,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_${flow.type}_seed${training.seed}_NoAuxLoss
+    name: lj13_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
     tags: [lj13,post_kigali_1]

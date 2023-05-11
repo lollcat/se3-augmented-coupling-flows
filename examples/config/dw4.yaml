@@ -90,7 +90,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 400
-  batch_size: 100
+  batch_size: 32
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
@@ -117,7 +117,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_${flow.type}_NoAuxLoss
+    name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
     tags: [dw4,post_kigali_1]
