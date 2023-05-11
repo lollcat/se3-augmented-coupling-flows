@@ -75,6 +75,8 @@ def run(cfg: DictConfig):
     # Run eval fn
     key = jax.random.PRNGKey(seed)
     eval_info = eval_fn(test_data, key, state.params)
+    print(eval_info)
+    print(test_data)
 
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"log_prob")
