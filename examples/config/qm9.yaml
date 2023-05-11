@@ -80,7 +80,7 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-5
+    init_lr: 2e-4
     optimizer_name: adam
     use_schedule: false
     peak_lr: 2e-4
