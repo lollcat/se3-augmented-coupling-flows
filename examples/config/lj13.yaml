@@ -119,5 +119,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,post_kigali_1]
+    tags: [lj13,post_kigali_2]
 
