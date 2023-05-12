@@ -6,10 +6,9 @@ import os
 import hydra
 import numpy as np
 from omegaconf import DictConfig, open_dict
-import jax.numpy as jnp
 import jax
-import haiku as hk
 
+from molboil.base import FullGraphSample
 from molboil.targets.data import load_aldp
 from molboil.utils.checkpoints import get_latest_checkpoint
 from molboil.train.base import eval_fn
@@ -23,7 +22,8 @@ from train.max_lik_train_and_eval import get_eval_on_test_batch
 def run(cfg: DictConfig):
     # Get parameters
     test_path = cfg.target.data.val
-    n_points = 100000
+    n_points = 1000000
+    ind = 0
     batch_size = 1000
     K = 10
     seed = 0
@@ -31,6 +31,8 @@ def run(cfg: DictConfig):
         test_path = str(os.environ['FLOW_TEST_PATH'])
     if 'FLOW_N_POINTS' in os.environ:
         n_points = int(os.environ['FLOW_N_POINTS'])
+    if 'FLOW_IND' in os.environ:
+        ind = int(os.environ['FLOW_IND'])
     if 'FLOW_BATCH_SIZE' in os.environ:
         batch_size = int(os.environ['FLOW_BATCH_SIZE'])
     if 'FLOW_K' in os.environ:
@@ -70,7 +72,9 @@ def run(cfg: DictConfig):
         state = pickle.load(f)
 
     # Get test set
-    test_data = load_aldp(test_path=test_path, test_n_points=n_points)[2]
+    test_data = load_aldp(test_path=test_path)[2]
+    test_data = FullGraphSample(positions=test_data.positions[(ind * n_points):((ind + 1) * n_points)],
+                                features=test_data.features[(ind * n_points):((ind + 1) * n_points)])
 
     # Run eval fn
     key = jax.random.PRNGKey(seed)
