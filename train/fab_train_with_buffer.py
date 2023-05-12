@@ -1,6 +1,6 @@
 """Training with FAB. Note assumes fixed conditioning info."""
 
-from typing import Callable, NamedTuple, Tuple
+from typing import Callable, NamedTuple, Tuple, Optional
 
 import chex
 import jax.numpy as jnp
@@ -110,9 +110,13 @@ def build_fab_with_buffer_init_step_fns(
     flat_event_shape = np.prod(event_shape)
 
 
-    def init(key: chex.PRNGKey) -> TrainStateWithBuffer:
-        """Initialise the flow, optimizer and smc states."""
-        key1, key2, key3, key4 = jax.random.split(key, 4)
+    def init(key: chex.PRNGKey, per_device_key: Optional[chex.PRNGKey] = None) -> TrainStateWithBuffer:
+        """Initialise the flow, optimizer and smc states. `per_device_key` used for pmap."""
+        if per_device_key is None:
+            key1, key2, key3, key4 = jax.random.split(key, 4)
+        else:
+            key1 = key
+            key2, key3, key4 = jax.random.split(per_device_key, 3)
         dummy_sample = FullGraphSample(positions=jnp.zeros((n_nodes, flow.dim_x)), features=features)
         flow_params = flow.init(key1, dummy_sample)
         opt_state = optimizer.init(flow_params)
