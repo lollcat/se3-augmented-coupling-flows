@@ -83,7 +83,7 @@ def run(cfg: DictConfig):
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"log_prob")
     pathlib.Path(sample_dir).mkdir(exist_ok=True)
-    np.savez(os.path.join(sample_dir, f"log_prob_%04i.npz" % seed),
+    np.savez(os.path.join(sample_dir, f"log_prob_%04i_%04i.npz" % (seed, ind)),
              **eval_info)
 
 
