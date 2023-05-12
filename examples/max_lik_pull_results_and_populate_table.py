@@ -26,14 +26,14 @@ def download_eval_metrics(problem="dw4", n_runs=3):
                 data = data.join(pd.Series(info, name=i), how="outer")
                 i += 1
                 n_runs_found += 1
-                if n_runs_found == 3:
+                if n_runs_found == n_runs:
                     break
             except:
                 pass
                 # print(f"No runs for for flow_type {flow_type}, tags {tags} seed {seed} found!")
 
-        if n_runs_found != 3:
-            print(f"Less than 3 runs found for flow {flow_type}")
+        if n_runs_found != n_runs:
+            print(f"Less than {n_runs} runs found for flow {flow_type}")
     return data.T
 
 
@@ -62,7 +62,7 @@ def create_latex_table():
             f"{row_names[i]} & " \
             f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
             f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} & " \
-            f"{-means_qm9.loc[flow_type]['marginal_log_lik']:.2f},{sem_qm9.loc[flow_type]['marginal_log_lik']:.2f} \ \n "
+            f"{-means_qm9.loc[flow_type]['marginal_log_lik']:.2f},{sem_qm9.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n "
 
     print(table_values_string)
 
