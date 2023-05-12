@@ -17,11 +17,11 @@ def evaluate_dw4(flow,
                  test_data,
                  K: int = 50,
                  n_samples_eval: int = int(1e4),
-                 eval_batch_size=100):
+                 eval_batch_size=200):
     key = jax.random.PRNGKey(0)
 
     eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                    flow=flow, K=K, test_invariances=True)
+                                    flow=flow, K=K, test_invariances=False)
     eval_batch_free_fn = partial(
         eval_non_batched,
         single_feature=test_data.features[0],
@@ -47,8 +47,20 @@ if __name__ == '__main__':
     flow_types = ['spherical']  # , 'along_vector', 'proj', 'non_equivariant']
     seeds = [0]
 
+    small = True
+    if small:
+        test_set_size = 10
+        K = 2
+        n_samples_eval = 10
+        eval_batch_size = 10
+    else:
+        test_set_size = 1000
+        K = 50
+        n_samples_eval = 10_000
+        eval_batch_size = 200
+
     train_data, valid_data, test_data = load_dw4(train_set_size=1000,
-                                                 test_set_size=100,
+                                                 test_set_size=test_set_size,
                                                  val_set_size=1000)
 
     data = pd.DataFrame()
@@ -60,9 +72,10 @@ if __name__ == '__main__':
 
             flow, state = load_flow(cfg, checkpoint_path)
 
-            info = evaluate_dw4(flow, state, test_data, K=8, n_samples_eval=10)
+            info = evaluate_dw4(flow, state, test_data, K=K, n_samples_eval=n_samples_eval,
+                                eval_batch_size=eval_batch_size)
             info.update(flow_type=flow_type, seed=seed)
-            data.join(pd.Series(data, name=i), how="outer")
+            data.join(pd.Series(info, name=i), how="outer")
             print(f"evaluated flow {flow_type} seed {seed}")
 
             i += 1
