@@ -97,7 +97,9 @@ def build_fab_with_buffer_init_step_fns(
         n_updates_per_smc_forward_pass: int,
         alpha: float = 2.,
         w_adjust_clip: float = 10.,
-        equivariance_regularisation: bool = False
+        equivariance_regularisation: bool = False,
+        use_pmap: bool = False,
+        pmap_axis_name: str = 'data'
 ):
     """Create the `init` and `step` functions that define the FAB algorithm."""
     assert smc.alpha == alpha
@@ -113,8 +115,10 @@ def build_fab_with_buffer_init_step_fns(
     def init(key: chex.PRNGKey, per_device_key: Optional[chex.PRNGKey] = None) -> TrainStateWithBuffer:
         """Initialise the flow, optimizer and smc states. `per_device_key` used for pmap."""
         if per_device_key is None:
+            assert not use_pmap
             key1, key2, key3, key4 = jax.random.split(key, 4)
         else:
+            assert use_pmap
             key1 = key
             key2, key3, key4 = jax.random.split(per_device_key, 3)
         dummy_sample = FullGraphSample(positions=jnp.zeros((n_nodes, flow.dim_x)), features=features)
@@ -163,6 +167,8 @@ def build_fab_with_buffer_init_step_fns(
         # Estimate loss and update flow params.
         grad, (log_w_adjust, log_q, loss_info) = jax.grad(generic_loss, has_aux=True)(
             flow_params, x, key, log_q_old, alpha, flow_log_prob_apply, w_adjust_clip, equivariance_regularisation)
+        if use_pmap:
+            grad = jax.lax.pmean(grad, axis_name=pmap_axis_name)
         updates, new_opt_state = optimizer.update(grad, opt_state, params=flow_params)
         new_params = optax.apply_updates(flow_params, updates)
         grad_norm = optax.global_norm(grad)

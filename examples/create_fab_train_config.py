@@ -284,7 +284,8 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
-            equivariance_regularisation=data_augmentation
+            equivariance_regularisation=data_augmentation,
+            use_pmap=True, pmap_axis_name=pmap_axis_name
         )
     else:
         print("running fab without buffer")

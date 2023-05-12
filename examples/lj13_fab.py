@@ -1,3 +1,7 @@
+import chex
+
+chex.set_n_cpu_devices(2)
+
 import hydra
 from omegaconf import DictConfig
 
@@ -43,7 +47,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="lj13_fab.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 
