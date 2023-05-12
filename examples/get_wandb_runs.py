@@ -33,7 +33,13 @@ def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
             print("saved" + path)
 
 
+def download_run_history(flow_type, tags, seed):
+    run = get_wandb_run(flow_type, tags, seed)
+
+
+
 if __name__ == '__main__':
+    download_run_history(flow_type='spherical', tags=["lj13", "post_kigali_1"], seed=0)
     download_checkpoint(flow_type='spherical', tags=["lj13", "post_kigali_1"], seed=0, max_iter=256,
                         base_path='./examples/lj13_results/models')
 

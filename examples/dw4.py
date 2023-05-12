@@ -6,7 +6,7 @@ from functools import partial
 from molboil.train.train import train
 from molboil.targets.data import load_dw4
 from examples.create_train_config import create_train_config
-from target.double_well import make_dataset
+from target.double_well import make_dataset, log_prob_fn
 from utils.data import positional_dataset_only_to_full_graph
 import jax
 
@@ -83,9 +83,11 @@ def run(cfg: DictConfig):
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
         load_dataset = load_dataset_original
-    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset)
+    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset,
+                                            target_log_prob_fn=log_prob_fn)
     train(experiment_config)
 
 
 if __name__ == '__main__':
     run()
+

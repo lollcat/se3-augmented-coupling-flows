@@ -87,12 +87,13 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 200
-  batch_size: 64
+  batch_size: 32
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
+  eval_model_samples: 10_000 # Number of samples from model for eval
   n_checkpoints: 2
   n_eval: 20
   K_marginal_log_lik: 20
@@ -117,5 +118,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,post_kigali_4]
+    tags: [dw4,post_kigali_6]
 

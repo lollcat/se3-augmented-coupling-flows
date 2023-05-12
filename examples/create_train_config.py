@@ -21,7 +21,7 @@ from molboil.eval.base import get_eval_and_plot_fn
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig, TransformerConfig
-from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
+from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState
@@ -104,22 +104,25 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None) -> TrainConfig:
     devices = jax.devices()
     if len(devices) > 1:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
-                                        date_folder)
+                                        date_folder, target_log_prob_fn)
     else:
         print(f"Running on one device only.")
         return create_train_config_non_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
-                                        date_folder)
+                                        date_folder, target_log_prob_fn)
 
 def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None
+    ) -> TrainConfig:
     """Creates `mol_boil` style train config"""
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
@@ -209,7 +212,16 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         # Setup eval functions
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
-        eval_batch_free_fn = None
+        if target_log_prob_fn:
+            eval_batch_free_fn = partial(
+                                    eval_non_batched,
+                                    single_feature=test_data.features[0],
+                                    flow=flow,
+                                    n_samples=cfg.training.eval_model_samples,
+                                    inner_batch_size=cfg.training.eval_batch_size,
+                                    target_log_prob=target_log_prob_fn)
+        else:
+            eval_batch_free_fn = None
 
         def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
@@ -243,8 +255,12 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None
+                             ) -> TrainConfig:
     """Creates `mol_boil` style train config"""
+    if target_log_prob_fn is not None:
+        raise NotImplementedError # TODO still need to implement this
     devices = jax.devices()
     n_devices = len(devices)
     pmap_axis_name = 'data'
@@ -367,7 +383,8 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                 for i in range(batched_data.positions.shape[0]):
                     x = batched_data[i]
                     # Reshape to [n_devices, batch_size]
-                    x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.eval_batch_size, *x.shape[1:])), x)
+                    x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.eval_batch_size, *x.shape[1:])),
+                                     x)
                     key, subkey = jax.random.split(key)
                     key_per_device = jax.random.split(subkey, n_devices)
                     info = jax.pmap(eval_function, axis_name=pmap_axis_name)(state, x, key_per_device)

@@ -4,6 +4,7 @@ import jax
 
 from molboil.train.train import train
 from molboil.targets.data import load_lj13
+from target.leonard_jones import log_prob_fn
 from examples.create_train_config import create_train_config
 
 
@@ -59,7 +60,8 @@ def run(cfg: DictConfig):
     experiment_config = create_train_config(cfg,
                                             dim=3,
                                             n_nodes=13,
-                                            load_dataset=load_dataset)
+                                            load_dataset=load_dataset,
+                                            target_log_prob_fn=log_prob_fn)
     train(experiment_config)
 
 

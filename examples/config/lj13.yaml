@@ -19,7 +19,7 @@ flow:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 3
   nodes: 13
   n_layers: 12
@@ -91,7 +91,7 @@ training:
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 256
-  batch_size: 64
+  batch_size: 32
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
@@ -99,6 +99,7 @@ training:
   test_set_size: 1000
   n_checkpoints: 2
   n_eval: 10
+  eval_model_samples: 10_000
   K_marginal_log_lik: 20
   save: true
   save_dir: lj13_results
@@ -120,5 +121,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,post_kigali_4]
+    tags: [lj13,post_kigali_6]
 

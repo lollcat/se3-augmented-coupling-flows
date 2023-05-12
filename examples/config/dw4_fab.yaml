@@ -45,7 +45,7 @@ flow:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 2
   nodes: 4
   n_aug: 1
@@ -143,5 +143,5 @@ logger:
     name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,post_kigali_4]
+    tags: [dw4,fab,post_kigali_6]
 
