@@ -11,7 +11,7 @@ target:
     scale_init: 0.1
 
 flow:
-  n_aug: 1
+  n_aug: 3
   scaling_layer: false
   scaling_layer_conditioned: true
   base:
@@ -97,7 +97,7 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  n_checkpoints: 2
+  n_checkpoints: 10
   n_eval: 15
   K_marginal_log_lik: 20
   save: true
@@ -120,4 +120,4 @@ logger:
     name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,post_kigali_6,ml,v3]
+    tags: [qm9pos,post_kigali_7,ml,v1]

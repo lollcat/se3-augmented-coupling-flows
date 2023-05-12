@@ -97,7 +97,7 @@ training:
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 2
+  n_checkpoints: 10
   n_eval: 10
   eval_model_samples: 10_000
   K_marginal_log_lik: 20

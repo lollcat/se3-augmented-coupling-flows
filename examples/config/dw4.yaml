@@ -94,7 +94,7 @@ training:
   train_set_size: 1000
   test_set_size: 1000
   eval_model_samples: 10_000 # Number of samples from model for eval
-  n_checkpoints: 2
+  n_checkpoints: 10
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
