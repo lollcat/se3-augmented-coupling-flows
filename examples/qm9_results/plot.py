@@ -20,10 +20,10 @@ rc('ytick', labelsize=20)
 rc("lines", linewidth=4)
 
 def plot_qm9(ax: Optional = None):
-    download_checkpoint(flow_type='spherical', tags=["lj13", "post_kigali_6"], seed=0, max_iter=256,
+    flow_type = 'along_vector'
+    download_checkpoint(flow_type=flow_type, tags=["lj13", "post_kigali_6"], seed=0, max_iter=256,
                         base_path='./examples/lj13_results/models')
 
-    flow_type = 'spherical'
     checkpoint_path = f"examples/qm9_results/models/{flow_type}_seed0.pkl"
     cfg = DictConfig(yaml.safe_load(open(f"examples/config/qm9.yaml")))
     cfg.flow.type = flow_type
@@ -31,7 +31,7 @@ def plot_qm9(ax: Optional = None):
 
     flow, state = load_flow(cfg, checkpoint_path)
 
-    train_data, valid_data, test_data = load_qm9(train_set_size=2000)  # None)
+    train_data, valid_data, test_data = load_qm9(train_set_size=1000)  # None)
     n_samples_from_flow_plotting = train_data.positions.shape[0]
     print(f"plotting qm9 with {n_samples_from_flow_plotting} samples")
 
@@ -53,10 +53,10 @@ def plot_qm9(ax: Optional = None):
     plot_histogram(count_list[0], bins_x, axs[0],  label="data")
     # axs[0].legend(loc="upper left")
     axs[0].set_title("QM9 Positional")
+    axs[0].set_xlim(0.5, 8.)
+    axs[0].set_xlabel("interatomic distance")
     if ax is None:
         axs[0].set_ylabel("normalized count")
-        axs[0].set_xlabel("interatomic distance")
-        axs[0].set_xlim(0.5, 9.)
         fig1.tight_layout()
         fig1.savefig("examples/plots/qm9.png")
         # plt.show()

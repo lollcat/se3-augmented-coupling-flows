@@ -53,11 +53,10 @@ def plot_lj13(ax: Optional = None):
     plot_histogram(count_list[0], bins_x, axs[0],  label="data")
     # axs[0].legend(loc="upper left")
     axs[0].set_title("LJ13")
+    axs[0].set_xlim(0.6, 4.)
+    axs[0].set_xlabel("interatomic distance")
     if ax is None:
         axs[0].set_ylabel("normalized count")
-        axs[0].set_xlabel("interatomic distance")
-
-        axs[0].set_xlim(0.6, 4.)
         fig1.tight_layout()
         fig1.savefig("examples/plots/lj13.png")
         plt.show()
