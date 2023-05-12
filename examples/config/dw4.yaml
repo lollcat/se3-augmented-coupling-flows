@@ -118,5 +118,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,post_kigali_6]
+    tags: [dw4,post_kigali_6,ml]
 

@@ -12,6 +12,8 @@ def get_wandb_run(flow_type, tags, seed):
          {"config.training": {"$regex": f"'seed': {seed},"}}
     ])
     filters = {"$and": filter_list}
+    if 'fab' not in tags:
+        filters.update({"$not": {"tags": 'fab'}})
     runs = api.runs(path='flow-ais-bootstrap/fab',
                     filters=filters)
     if len(runs) > 1:
@@ -19,8 +21,13 @@ def get_wandb_run(flow_type, tags, seed):
               f"Taking the most recent.")
     elif len(runs) == 0:
         raise Exception(f"No runs for for flow_type {flow_type}, tags {tags}, seed {seed} found!")
-
-    return runs[0]  # Get latest run.
+    run = runs[0]  # Get latest run.
+    if 'fab' not in tags:
+        assert '"fab": ' not in run.json_config
+    else:
+        assert '"fab": ' in run.json_config
+    assert "finished" in str(run)
+    return run
 
 
 def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
@@ -33,14 +40,17 @@ def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
             print("saved" + path)
 
 
-def download_run_history(flow_type, tags, seed):
+def get_run_history(flow_type, tags, seed,
+                    fields=['marginal_log_lik', 'lower_bound_marginal_gap']):
     run = get_wandb_run(flow_type, tags, seed)
+    history = run.history(keys=fields)
+    return history
 
 
 
 if __name__ == '__main__':
-    download_run_history(flow_type='spherical', tags=["lj13", "post_kigali_1"], seed=0)
-    download_checkpoint(flow_type='spherical', tags=["lj13", "post_kigali_1"], seed=0, max_iter=256,
-                        base_path='./examples/lj13_results/models')
+    get_run_history(flow_type='spherical', tags=["lj13", "post_kigali_4"], seed=0)
+    # download_checkpoint(flow_type='spherical', tags=["lj13", "post_kigali_1"], seed=0, max_iter=256,
+    #                     base_path='./examples/lj13_results/models')
 
 
