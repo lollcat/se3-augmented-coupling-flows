@@ -9,6 +9,7 @@ from matplotlib import rc
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
 from molboil.targets.data import load_dw4
+from examples.get_wandb_runs import download_checkpoint
 
 
 mpl.rcParams['figure.dpi'] = 300
@@ -53,59 +54,13 @@ def make_get_data_for_plotting(
             [a_minus_x_flow, a_minus_x_target], max_distance)
         return counts_flow_x, bins_a, count_list_a, bins_a_minus_x, count_list_a_minus_x
 
-
-    # def default_plotter(state: TrainingState, key: chex.PRNGKey) -> dict:
-    #     # Plot interatomic distance histograms.
-    #     key = jax.random.PRNGKey(0)
-    #     counts_flow_x, bins_a, count_list_a, bins_a_minus_x, count_list_a_minus_x = get_data_for_plotting(state, key)
-    #
-    #     # Plot original coords
-    #     fig1, axs = plt.subplots(1, 2, figsize=(10, 5))
-    #     plot_histogram(counts_flow_x, bins_x, axs[0], label="flow samples")
-    #     plot_histogram(counts_flow_x, bins_x, axs[1], label="flow samples")
-    #     plot_histogram(count_list[0], bins_x, axs[0],  label="train samples")
-    #     plot_histogram(count_list[1], bins_x, axs[1],  label="test samples")
-    #
-    #     axs[0].set_title(f"norms between original coordinates train")
-    #     axs[1].set_title(f"norms between original coordinates test")
-    #     axs[0].legend()
-    #     axs[1].legend()
-    #     fig1.tight_layout()
-    #
-    #     # Augmented info.
-    #     fig2, axs2 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
-    #     axs2 = [axs2] if isinstance(axs2, plt.Subplot) else axs2
-    #     for i in range(flow.n_augmented):
-    #         d_a_flow_single = count_list_a[0][i]  # get single group of augmented coordinates
-    #         d_a_target = count_list_a[1][i]  # Get first set of aux variables.
-    #         chex.assert_equal_shape((counts_flow_x, d_a_flow_single, d_a_target))
-    #         plot_histogram(d_a_flow_single, bins_a[i], axs2[i], label="flow samples")
-    #         plot_histogram(d_a_target, bins_a[i], axs2[i], label="test samples")
-    #         axs2[i].set_title(f"norms between augmented coordinates (aug group {i})")
-    #     axs2[0].legend()
-    #     fig2.tight_layout()
-    #
-    #     # Plot histogram (x - a)
-    #
-    #     fig3, axs3 = plt.subplots(1, flow.n_augmented, figsize=(5*flow.n_augmented, 5))
-    #     axs3 = [axs3] if isinstance(axs3, plt.Subplot) else axs3
-    #     for i in range(flow.n_augmented):
-    #         d_a_minus_x_flow_single = count_list_a_minus_x[0][i]  # get single group of augmented coordinates
-    #         d_a_minus_x_target_single = count_list_a_minus_x[1][i]  # Get first set of aux variables.
-    #         chex.assert_equal_shape((counts_flow_x, d_a_minus_x_flow_single, d_a_minus_x_target_single))
-    #         plot_histogram(d_a_minus_x_flow_single, bins_a_minus_x[i], axs3[i], label="flow samples")
-    #         plot_histogram(d_a_minus_x_target_single, bins_a_minus_x[i], axs3[i], label="test samples")
-    #         axs3[i].set_title(f"norms between graph of x - a (aug group {i}). ")
-    #     axs3[0].legend()
-    #     fig3.tight_layout()
-    #
-    #     return [fig1, fig2, fig3]
-
     return get_data_for_plotting, count_list, bins_x
 
 
+def plot_dw4(ax: Optional = None):
+    download_checkpoint(flow_type='spherical', tags=["dw4", "post_kigali_6"], seed=0, max_iter=200,
+                        base_path='./examples/dw4_results/models')
 
-if __name__ == '__main__':
     checkpoint_path = "examples/dw4_results/models/spherical_seed0.pkl"
     cfg = DictConfig(yaml.safe_load(open(f"examples/config/dw4.yaml")))
     n_samples_from_flow_plotting = 1000
@@ -116,13 +71,6 @@ if __name__ == '__main__':
     train_data, valid_data, test_data = load_dw4(train_set_size=1000, test_set_size=1000, val_set_size=1000)
 
 
-
-    # plotter = make_default_plotter(train_data=train_data, test_data=test_data, flow=flow,
-    #                                n_samples_from_flow=n_samples_from_flow_plotting,
-    #                                )
-    #
-    # plotter(state, key)
-    # plt.show()
     get_data_for_plotting, count_list, bins_x = make_get_data_for_plotting(train_data=train_data, test_data=test_data,
                                                                            flow=flow,
                                    n_samples_from_flow=n_samples_from_flow_plotting)
@@ -131,7 +79,10 @@ if __name__ == '__main__':
     counts_flow_x, bins_a, count_list_a, bins_a_minus_x, count_list_a_minus_x = get_data_for_plotting(state, key)
 
     # Plot original coords
-    fig1, axs = plt.subplots(1, 1, figsize=(5, 5))
+    if ax is None:
+        fig1, axs = plt.subplots(1, 1, figsize=(5, 5))
+    else:
+        axs = ax
     axs = [axs]
     plot_histogram(counts_flow_x, bins_x, axs[0], label="flow")
     plot_histogram(count_list[0], bins_x, axs[0],  label="data")
@@ -139,7 +90,12 @@ if __name__ == '__main__':
     axs[0].set_ylabel("normalized count")
     axs[0].set_xlabel("interatomic distance")
     axs[0].set_xlim(1, 6.3)
-    plt.title("DW4")
-    fig1.tight_layout()
-    fig1.savefig("examples/plots/dw4.png")
-    plt.show()
+    axs[0].set_title("DW4")
+    if ax is None:
+        fig1.tight_layout()
+        fig1.savefig("examples/plots/dw4.png")
+        plt.show()
+
+
+if __name__ == '__main__':
+    plot_dw4()

@@ -6,7 +6,7 @@ def download_dw4_models():
     seeds = [0]
     for flow_type in flow_types:
         for seed in seeds:
-            download_checkpoint(flow_type=flow_type, tags=["dw4", "post_kigali_2"], seed=seed, max_iter=100,
+            download_checkpoint(flow_type=flow_type, tags=["dw4", "post_kigali_6"], seed=seed, max_iter=200,
                                 base_path='./examples/dw4_results/models')
 
 

@@ -3,9 +3,9 @@ import pandas as pd
 from examples.get_wandb_runs import get_run_history
 
 
-_TAGS = ['post_kigali_4']
+_TAGS = ['post_kigali_6']
 
-def download_eval_metrics(problem="dw4"):
+def download_eval_metrics(problem="dw4", n_runs=3):
     flow_types = ['spherical', 'along_vector', 'proj', 'non_equivariant']
     seeds = [0, 1, 2, 3, 4]
     tags = _TAGS.copy()
@@ -14,16 +14,26 @@ def download_eval_metrics(problem="dw4"):
 
     i = 0
     for flow_type in flow_types:
+        n_runs_found = 0
         for seed in seeds:
-            hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap'])
-            info = dict(hist.iloc[-1])
-            if info["_step"] == 0:
-                print(f"skipping {flow_type} seed={seed} as it only has 1 step")
-                continue
-            info.update(flow_type=flow_type, seed=seed)
-            data = data.join(pd.Series(info, name=i), how="outer")
+            try:
+                hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap'])
+                info = dict(hist.iloc[-1])
+                if info["_step"] == 0:
+                    print(f"skipping {flow_type} seed={seed} as it only has 1 step")
+                    continue
+                info.update(flow_type=flow_type, seed=seed)
+                data = data.join(pd.Series(info, name=i), how="outer")
+                i += 1
+                n_runs_found += 1
+                if n_runs_found == 3:
+                    break
+            except:
+                pass
+                # print(f"No runs for for flow_type {flow_type}, tags {tags} seed {seed} found!")
 
-            i += 1
+        if n_runs_found != 3:
+            print(f"Less than 3 runs found for flow {flow_type}")
     return data.T
 
 
@@ -50,9 +60,9 @@ def create_latex_table():
     for i, flow_type in enumerate(flow_types):
         table_values_string += \
             f"{row_names[i]} & " \
-            f"{means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
-            f"{means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} & " \
-            f"{means_qm9.loc[flow_type]['marginal_log_lik']:.2f},{sem_qm9.loc[flow_type]['marginal_log_lik']:.2f} \ \n "
+            f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
+            f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} & " \
+            f"{-means_qm9.loc[flow_type]['marginal_log_lik']:.2f},{sem_qm9.loc[flow_type]['marginal_log_lik']:.2f} \ \n "
 
     print(table_values_string)
 
