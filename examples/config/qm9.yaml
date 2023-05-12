@@ -83,7 +83,7 @@ training:
     init_lr: 6e-5
     optimizer_name: adam
     use_schedule: true
-    peak_lr: 3e-4
+    peak_lr: 2e-4
     end_lr: 6e-5
     warmup_n_epoch: 10
     max_global_norm: null
@@ -105,7 +105,7 @@ training:
   resume: false
   runtime_limit: 6.
   use_flow_aux_loss: true
-  aux_loss_weight: 1.0
+  aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
   verbose_info: false
@@ -120,4 +120,4 @@ logger:
     name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,post_kigali_6,ml,v2]
+    tags: [qm9pos,post_kigali_6,ml,v3]

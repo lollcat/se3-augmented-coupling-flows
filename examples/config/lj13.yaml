@@ -106,7 +106,7 @@ training:
   resume: false
   runtime_limit: 4.
   use_flow_aux_loss: true
-  aux_loss_weight: 1.0
+  aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
   verbose_info: true
@@ -121,5 +121,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,post_kigali_6,ml]
+    tags: [lj13,post_kigali_6,ml,v3]
 
