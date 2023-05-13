@@ -56,12 +56,14 @@ def create_latex_table():
 
 
     table_values_string = ""
+    table_lower_bound_gap = ""
+
     for i, flow_type in enumerate(flow_types):
-        if i == 0:
-            table_values_string += f"{row_names[i]} & " \
-            f"0,0 & 0,0 & 0,0 &" \
-            f"0,0 & 0,0 & 0,0  \\\ \n"
-            continue
+        # if i == 0:
+        #     table_values_string += f"{row_names[i]} & " \
+        #     f"0,0 & 0,0 & 0,0 &" \
+        #     f"0,0 & 0,0 & 0,0  \\\ \n"
+        #     continue
         table_values_string += \
             f"{row_names[i]} & " \
             f"{means_dw4.loc[flow_type]['eval_ess_flow']*100:.2f},{sem_dw4.loc[flow_type]['eval_ess_flow']*100:.2f} & " \
@@ -70,7 +72,16 @@ def create_latex_table():
             f"0,0 & 0,0 & 0,0  \\\ \n"
             # f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ " \
 
+
+        table_lower_bound_gap += \
+            f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f} & " \
+            f"0,0 \\\ \n"
+            # f"{-means_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f} \\\ \n " \
+
     print(table_values_string)
+    print("\n\n")
+    print(table_lower_bound_gap)
 
 
 if __name__ == '__main__':

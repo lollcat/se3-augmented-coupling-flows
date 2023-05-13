@@ -21,12 +21,14 @@ def get_wandb_run(flow_type, tags, seed):
               f"Taking the most recent.")
     elif len(runs) == 0:
         raise Exception(f"No runs for for flow_type {flow_type}, tags {tags}, seed {seed} found!")
-    run = runs[0]  # Get latest run.
+    j = 0
+    while not "finished" in str(runs[j]):
+        j += 1
+    run = runs[j]  # Get latest finished run.
     if 'fab' not in tags:
         assert '"fab": ' not in run.json_config
     else:
         assert '"fab": ' in run.json_config
-    assert "finished" in str(run)
     return run
 
 
