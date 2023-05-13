@@ -8,9 +8,12 @@ from examples.create_fab_train_config import create_train_config
 from target.leonard_jones import log_prob_fn
 
 
-def load_dataset(train_set_size: int, valid_set_size: int):
+def load_dataset(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_lj13(train_set_size)
-    return train, valid[:valid_set_size]
+    if not final_run:
+        return train, valid[:valid_set_size]
+    else:
+        return train, test[:valid_set_size]
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""

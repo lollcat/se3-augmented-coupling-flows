@@ -10,9 +10,12 @@ from target.double_well import make_dataset, log_prob_fn
 from utils.data import positional_dataset_only_to_full_graph
 import jax
 
-def load_dataset_original(train_set_size: int, valid_set_size: int):
+def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_dw4(train_set_size)
-    return train, valid[:valid_set_size]
+    if not final_run:
+        return train, valid[:valid_set_size]
+    else:
+        return train, test[:valid_set_size]
 
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):

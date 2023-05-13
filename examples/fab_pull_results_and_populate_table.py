@@ -7,7 +7,7 @@ _TAGS = ['post_kigali_6', 'fab']
 
 def download_eval_metrics(problem="dw4",
                           n_runs=3,
-                          flow_types = ('spherical', 'along_vector', 'proj', 'non_equivariant')):
+                          flow_types=('spherical', 'along_vector', 'proj', 'non_equivariant')):
     seeds = [0, 1, 2, 3, 4]
     tags = _TAGS.copy()
     tags.append(problem)
