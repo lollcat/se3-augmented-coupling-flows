@@ -54,7 +54,8 @@ def run(cfg: DictConfig):
                                             target_log_p_x_fn=log_prob_fn,
                                             dim=3,
                                             n_nodes=13,
-                                            load_dataset=load_dataset)
+                                            load_dataset=load_dataset,
+                                            date_folder=False)
     train(experiment_config)
 
 
