@@ -143,5 +143,5 @@ logger:
     name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,post_kigali_6]
+    tags: [dw4,fab,final_run]
 
