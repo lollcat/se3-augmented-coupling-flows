@@ -3,7 +3,7 @@ import pandas as pd
 from examples.get_wandb_runs import get_run_history
 
 
-_TAGS = ['post_kigali_6', 'fab']
+_TAGS = ['final_run', 'fab']
 
 def download_eval_metrics(problem="dw4",
                           n_runs=3,

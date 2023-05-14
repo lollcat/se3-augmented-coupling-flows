@@ -3,7 +3,7 @@ import pandas as pd
 from examples.get_wandb_runs import get_run_history
 
 
-_TAGS = ['post_kigali_6']
+_TAGS = ['final_run']
 
 def download_eval_metrics(problem="dw4", n_runs=3):
     flow_types = ['spherical', 'along_vector', 'proj', 'non_equivariant']
