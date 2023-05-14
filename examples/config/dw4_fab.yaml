@@ -112,7 +112,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 20000
+  n_epoch: 7000
   batch_size: 512
   plot_batch_size: 256
   eval_batch_size: 128
@@ -125,7 +125,7 @@ training:
   save: true
   save_dir: dw4_results
   resume: false
-  runtime_limit: 6.
+  runtime_limit: 8.
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   last_iter_info_only: true
@@ -143,5 +143,5 @@ logger:
     name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,final_run]
+    tags: [dw4,fab,final_run,v2]
 
