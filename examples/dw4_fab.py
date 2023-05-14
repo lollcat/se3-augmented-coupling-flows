@@ -1,3 +1,7 @@
+import chex
+
+chex.set_n_cpu_devices(2)
+
 import hydra
 from omegaconf import DictConfig
 from functools import partial
@@ -35,7 +39,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
     cfg.training.n_epoch = int(1e3)
-    cfg.training.save = False
+    cfg.training.save = True
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2
@@ -72,7 +76,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
     # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)

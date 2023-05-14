@@ -361,5 +361,6 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
         save_dir=save_path,
         resume=cfg.training.resume,
         use_64_bit=cfg.training.use_64_bit,
-        runtime_limit=cfg.training.runtime_limit
+        runtime_limit=cfg.training.runtime_limit,
+        save_state_all_devices=True
                        )
