@@ -121,5 +121,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}_Ntrain${training.train_set_size}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,final_run,ml,v3]
+    tags: [lj13,final_run,ml,v4]
 

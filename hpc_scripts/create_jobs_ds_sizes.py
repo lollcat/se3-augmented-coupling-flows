@@ -10,7 +10,7 @@ DELETE_PREV_FOLDER = True
 SCRIPT_NAMES = ['dw4', 'lj13']
 FLOW_TYPES=['spherical','non_equivariant'] # ['spherical', 'along_vector', 'proj','non_equivariant']
 SCRIPT_FOLDER = 'examples/' #  f'home/lim24/rds/hpc-work/lim24/augmented-equivariant-flows/examples/'
-RANDOM_SEEDS = [0,1,2,3,4]
+RANDOM_SEEDS = [0,1,2]
 DS_SIZES = {'dw4': [100, 1000, 10000, 100000],
             'lj13': [10, 100, 1000, 10000],
             'qm9': [None]
