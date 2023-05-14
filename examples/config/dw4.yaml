@@ -100,7 +100,7 @@ training:
   save: true
   save_dir: dw4_results
   resume: false
-  runtime_limit: 1.
+  runtime_limit: 30.
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   last_iter_info_only: true
