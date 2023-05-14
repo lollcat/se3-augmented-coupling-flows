@@ -21,7 +21,7 @@ rc("lines", linewidth=4)
 
 
 def plot_lj13(ax: Optional = None):
-    download_checkpoint(flow_type='spherical', tags=["lj13", "post_kigali_6"], seed=0, max_iter=256,
+    download_checkpoint(flow_type='spherical', tags=["lj13", "final_run"], seed=0, max_iter=256,
                         base_path='./examples/lj13_results/models')
 
     flow_type = 'spherical'

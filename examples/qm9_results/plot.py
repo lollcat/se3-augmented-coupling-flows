@@ -20,9 +20,9 @@ rc('ytick', labelsize=20)
 rc("lines", linewidth=4)
 
 def plot_qm9(ax: Optional = None):
-    flow_type = 'along_vector'
-    download_checkpoint(flow_type=flow_type, tags=["lj13", "post_kigali_6"], seed=0, max_iter=256,
-                        base_path='./examples/lj13_results/models')
+    flow_type = 'spherical'
+    download_checkpoint(flow_type=flow_type, tags=["qm9pos", "final_run"], seed=0, max_iter=256,
+                        base_path='./examples/qm9_results/models')
 
     checkpoint_path = f"examples/qm9_results/models/{flow_type}_seed0.pkl"
     cfg = DictConfig(yaml.safe_load(open(f"examples/config/qm9.yaml")))

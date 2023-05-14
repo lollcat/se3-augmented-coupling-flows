@@ -58,7 +58,7 @@ def make_get_data_for_plotting(
 
 
 def plot_dw4(ax: Optional = None):
-    download_checkpoint(flow_type='spherical', tags=["dw4", "post_kigali_6"], seed=0, max_iter=200,
+    download_checkpoint(flow_type='spherical', tags=["dw4", "final_run"], seed=0, max_iter=200,
                         base_path='./examples/dw4_results/models')
 
     checkpoint_path = "examples/dw4_results/models/spherical_seed0.pkl"

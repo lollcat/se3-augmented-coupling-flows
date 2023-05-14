@@ -41,10 +41,8 @@ def download_eval_metrics(problem="dw4", n_runs=3):
 
 
 def create_latex_table():
-    flow_types = ['along_vector', 'proj', 'spherical']
-    row_names = ["\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
-    # flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical']
-    # row_names = ["ANF + data augmentation", "Vector-proj E-ANF", "Cartesian-proj E-ANF", "Spherical-proj E-ANF"]
+    flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical']
+    row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
     keys = ['marginal_log_lik', 'lower_bound_marginal_gap', 'ess']
 
     data_qm9 = download_eval_metrics("qm9pos")
