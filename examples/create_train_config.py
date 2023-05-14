@@ -127,6 +127,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
+    batch_size = min(cfg.training.batch_size, cfg.training.train_set_size)
 
     logger = setup_logger(cfg)
     training_config = dict(cfg.training)
@@ -151,7 +152,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))
-    n_iter_per_epoch = train_data.positions.shape[0] // cfg.training.batch_size
+    n_iter_per_epoch = train_data.positions.shape[0] // batch_size
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
     n_iter_total = n_epoch * n_iter_per_epoch
     optimizer_config = OptimizerConfig(**opt_cfg,
@@ -181,11 +182,10 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                       apply_random_rotation=data_augmentation)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
                                verbose_info=cfg.training.verbose_info)
-
     scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
                                          data=train_data,
                                          last_iter_info_only=cfg.training.last_iter_info_only,
-                                         batch_size=cfg.training.batch_size)
+                                         batch_size=batch_size)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)

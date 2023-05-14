@@ -4,10 +4,10 @@ from hashlib import md5
 
 ################################### Configs #####################################
 
-EXPERIMENT_NAME = 'dw4-ml'  # no underscores.
+EXPERIMENT_NAME = 'ml'  # no underscores.
 JOBS_FOLDER = f'trial-{EXPERIMENT_NAME}'
 DELETE_PREV_FOLDER = True
-SCRIPT_NAMES = ['dw4', 'lj13', 'qm9']
+SCRIPT_NAMES = ['dw4', 'lj13'] # , 'qm9']
 FLOW_TYPES=['spherical', 'along_vector', 'proj','non_equivariant'] # ['spherical', 'along_vector', 'proj','non_equivariant']
 SCRIPT_FOLDER = 'examples/' #  f'home/lim24/rds/hpc-work/lim24/augmented-equivariant-flows/examples/'
 RANDOM_SEEDS = [0,1,2,3,4]
