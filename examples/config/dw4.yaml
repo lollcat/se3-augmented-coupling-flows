@@ -118,5 +118,5 @@ logger:
     name: dw4_${flow.type}_Ntrain${training.train_set_size}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,final_run,ml,v2]
+    tags: [dw4,final_run,ml,v3]
 
