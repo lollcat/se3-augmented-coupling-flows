@@ -1,7 +1,3 @@
-import chex
-
-chex.set_n_cpu_devices(2)
-
 import hydra
 from omegaconf import DictConfig
 from functools import partial
@@ -76,7 +72,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
     # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
-    local_config = True
+    local_config = False
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)

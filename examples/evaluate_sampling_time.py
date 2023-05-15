@@ -2,13 +2,14 @@ import jax.random
 from omegaconf import DictConfig
 import yaml
 import time
+import timeit
 
 from molboil.targets.data import load_dw4, load_lj13, load_qm9
 from examples.create_train_config import create_flow_config, AugmentedFlow, TrainingState
 from examples.create_train_config import build_flow
 
 
-def sampling_time(problem = "dw4"):
+def sampling_time(problem = "dw4", n = 10):
     key = jax.random.PRNGKey(0)
     if problem == "dw4":
         cfg = DictConfig(yaml.safe_load(open(f"examples/config/dw4.yaml")))
@@ -32,16 +33,28 @@ def sampling_time(problem = "dw4"):
     def sample(params, key):
         return flow.sample_apply(params, train_data[0].features, key, ())
 
-    dummy_sample = sample(params, key)
     start = time.time()
     dummy_sample = sample(params, key)
-    dummy_sample.positions.block_until_ready()
     time_elapsed = time.time() - start
-    return time_elapsed
+    print("compile time")
+    print(time_elapsed)
+
+    times = []
+    print("time elapsed per run")
+    for i in range(10):
+        start = time.time()
+        dummy_sample = sample(params, key)
+        dummy_sample.positions.block_until_ready()
+        time_elapsed = time.time() - start
+        times.append(time_elapsed)
+        print(time_elapsed)
+
+    return times
 
 
 
-#TODO: Add flow type, time properly, format in latex table
 if __name__ == '__main__':
-    for problem in ["dw4"]: # , "lj13", "qm9"]:
-        print(sampling_time())
+    for problem in ["qm9"]: # , "lj13", "qm9"]:
+        time_elapsed = sampling_time()
+        print("average time elapsed")
+        print(sum(time_elapsed)/len(time_elapsed))
