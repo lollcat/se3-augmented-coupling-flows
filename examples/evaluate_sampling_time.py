@@ -54,6 +54,7 @@ def sampling_time(problem = "dw4", n = 10):
 
 
 if __name__ == '__main__':
+    print(jax.devices())
     for problem in ["qm9"]: # , "lj13", "qm9"]:
         time_elapsed = sampling_time()
         print("average time elapsed")
