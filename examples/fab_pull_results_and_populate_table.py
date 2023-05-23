@@ -66,7 +66,9 @@ def create_latex_table():
 
 
     table_values_string = ""
+    table_v2_string = ""
     table_lower_bound_gap = ""
+    ess_table_string = ""
 
     for i, flow_type in enumerate(flow_types):
         # if i == 0:
@@ -84,12 +86,31 @@ def create_latex_table():
             f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
             # f"0,0 & 0,0 & 0,0  \\\ \n"
 
+        table_v2_string += \
+            f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['eval_ess_flow']*100:.2f},{sem_dw4.loc[flow_type]['eval_ess_flow']*100:.2f} & " \
+            f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
+            f"{means_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f} & " \
+            f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
+            # f"0,0 & 0,0 & 0,0  \\\ \n"
+
 
         table_lower_bound_gap += \
             f"{row_names[i]} & " \
             f"{means_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f} & " \
             f"{-means_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f} \\\ \n "
     #                 f"0,0 \\\ \n"
+
+
+        table_values_string += \
+            f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['eval_ess_flow']*100:.2f},{sem_dw4.loc[flow_type]['eval_ess_flow']*100:.2f} & " \
+            f"{means_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f},{sem_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f} & " \
+            f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
+            f"{means_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f} & " \
+            f"{means_lj13.loc[flow_type]['eval_ess_ais'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_ais'] * 100:.2f} & " \
+            f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
+            # f"0,0 & 0,0 & 0,0  \\\ \n"
 
     print(table_values_string)
     print("\n\n")

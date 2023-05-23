@@ -10,14 +10,14 @@ from examples.get_wandb_runs import download_checkpoint
 from examples.dw4_results.plot import make_get_data_for_plotting
 
 
-mpl.rcParams['figure.dpi'] = 300
-# rc('font', **{'family': 'serif', 'serif': ['Times']})
-# rc('text', usetex=False)
-rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
-rc('legend', fontsize=24)
-rc('xtick', labelsize=20)
-rc('ytick', labelsize=20)
-rc("lines", linewidth=4)
+# mpl.rcParams['figure.dpi'] = 300
+# # rc('font', **{'family': 'serif', 'serif': ['Times']})
+# # rc('text', usetex=False)
+# rc('axes', titlesize=24, labelsize=24)  # fontsize of the axes title and labels
+# rc('legend', fontsize=24)
+# rc('xtick', labelsize=20)
+# rc('ytick', labelsize=20)
+# rc("lines", linewidth=4)
 
 def plot_qm9(ax: Optional = None):
     flow_type = 'spherical'
@@ -53,7 +53,7 @@ def plot_qm9(ax: Optional = None):
     plot_histogram(count_list[0], bins_x, axs[0],  label="data")
     # axs[0].legend(loc="upper left")
     axs[0].set_title("QM9 Positional")
-    axs[0].set_xlim(0.5, 8.)
+    axs[0].set_xlim(0.6, 7.3)
     axs[0].set_xlabel("interatomic distance")
     if ax is None:
         axs[0].set_ylabel("normalized count")
