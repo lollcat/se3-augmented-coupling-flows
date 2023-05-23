@@ -8,28 +8,29 @@ hydra:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
 
 flow:
   n_aug: 1
-  scaling_layer: true
+  scaling_layer: false
   scaling_layer_conditioned: true
   base:
     x_dist:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 3
   nodes: 13
-  n_layers: 8
+  n_layers: 12
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
     n_inner_transforms: 3
     non_equivariant:
       transform_type: real_nvp # spline or real_nvp
       spline_num_bins: 8
-      spline_max_abs_min: 10.
+      spline_max_abs_min: 20.
       n_inner_transforms: 1
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
@@ -41,12 +42,12 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
     proj:
-      transform_type: spline # spline or real_nvp
+      transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn
@@ -79,9 +80,9 @@ flow:
 
 training:
   optimizer:
-    init_lr: 1e-4
+    init_lr: 2e-4
     optimizer_name: adam
-    use_schedule: true
+    use_schedule: false
     peak_lr: 6e-4
     end_lr: 1e-4 # can be null
     warmup_n_epoch: 10 # can be null
@@ -89,34 +90,30 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 64
+  n_epoch: 256
   batch_size: 32
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 0
+  n_checkpoints: 10
   n_eval: 10
+  eval_model_samples: 10_000
   K_marginal_log_lik: 20
   save: true
   save_dir: lj13_results
   resume: false
-  runtime_limit: null
+  runtime_limit: 30.
   use_flow_aux_loss: true
-  aux_loss_weight: 1.0
+  aux_loss_weight: 10.0
   last_iter_info_only: true
   debug: false
   verbose_info: true
   data_augmentation_for_non_eq: true
+  factor_to_train_non_eq_flow: 4
 
 logger:
-#  list_logger: null
-#  pandas_logger:
-#    save_period: 1000 # how often to save the pandas dataframe as a csv
-  wandb:
-    name: lj13_${flow.type}_${flow.type}
-    project: fab
-    entity: flow-ais-bootstrap
-    tags: [lj13]
-
+  list_logger: null
+  pandas_logger:
+    save_period: 1000 # how often to save the pandas dataframe as a csv

@@ -8,8 +8,8 @@ hydra:
 fab:
   with_buffer: true
   buffer_max_length_batches: 512
-  buffer_min_length_batches: 16
-  n_updates_per_smc_forward_pass: 16
+  buffer_min_length_batches: 64
+  n_updates_per_smc_forward_pass: 8
   w_adjust_clip: 10.
   use_resampling: false
   use_hmc: true
@@ -35,6 +35,7 @@ fab:
 target:
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
 
 flow:
   n_aug: 1
@@ -45,10 +46,10 @@ flow:
       type: centre_gravity_gaussian
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 3
   nodes: 13
-  n_layers: 8
+  n_layers: 12
   identity_init: true
   type: spherical #  nice proj spherical along_vector non_equivariant
   kwargs:
@@ -72,8 +73,8 @@ flow:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       origin_on_coupled_pair: false
       num_bins: 8
-      lower: -2.
-      upper: 2.
+      lower: -10.
+      upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     type: egnn
@@ -81,8 +82,8 @@ flow:
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
-      mlp_units: [ 64, 64 ]
-      n_invariant_feat_hidden: 64
+      mlp_units: [ 32, 32 ]
+      n_invariant_feat_hidden: 32
       cross_multiplicity_shifts: true
       centre_mass: false
       norm_wrt_centre_feat: true
@@ -94,18 +95,19 @@ flow:
       n_invariant_feat_hidden: 32
       get_shifts_via_tensor_product: false
     mlp_head_config:
-      mlp_units: [64,]
+      mlp_units: [32, 32]
+      stable: true
     non_equivariant_transformer_config:
-      output_dim: 64
-      key_size_per_node_dim_in: 8  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      output_dim: 32
+      key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
       n_layers: 3
-      mlp_units: [ 64, 64 ]
-      num_heads: 8
+      mlp_units: [ 32, 32 ]
+      num_heads: 4
 
 
 training:
   optimizer:
-    init_lr: 3e-4
+    init_lr: 2e-4
     optimizer_name: adam
     use_schedule: false
     peak_lr: 3e-4
@@ -115,34 +117,29 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 60000
-  batch_size: 32
+  n_epoch: 7000
+  batch_size: 512
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 0
+  n_checkpoints: 10
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
   save_dir: lj13_results
   resume: false
-  runtime_limit: null
+  runtime_limit: 30.
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
   verbose_info: false
   data_augmentation_for_non_eq: false
+  factor_to_train_non_eq_flow: 4
 
 logger:
-#  list_logger: null
-#  pandas_logger:
-#    save_period: 1000 # how often to save the pandas dataframe as a csv
-  wandb:
-    name: lj13_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
-    project: fab
-    entity: flow-ais-bootstrap
-    tags: [lj13,fab]
-
+  list_logger: null
+  pandas_logger:
+    save_period: 1000 # how often to save the pandas dataframe as a csv
