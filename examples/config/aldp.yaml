@@ -7,66 +7,62 @@ hydra:
 
 target:
   data:
-    train: target/data/aldp_500K_train_mini.h5
-    val: target/data/aldp_500K_test_mini.h5
+    train: data/train.h5
+    val: data/val.h5
   aux:
     conditioned_on_x: true
+    scale_init: 0.5
+    trainable_augmented_scale: false
 
 flow:
-  n_aug: 3
-  scaling_layer: true
-  scaling_layer_conditioned: true
+  n_aug: 1
   base:
     x_dist:
       type: centre_gravity_gaussian
-      a: 0.3
-      trainable_mode_scale: false
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
+      trainable_augmented_scale: false
   dim: 3
   nodes: 22
-  n_layers: 8
+  n_layers: 16
+  scaling_layer: true
+  scaling_layer_conditioned: true
   identity_init: true
-  type: along_vector #  nice proj spherical along_vector non_equivariant
+  type: spherical # nice proj spherical along_vector
   kwargs:
-    n_inner_transforms: 2
-    non_equivariant:
-      transform_type: real_nvp # spline or real_nvp
-      spline_num_bins: 8
-      spline_max_abs_min: 10.
-      n_inner_transforms: 1
+    n_inner_transforms: 4
     along_vector:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
     spherical:
-      reflection_invariant: false
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
+      reflection_invariant: false
     proj:
-      transform_type: spline # spline or real_nvp
+      transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       num_bins: 8
       lower: -10.
       upper: 10.
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
-    type: egnn
+    type: egnn # mace or egnn or e3transformer or e3gnn
     embedding_for_non_positional_feat: true  # No non-positional features.
     embedding_dim: 32
     num_discrete_feat: 22  # Number of atoms.
     egnn:
       name: egnn
       n_blocks: 3 # number of layers
-      mlp_units: [ 32, 32 ]
-      n_invariant_feat_hidden: 32
+      mlp_units: [ 128, 128 ]
+      n_invariant_feat_hidden: 128
       cross_multiplicity_shifts: true
       centre_mass: false
       norm_wrt_centre_feat: true
     mlp_head_config:
-      mlp_units: [64,64]
+      mlp_units: [ 64, 64 ]
       stable: true
 
 
@@ -77,43 +73,35 @@ training:
     use_schedule: true
     peak_lr: 1e-4 # can be null
     end_lr: 0. # can be null
-    warmup_n_epoch: 10 # can be null
-    max_global_norm: null
+    warmup_n_epoch: 1 # can be null
+    max_global_norm: 10000.0
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
-  use_64_bit: false
-  n_epoch: 64
-  batch_size: 64
-  eval_batch_size: 128
+  use_64_bit: true
+  n_epoch: 50
+  batch_size: 24
   plot_batch_size: 1000
   seed: 0
   train_set_size: null
-  test_set_size: null
-  n_checkpoints: 0
-  n_eval: 20
-  K_marginal_log_lik: 20
+  test_set_size: 100000
+  n_checkpoints: 10
+  n_eval: 10
+  K_marginal_log_lik: 1
   save: true
-  save_dir: aldp_results
+  save_dir: experiments/spherical/00
   resume: true
   runtime_limit: 23.5
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
   debug: false
-  verbose_info: false
-  data_augmentation_for_non_eq: true
+  verbose_info: true
 
 
 eval:
-  plot_n_batches: 10
+  plot_n_batches: 100
 
 
 logger:
-#  list_logger: null
   pandas_logger:
     save_period: 1 # how often to save the pandas dataframe as a csv
-#  wandb:
-#    name: aldp_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
-#    project: fab
-#    entity: flow-ais-bootstrap
-#    tags: [aldp,loll]
