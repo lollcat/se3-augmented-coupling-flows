@@ -67,6 +67,7 @@ flow:
 
 
 training:
+  atom_type_permutation_invariance: true
   optimizer:
     init_lr: 0.
     optimizer_name: adam
