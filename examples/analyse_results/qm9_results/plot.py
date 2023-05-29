@@ -1,13 +1,12 @@
 import jax.random
 from omegaconf import DictConfig
 import yaml
-from matplotlib import rc
 
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
 from molboil.targets.data import load_qm9
-from examples.get_wandb_runs import download_checkpoint
-from examples.dw4_results.plot import make_get_data_for_plotting
+from examples.analyse_results.get_wandb_runs import download_checkpoint
+from examples.analyse_results.dw4_results.plot import make_get_data_for_plotting
 
 
 # mpl.rcParams['figure.dpi'] = 300

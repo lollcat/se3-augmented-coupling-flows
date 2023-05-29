@@ -19,9 +19,9 @@ mpl.rc('xtick', labelsize=text_size - 1)
 mpl.rc('ytick', labelsize=text_size - 1)
 # mpl.rc("lines", linewidth=4)
 
-from examples.dw4_results.plot import plot_dw4
-from examples.lj13_results.plot import plot_lj13
-from examples.qm9_results.plot import plot_qm9
+from examples.analyse_results.dw4_results.plot import plot_dw4
+from examples.analyse_results.lj13_results.plot import plot_lj13
+from examples.analyse_results.qm9_results.plot import plot_qm9
 
 
 if __name__ == '__main__':

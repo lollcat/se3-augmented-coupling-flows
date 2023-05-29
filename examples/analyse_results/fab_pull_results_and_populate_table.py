@@ -1,6 +1,6 @@
 import pandas as pd
 
-from examples.get_wandb_runs import get_run_history
+from examples.analyse_results.get_wandb_runs import get_run_history
 
 
 _TAGS = ['final_run', 'fab']

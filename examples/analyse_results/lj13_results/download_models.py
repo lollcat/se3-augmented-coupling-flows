@@ -1,7 +1,4 @@
-import re
-import os
-
-from examples.get_wandb_runs import download_checkpoint
+from examples.analyse_results.get_wandb_runs import download_checkpoint
 
 
 def download_lj13_models():
