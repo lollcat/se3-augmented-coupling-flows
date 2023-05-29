@@ -11,6 +11,7 @@ target:
     val: target/data/aldp_500K_test_mini.h5
   aux:
     conditioned_on_x: true
+    scale_init: 0.1
 
 flow:
   n_aug: 3
@@ -23,7 +24,7 @@ flow:
       trainable_mode_scale: false
     aux:
       conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: 1.0
+      scale_init: ${target.aux.scale_init}
   dim: 3
   nodes: 22
   n_layers: 8
