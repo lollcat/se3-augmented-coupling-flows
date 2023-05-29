@@ -111,10 +111,10 @@ eval:
 
 logger:
 #  list_logger: null
-  pandas_logger:
-    save_period: 1 # how often to save the pandas dataframe as a csv
-#  wandb:
-#    name: aldp_${flow.nets.type}_auxloss${training.use_flow_aux_loss}_bs${training.batch_size} # qm9pos_${flow.type}_${flow.nets.type}_batchsize${training.batch_size}_opt${training.optimizer.optimizer_name}_maxnorm${training.optimizer.max_global_norm}_lrs${training.optimizer.init_lr}-${training.optimizer.peak_lr}_layers${flow.n_layers}_augtargetscale${target.aug_scale}
-#    project: fab
-#    entity: flow-ais-bootstrap
-#    tags: [aldp,loll]
+#  pandas_logger:
+#    save_period: 1 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: aldp
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [aldp,loll]
