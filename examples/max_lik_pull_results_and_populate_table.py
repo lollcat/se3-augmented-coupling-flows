@@ -18,8 +18,8 @@ def download_eval_metrics(problem="dw4", n_runs=3):
         for seed in seeds:
             try:
                 hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap',
-                                                                      'ess'] if problem in ["dw4", "lj13"] else
-                ['marginal_log_lik', 'lower_bound_marginal_gap'])
+                                                                      'ess', '_runtime', "_step"] if problem in ["dw4", "lj13"] else
+                ['marginal_log_lik', 'lower_bound_marginal_gap', '_runtime', "_step"])
 
                 info = dict(hist.iloc[-1])
                 if info["_step"] == 0:
@@ -43,7 +43,6 @@ def download_eval_metrics(problem="dw4", n_runs=3):
 def create_latex_table():
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical']
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
-    keys = ['marginal_log_lik', 'lower_bound_marginal_gap', 'ess']
 
     data_qm9 = download_eval_metrics("qm9pos")
     data_dw4 = download_eval_metrics("dw4")
@@ -62,7 +61,16 @@ def create_latex_table():
     table_values_string = ""
     table_ess = ""
     table_lower_bound_gap = ""
+    table_runtimes = ""
+
     for i, flow_type in enumerate(flow_types):
+        table_runtimes += \
+            f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['_runtime']/3600:.2f},{sem_dw4.loc[flow_type]['_runtime']/3600:.2f} & " \
+            f"{means_lj13.loc[flow_type]['_runtime']/3600:.2f},{sem_lj13.loc[flow_type]['_runtime']/3600:.2f} & " \
+            f"{means_qm9.loc[flow_type]['_runtime']/3600:.2f},{sem_qm9.loc[flow_type]['_runtime']/3600:.2f} \\\ \n "
+
+
         table_values_string += \
             f"{row_names[i]} & " \
             f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
@@ -82,11 +90,13 @@ def create_latex_table():
             f"{means_dw4.loc[flow_type]['ess']*100:.2f},{sem_dw4.loc[flow_type]['ess']*100:.2f} & " \
             f"{means_lj13.loc[flow_type]['ess']*100:.2f},{sem_lj13.loc[flow_type]['ess']*100:.2f} \\\ \n "
 
-    print(table_values_string)
+    # print(table_values_string)
+    # print("\n\n")
+    # print(table_lower_bound_gap)
+    # print("\n\n")
+    # print(table_ess)
     print("\n\n")
-    print(table_lower_bound_gap)
-    print("\n\n")
-    print(table_ess)
+    print(table_runtimes)
 
 
 if __name__ == '__main__':

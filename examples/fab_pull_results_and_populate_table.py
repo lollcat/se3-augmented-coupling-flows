@@ -24,7 +24,8 @@ def download_eval_metrics(problem="dw4",
         for seed in seeds:
             try:
                 hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap',
-                                                                      'eval_ess_flow', 'eval_ess_ais'])
+                                                                      'eval_ess_flow', 'eval_ess_ais', '_runtime',
+                                                                      "_step"])
                 info = dict(hist.iloc[iter_n])
                 if info["_step"] == 0:
                     print(f"skipping {flow_type} seed={seed} as it only has 1 step")
@@ -48,9 +49,9 @@ def create_latex_table():
     step_numbers_dw4 = [2,3,3,3]
     step_numbers_lj13 = [10,6,6,6]
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical'] #
-    row_names = ['{\scshape \\' + "noneanf}", "{\scshape \\vecproj \ \eanf}", "{\scshape \\cartproj \ \eanf}",
-                 "{\scshape \\sphproj \ \eanf}"]
-    keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap']
+    row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
+                 "\\sphproj \ \eanf"]
+    keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', 'runtime']
 
     data_dw4 = download_eval_metrics("dw4", flow_types=flow_types, step_number=step_numbers_dw4)
     data_lj13 = download_eval_metrics("lj13", flow_types=flow_types, step_number=step_numbers_lj13)
@@ -69,6 +70,7 @@ def create_latex_table():
     table_v2_string = ""
     table_lower_bound_gap = ""
     ess_table_string = ""
+    runtime_table_string = ""
 
     for i, flow_type in enumerate(flow_types):
         # if i == 0:
@@ -95,26 +97,23 @@ def create_latex_table():
             # f"0,0 & 0,0 & 0,0  \\\ \n"
 
 
+        runtime_table_string += \
+            f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['_runtime']/3600:.1f},{sem_dw4.loc[flow_type]['_runtime']/3600:.1f} & " \
+            f"{means_lj13.loc[flow_type]['_runtime']/3600:.1f},{sem_lj13.loc[flow_type]['_runtime']/3600:.1f} \\\ \n "
+
+
         table_lower_bound_gap += \
             f"{row_names[i]} & " \
             f"{means_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f} & " \
             f"{-means_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f} \\\ \n "
     #                 f"0,0 \\\ \n"
 
-
-        table_values_string += \
-            f"{row_names[i]} & " \
-            f"{means_dw4.loc[flow_type]['eval_ess_flow']*100:.2f},{sem_dw4.loc[flow_type]['eval_ess_flow']*100:.2f} & " \
-            f"{means_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f},{sem_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f} & " \
-            f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
-            f"{means_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f} & " \
-            f"{means_lj13.loc[flow_type]['eval_ess_ais'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_ais'] * 100:.2f} & " \
-            f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
-            # f"0,0 & 0,0 & 0,0  \\\ \n"
-
-    print(table_values_string)
-    print("\n\n")
-    print(table_lower_bound_gap)
+    # print(table_values_string)
+    # print("\n\n")
+    # print(table_lower_bound_gap)
+    # print("\n\n")
+    print(runtime_table_string)
 
 
 if __name__ == '__main__':

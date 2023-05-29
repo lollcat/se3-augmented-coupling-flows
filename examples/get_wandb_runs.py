@@ -43,7 +43,7 @@ def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
 
 
 def get_run_history(flow_type, tags, seed,
-                    fields=['marginal_log_lik', 'lower_bound_marginal_gap']):
+                    fields=['marginal_log_lik', 'lower_bound_marginal_gap', '_timestamp', "_step"]):
     run = get_wandb_run(flow_type, tags, seed)
     history = run.history(keys=fields)
     return history
