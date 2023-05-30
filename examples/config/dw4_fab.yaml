@@ -79,7 +79,6 @@ flow:
       upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
-    embedding_for_non_positional_feat: false
     type: egnn
     egnn:
         name: egnn

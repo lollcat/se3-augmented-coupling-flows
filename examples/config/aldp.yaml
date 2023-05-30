@@ -50,7 +50,6 @@ flow:
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn # mace or egnn or e3transformer or e3gnn
-    embedding_for_non_positional_feat: true  # No non-positional features.
     embedding_dim: 32
     num_discrete_feat: 22  # Number of atoms.
     egnn:

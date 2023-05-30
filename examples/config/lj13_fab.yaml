@@ -78,7 +78,6 @@ flow:
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
     type: egnn
-    embedding_for_non_positional_feat: false  # No non-positional features.
     egnn:
       name: egnn
       n_blocks: 3 # number of layers

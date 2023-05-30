@@ -85,6 +85,8 @@ def make_proj_coupling_layer(
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
     elif nets_config.type == "e3gnn":
         n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
+    elif nets_config.type == "e3transformer":
+        n_invariant_feat_out = nets_config.e3transformer_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 
