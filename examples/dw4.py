@@ -6,13 +6,16 @@ from functools import partial
 from molboil.train.train import train
 from molboil.targets.data import load_dw4
 from examples.create_train_config import create_train_config
-from target.double_well import make_dataset
+from target.double_well import make_dataset, log_prob_fn
 from utils.data import positional_dataset_only_to_full_graph
 import jax
 
-def load_dataset_original(train_set_size: int, valid_set_size: int):
+def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_dw4(train_set_size)
-    return train, valid[:valid_set_size]
+    if not final_run:
+        return train, valid[:valid_set_size]
+    else:
+        return train, test[:valid_set_size]
 
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):
@@ -43,7 +46,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['spherical']
+    cfg.flow.type = ['non_equivariant']
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
@@ -70,7 +73,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = True
+    local_config = False
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
@@ -83,9 +86,11 @@ def run(cfg: DictConfig):
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
         load_dataset = load_dataset_original
-    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset)
+    experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset,
+                                            target_log_prob_fn=log_prob_fn)
     train(experiment_config)
 
 
 if __name__ == '__main__':
     run()
+

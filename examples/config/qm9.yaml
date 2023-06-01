@@ -50,7 +50,6 @@ flow:
       upper: 10.
       orthogonalization_method: gram-schmidt   #  gram-schmidt or loewdin
   nets:
-    embedding_for_non_positional_feat: false  # No non-positional features.
     type: egnn
     egnn:
       name: egnn
@@ -113,6 +112,11 @@ training:
   factor_to_train_non_eq_flow: 4
 
 logger:
-  list_logger: null
-  pandas_logger:
-    save_period: 1000 # how often to save the pandas dataframe as a csv
+#  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}_InnerTransforms${flow.kwargs.n_inner_transforms}
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [qm9pos,final_run,ml,v2]

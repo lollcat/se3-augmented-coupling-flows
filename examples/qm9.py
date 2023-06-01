@@ -8,9 +8,12 @@ from examples.create_train_config import create_train_config
 from examples.lj13 import to_local_config
 
 
-def load_dataset(train_set_size, valid_set_size):
+def load_dataset(train_set_size, valid_set_size, final_run: bool = True):
     train_data, valid_data, test_data = load_qm9(train_set_size=train_set_size)
-    return train_data, valid_data[:valid_set_size]
+    if not final_run:
+        return train_data, valid_data[:valid_set_size]
+    else:
+        return train_data, test_data[:valid_set_size]
 
 
 @hydra.main(config_path="./config", config_name="qm9.yaml")

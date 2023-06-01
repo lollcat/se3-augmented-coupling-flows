@@ -50,7 +50,6 @@ flow:
       orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn # mace or egnn or e3transformer or e3gnn
-    embedding_for_non_positional_feat: true  # No non-positional features.
     embedding_dim: 32
     num_discrete_feat: 22  # Number of atoms.
     egnn:
@@ -105,3 +104,8 @@ eval:
 logger:
   pandas_logger:
     save_period: 1 # how often to save the pandas dataframe as a csv
+#  wandb:
+#    name: aldp
+#    project: fab
+#    entity: flow-ais-bootstrap
+#    tags: [aldp,loll]

@@ -3,15 +3,19 @@ from omegaconf import DictConfig
 from functools import partial
 
 
+
 from molboil.train.train import train
 from molboil.targets.data import load_dw4
 from examples.create_fab_train_config import create_train_config
 from target.double_well import make_dataset, log_prob_fn
 from utils.data import positional_dataset_only_to_full_graph
 
-def load_dataset_original(train_set_size: int, valid_set_size: int):
+def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_dw4(train_set_size)
-    return train, valid[:valid_set_size]
+    if not final_run:
+        return train, valid[:valid_set_size]
+    else:
+        return train, test[:valid_set_size]
 
 def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:int = 1000, seed: int = 0,
                         temperature: float = 1.0):
@@ -31,7 +35,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
     cfg.training.n_epoch = int(1e3)
-    cfg.training.save = False
+    cfg.training.save = True
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 2

@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import e3nn_jax as e3nn
 import haiku as hk
 import jax
+import warnings
 
 from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.models.base import EquivariantForwardFunction
@@ -11,6 +12,8 @@ from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
 from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
 from molboil.models.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
 
+
+from nets.e3_transformer import make_e3transformer_torso_forward_fn, E3TransformerTorsoConfig
 from nets.transformer import TransformerConfig
 
 class MLPHeadConfig(NamedTuple):
@@ -22,10 +25,10 @@ class NetsConfig(NamedTuple):
     type: str
     egnn_torso_config: Optional[EGNNTorsoConfig] = None
     e3gnn_torso_config: Optional[E3GNNTorsoConfig] = None
+    e3transformer_config: Optional[E3TransformerTorsoConfig] = None
     mlp_head_config: Optional[MLPHeadConfig] = None
     non_equivariant_transformer_config: Optional[TransformerConfig] = None
     softmax_layer_invariant_feat: bool = True
-    embedding_for_non_positional_feat: bool = True
     embedding_dim: int = 32
     num_discrete_feat: Optional[int] = None  # E.g. number of atom types
 
@@ -44,6 +47,9 @@ def build_torso(name: str, config: NetsConfig,
             n_vectors_hidden_per_vec_in=n_vectors_out // n_vectors_in,
         ),
         )
+    elif config.type == "e3transformer":
+        torso = make_e3transformer_torso_forward_fn(torso_config=config.e3transformer_config._replace(
+            name=name + config.e3transformer_config.name))
     else:
         raise NotImplementedError
     return torso
@@ -77,21 +83,22 @@ class EGNN(hk.Module):
         chex.assert_rank(h, 2)
         n_nodes, vec_multiplicity_in, dim = x.shape[-3:]
         assert h.shape[0] == x.shape[0]  # n_nodes
-        if self.nets_config.embedding_for_non_positional_feat:
-            # Create an embedding of the non-positional features.
-            chex.assert_axis_dimension(h, 1, 1)
-            h = jnp.squeeze(h, axis=-1)
-            assert self.nets_config.num_discrete_feat is not None
+
+        # Create an embedding of the non-positional features.
+        chex.assert_axis_dimension(h, 1, 1)
+        h = jnp.squeeze(h, axis=-1)
+        if self.nets_config.num_discrete_feat is None:
+            warnings.warn("No number of discrete node features set.")
+            h = hk.get_parameter("embedding", shape=(1,), dtype=float, init=hk.initializers.RandomNormal())
+            h = jnp.repeat(h[None, :], n_nodes, axis=0)
+        else:
             full_embedding = hk.get_parameter("embedding", shape=(self.nets_config.num_discrete_feat,
                                                                   self.nets_config.embedding_dim,), dtype=float,
                                               init=hk.initializers.RandomNormal())
             h = full_embedding[h]
             chex.assert_shape(h, (n_nodes, self.nets_config.embedding_dim))
-        else:
-            # Turn h into a float. We often use this option when
-            # no non-positional features exist.
-            h = jnp.asarray(h, dtype=float)
 
+        # Pass through torso network.
         torso = build_torso(self.name, self.nets_config, self.n_equivariant_vectors_out, vec_multiplicity_in)
         vectors, h = torso(x, h, senders, receivers)
 

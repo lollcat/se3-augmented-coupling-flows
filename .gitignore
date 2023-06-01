@@ -9,3 +9,5 @@
 *.npy
 *.log
 /outputs
+/examples/*./models/
+/hpc_scripts/

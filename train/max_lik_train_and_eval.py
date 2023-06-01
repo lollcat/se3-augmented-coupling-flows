@@ -76,12 +76,15 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     log_w = log_q - log_p_a
 
     info = {}
-    info.update(eval_log_lik = jnp.mean(log_q))
+    info.update(eval_log_lik=jnp.mean(log_q))
     marginal_log_lik = jnp.mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)), axis=0)
     info.update(marginal_log_lik=marginal_log_lik)
 
+    lower_bound_marginal_gap = marginal_log_lik - jnp.mean(log_w)
+    info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
+
     info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
-    info.update(ess_marginal=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
+    info.update(ess_aug_conditional=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
 
     if test_invariances:
         key, subkey = jax.random.split(key)
@@ -90,22 +93,34 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     return info
 
 
-def eval_non_batched(params: AugmentedFlowParams, features: chex.Array, key: chex.PRNGKey, flow: AugmentedFlow,
-                     batch_size: int, target_log_prob: Callable = None):
+def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
+                     key: chex.PRNGKey, flow: AugmentedFlow,
+                     n_samples: int,
+                     inner_batch_size: int,
+                     target_log_prob: Callable = None):
+
+    def forward(carry, key: chex.PRNGKey):
+        joint_x_flow, log_prob_flow = flow.sample_and_log_prob_apply(params, single_feature, key, (inner_batch_size,))
+        features, x_positions, a_positions = flow.joint_to_separate_samples(joint_x_flow)
+        log_p_x = target_log_prob(x_positions) if target_log_prob else None
+        log_p_a_given_x = flow.aux_target_log_prob_apply(params.aux_target,
+                                       FullGraphSample(features=features, positions=x_positions), a_positions)
+        return None, (x_positions, a_positions, log_prob_flow, log_p_x, log_p_a_given_x)
+
+    n_batches = int(n_samples // inner_batch_size) + 1
+
+    _, result = jax.lax.scan(forward, None, xs=jax.random.split(key, n_batches), length=n_batches)
+    result = jax.tree_map(lambda x: jnp.reshape(x, (x.shape[0]*x.shape[1], *x.shape[2:])), result)
+    x_positions, a_positions, log_prob_flow, log_p_x, log_p_a_given_x = result  # unpack.
+
     info = {}
-    joint_x_flow, log_prob_flow = flow.sample_and_log_prob_apply(params, features, key, (batch_size,))
-    features, x_positions, a_positions = flow.joint_to_separate_samples(joint_x_flow)
     original_centre = jnp.mean(x_positions, axis=-2)
     aug_centre = jnp.mean(a_positions[:, :, 0, :], axis=-2)
     info.update(mean_aug_orig_norm=jnp.mean(jnp.linalg.norm(original_centre-aug_centre, axis=-1)))
 
     if target_log_prob is not None:
         # Calculate ESS
-        log_w = target_log_prob(x_positions) + \
-                flow.aux_target_log_prob_apply(params.aux_target,
-                                       FullGraphSample(features=features, positions=x_positions),
-                                       a_positions
-                                       ) - log_prob_flow
+        log_w = log_p_x + log_p_a_given_x - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
             {
