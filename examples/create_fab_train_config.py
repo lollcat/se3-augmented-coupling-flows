@@ -90,9 +90,10 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
 
 
     opt_cfg = dict(training_config.pop("optimizer"))
-    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')
+    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*cfg.fab.n_updates_per_smc_forward_pass
+    n_iter_total = n_epoch*cfg.fab.n_updates_per_smc_forward_pass
     optimizer_config = OptimizerConfig(**opt_cfg,
-                                       n_iter_total=n_epoch,
+                                       n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
     optimizer, lr = get_optimizer(optimizer_config)
 
@@ -239,9 +240,10 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
 
     opt_cfg = dict(training_config.pop("optimizer"))
-    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')
+    n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*cfg.fab.n_updates_per_smc_forward_pass
+    n_iter_total = n_epoch*cfg.fab.n_updates_per_smc_forward_pass
     optimizer_config = OptimizerConfig(**opt_cfg,
-                                       n_iter_total=n_epoch,
+                                       n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
     optimizer, lr = get_optimizer(optimizer_config)
 
