@@ -23,8 +23,7 @@ def run(cfg: DictConfig):
 
     def load_dataset(train_set_size: int, val_set_size: int):
         return load_aldp(train_path=cfg.target.data.train, val_path=cfg.target.data.val,
-                         train_n_points=train_set_size, val_n_points=val_set_size,
-                         atom_type_encoding_only=cfg.training.atom_type_permutation_invariance)[:2]
+                         train_n_points=train_set_size, val_n_points=val_set_size)[:2]
 
     train_set, val_set = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     # Add edges of aldp for harmonic potential
