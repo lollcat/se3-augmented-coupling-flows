@@ -51,7 +51,6 @@ flow:
       upper: 10.
       orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
   nets:
-    embedding_for_non_positional_feat: false  # No non-positional features.
 #    embedding_dim: 2
 #    num_discrete_feat: 2
     type: egnn
@@ -111,7 +110,12 @@ training:
 
 
 logger:
-  list_logger: null
-  pandas_logger:
-    save_period: 1000 # how often to save the pandas dataframe as a csv
+#  list_logger: null
+#  pandas_logger:
+#    save_period: 1000 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: dw4_${flow.type}_Ntrain${training.train_set_size}
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [dw4,final_run,ml,v4]
 

@@ -8,13 +8,16 @@ from examples.create_fab_train_config import create_train_config
 from target.leonard_jones import log_prob_fn
 
 
-def load_dataset(train_set_size: int, valid_set_size: int):
+def load_dataset(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_lj13(train_set_size)
-    return train, valid[:valid_set_size]
+    if not final_run:
+        return train, valid[:valid_set_size]
+    else:
+        return train, test[:valid_set_size]
 
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
-    cfg.flow.nets.type = "e3gnn"
+    cfg.flow.nets.type = "egnn"
     cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = (4,)
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = 2
@@ -23,8 +26,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_aug = 1
     cfg.fab.eval_inner_batch_size = 2
     cfg.fab.eval_total_batch_size = 4
-    cfg.fab.buffer_min_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass + 1
-    cfg.fab.buffer_max_length = cfg.training.batch_size * cfg.fab.n_updates_per_smc_forward_pass * 10
+    cfg.fab.n_updates_per_smc_forward_pass = 2
+    cfg.fab.n_intermediate_distributions = 4
+    cfg.fab.buffer_min_length_batches = 4
+    cfg.fab.buffer_max_length_batches = 10
 
     cfg.training.n_epoch = 32
     cfg.training.save = False
@@ -49,7 +54,8 @@ def run(cfg: DictConfig):
                                             target_log_p_x_fn=log_prob_fn,
                                             dim=3,
                                             n_nodes=13,
-                                            load_dataset=load_dataset)
+                                            load_dataset=load_dataset,
+                                            date_folder=False)
     train(experiment_config)
 
 

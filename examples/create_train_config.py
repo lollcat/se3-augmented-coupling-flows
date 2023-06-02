@@ -2,7 +2,6 @@ from typing import Tuple, Optional
 
 import chex
 import jax
-import optax
 import wandb
 import matplotlib.pyplot as plt
 import os
@@ -21,8 +20,8 @@ from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig, TransformerConfig
-from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch
+from nets.base import NetsConfig, MLPHeadConfig, E3GNNTorsoConfig, EGNNTorsoConfig, TransformerConfig, E3TransformerTorsoConfig
+from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState
@@ -69,6 +68,8 @@ def create_nets_config(nets_config: DictConfig):
     nets_config = dict(nets_config)
     egnn_cfg = EGNNTorsoConfig(**dict(nets_config.pop("egnn"))) if "egnn" in nets_config.keys() else None
     e3gnn_config = E3GNNTorsoConfig(**dict(nets_config.pop("e3gnn"))) if "e3gnn" in nets_config.keys() else None
+    e3transformer_config = E3TransformerTorsoConfig(**dict(nets_config.pop("e3transformer")))\
+        if "e3transformer" in nets_config.keys() else None
     mlp_head_config = MLPHeadConfig(**nets_config.pop('mlp_head_config')) if "mlp_head_config" in \
                                                                              nets_config.keys() else None
     non_equivariant_transformer_config = TransformerConfig(**nets_config.pop('non_equivariant_transformer_config')) \
@@ -77,6 +78,7 @@ def create_nets_config(nets_config: DictConfig):
                              **nets_config,
                              egnn_torso_config=egnn_cfg,
                              e3gnn_torso_config=e3gnn_config,
+                             e3transformer_config=e3transformer_config,
                              mlp_head_config=mlp_head_config,
                              non_equivariant_transformer_config=non_equivariant_transformer_config
                              )
@@ -105,22 +107,25 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None) -> TrainConfig:
     devices = jax.devices()
     if len(devices) > 1:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
-                                        date_folder)
+                                        date_folder, target_log_prob_fn)
     else:
         print(f"Running on one device only.")
         return create_train_config_non_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
-                                        date_folder)
+                                        date_folder, target_log_prob_fn)
 
 def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None
+    ) -> TrainConfig:
     """Creates `mol_boil` style train config"""
     assert cfg.flow.dim == dim
     assert cfg.flow.nodes == n_nodes
@@ -140,23 +145,19 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     else:
         save_path = ''
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
+    batch_size = min(cfg.training.batch_size, train_data.positions.shape[0])
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
-    # debug = True
-    # if debug:
-    #     x = test_data[:10]
-    #     key = jax.random.PRNGKey(0)
-    #     flow_params = flow.init(key, train_data[0])
-    #     aux_samples = flow.aux_target_sample_n_apply(flow_params.aux_target, x, key)
-    #     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
-    #     test_log_prob = flow.log_prob_apply(flow_params, joint_samples)
+    n_epoch = cfg.training.n_epoch
+    if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
+        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))
-    n_iter_per_epoch = train_data.positions.shape[0] // cfg.training.batch_size
+    n_iter_per_epoch = train_data.positions.shape[0] // batch_size
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
-    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    n_iter_total = n_epoch * n_iter_per_epoch
     optimizer_config = OptimizerConfig(**opt_cfg,
                                        n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
@@ -184,11 +185,10 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                       apply_random_rotation=data_augmentation)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
                                verbose_info=cfg.training.verbose_info)
-
     scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
                                          data=train_data,
                                          last_iter_info_only=cfg.training.last_iter_info_only,
-                                         batch_size=cfg.training.batch_size)
+                                         batch_size=batch_size)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)
@@ -215,7 +215,16 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         # Setup eval functions
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
-        eval_batch_free_fn = None
+        if target_log_prob_fn:
+            eval_batch_free_fn = partial(
+                                    eval_non_batched,
+                                    single_feature=test_data.features[0],
+                                    flow=flow,
+                                    n_samples=cfg.training.eval_model_samples,
+                                    inner_batch_size=cfg.training.eval_batch_size,
+                                    target_log_prob=target_log_prob_fn)
+        else:
+            eval_batch_free_fn = None
 
         def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
@@ -229,7 +238,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
 
     return TrainConfig(
-        n_iteration=cfg.training.n_epoch,
+        n_iteration=n_epoch,
         logger=logger,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,
@@ -249,8 +258,12 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                         plotter: Optional = None,
                         evaluation_fn: Optional = None,
                         eval_and_plot_fn: Optional = None,
-                        date_folder: bool = True) -> TrainConfig:
+                        date_folder: bool = True,
+                        target_log_prob_fn: Optional = None
+                             ) -> TrainConfig:
     """Creates `mol_boil` style train config"""
+    if target_log_prob_fn is not None:
+        raise NotImplementedError # TODO still need to implement this
     devices = jax.devices()
     n_devices = len(devices)
     pmap_axis_name = 'data'
@@ -276,10 +289,14 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
+    n_epoch = cfg.training.n_epoch
+    if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
+        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+
     opt_cfg = dict(training_config.pop("optimizer"))
     n_iter_per_epoch = train_data.positions.shape[0] // (cfg.training.batch_size * n_devices)
     n_iter_warmup = opt_cfg.pop('warmup_n_epoch')*n_iter_per_epoch
-    n_iter_total = cfg.training.n_epoch * n_iter_per_epoch
+    n_iter_total = n_epoch * n_iter_per_epoch
     optimizer_config = OptimizerConfig(**opt_cfg,
                                        n_iter_total=n_iter_total,
                                        n_iter_warmup=n_iter_warmup)
@@ -369,7 +386,8 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                 for i in range(batched_data.positions.shape[0]):
                     x = batched_data[i]
                     # Reshape to [n_devices, batch_size]
-                    x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.eval_batch_size, *x.shape[1:])), x)
+                    x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.eval_batch_size, *x.shape[1:])),
+                                     x)
                     key, subkey = jax.random.split(key)
                     key_per_device = jax.random.split(subkey, n_devices)
                     info = jax.pmap(eval_function, axis_name=pmap_axis_name)(state, x, key_per_device)
@@ -386,7 +404,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
 
     return TrainConfig(
-        n_iteration=cfg.training.n_epoch,
+        n_iteration=n_epoch,
         logger=logger,
         seed=cfg.training.seed,
         n_checkpoints=cfg.training.n_checkpoints,
