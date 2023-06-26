@@ -51,7 +51,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
     cfg.flow.kwargs.spherical.spline_num_bins = 3
-    cfg.flow.kwargs.n_inner_transforms = 1
 
 
     # Configure NNs

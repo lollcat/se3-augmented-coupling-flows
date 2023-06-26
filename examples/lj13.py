@@ -19,14 +19,13 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     cfg.training.train_set_size = 4
     cfg.training.test_set_size = 4
-    cfg.flow.nets.type = "e3transformer"
-    cfg.flow.nets.egnn.mlp_units = cfg.flow.nets.e3gnn.mlp_units = cfg.flow.nets.e3transformer.mlp_units = (2, 2)
+    cfg.flow.nets.type = "egnn"
+    cfg.flow.nets.egnn.mlp_units = (2, 2)
     cfg.flow.n_layers = 1
-    cfg.flow.nets.egnn.n_blocks = cfg.flow.nets.e3gnn.n_blocks = cfg.flow.nets.e3transformer.n_blocks = 2
+    cfg.flow.nets.egnn.n_blocks = 2
     cfg.training.batch_size = 2
     cfg.flow.type = 'spherical'
     cfg.flow.kwargs.spherical.spline_num_bins = 3
-    cfg.flow.kwargs.n_inner_transforms = 1
     cfg.flow.n_aug = 1
 
     cfg.training.n_epoch = 32
@@ -53,7 +52,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="lj13.yaml")
 def run(cfg: DictConfig):
-    local_config = True
+    local_config = False
     if local_config:
         cfg = to_local_config(cfg)
 
