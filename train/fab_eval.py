@@ -28,7 +28,8 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
     n_nodes = features.shape[0]
     event_shape = (n_nodes, 1 + flow.n_augmented, flow.dim_x)
     features_with_multiplicity = features[:, None]
-    flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+    flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply, flow_log_prob_apply_with_extra = \
+        flat_log_prob_components(
         log_p_x=log_p_x, flow=flow, params=state.params, features_with_multiplicity=features_with_multiplicity,
         event_shape=event_shape
     )

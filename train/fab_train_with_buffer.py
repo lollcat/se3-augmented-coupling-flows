@@ -13,13 +13,13 @@ from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.buffer import PrioritisedBuffer, PrioritisedBufferState
 from molboil.utils.test import random_rotate_translate_permute
 
-from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
+from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample, Extra
 from utils.optimize import IgnoreNanOptState
 from train.fab_train_no_buffer import flat_log_prob_components, build_smc_forward_pass
 
 Params = chex.ArrayTree
 LogProbFn = Callable[[chex.Array], chex.Array]
-ParameterizedLogProbFn = Callable[[chex.ArrayTree, chex.Array], chex.Array]
+ParameterizedLogProbWithExtraFn = Callable[[chex.ArrayTree, chex.Array], Tuple[chex.Array, Extra]]
 Info = dict
 
 def fab_loss_buffer_samples(
@@ -27,18 +27,30 @@ def fab_loss_buffer_samples(
         x: chex.Array,
         log_q_old: chex.Array,
         alpha: chex.Array,
-        log_q_fn_apply: ParameterizedLogProbFn,
+        log_q_with_extra_fn_apply: ParameterizedLogProbWithExtraFn,
         w_adjust_clip: float,
-) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        aux_loss_weight: float,
+        use_aux_loss: bool,
+) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array, dict]]:
     """Estimate FAB loss with a batch of samples from the prioritized replay buffer."""
     chex.assert_rank(x, 4)  # [batch_size, n_nodes, n_aug+1, dim]
     chex.assert_rank(log_q_old, 1)
 
-    log_q = log_q_fn_apply(params, x)
+    log_q, extra = log_q_with_extra_fn_apply(params, x)
     log_w_adjust = (1 - alpha) * (jax.lax.stop_gradient(log_q) - log_q_old)
     chex.assert_equal_shape((log_q, log_w_adjust))
     w_adjust = jnp.clip(jnp.exp(log_w_adjust), a_max=w_adjust_clip)
-    return - jnp.mean(w_adjust * log_q), (log_w_adjust, log_q)
+    fab_loss = - jnp.mean(w_adjust * log_q)
+
+    info = {}
+    info.update(fab_loss=fab_loss)
+    if use_aux_loss:
+        aux_loss = jnp.mean(extra.aux_loss)
+        loss = fab_loss + aux_loss * aux_loss_weight
+        info.update(aux_loss=aux_loss)
+    else:
+        loss = fab_loss
+    return loss, (log_w_adjust, log_q, info)
 
 
 def equivariance_regularisation_loss(
@@ -46,34 +58,35 @@ def equivariance_regularisation_loss(
         log_q: chex.Array,
         x: chex.Array,
         key: chex.PRNGKey,
-        log_q_fn_apply: ParameterizedLogProbFn):
+        log_q_with_extra_fn_apply: ParameterizedLogProbWithExtraFn):
     """Apply regularisation to encourage equivariance."""
     x_rot = random_rotate_translate_permute(x, key, translate=False, permute=False)
-    log_q_rot = log_q_fn_apply(params, x_rot)
+    log_q_rot, extra = log_q_with_extra_fn_apply(params, x_rot)
     chex.assert_equal_shape((log_q, log_q_rot))
     loss = jnp.mean((log_q - log_q_rot)**2)
     return loss
 
 
 def generic_loss(params: AugmentedFlowParams,
-        x: chex.Array,
-        key: chex.PRNGKey,
-        log_q_old: chex.Array,
-        alpha: chex.Array,
-        log_q_fn_apply: ParameterizedLogProbFn,
-        w_adjust_clip: float,
-        equivariance_regularisation: bool = False,
-        ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array, dict]]:
+                 x: chex.Array,
+                 key: chex.PRNGKey,
+                 log_q_old: chex.Array,
+                 alpha: chex.Array,
+                 log_q_with_extra_fn_apply: ParameterizedLogProbWithExtraFn,
+                 w_adjust_clip: float,
+                 use_flow_aux_loss: bool,
+                 aux_loss_weight: float,
+                 equivariance_regularisation: bool = False,
+                 ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array, dict]]:
     """Generic loss function for training, with option for equivariance regularisation."""
-    info = {}
-    fab_loss, (log_w_adjust, log_q) = fab_loss_buffer_samples(params, x, log_q_old, alpha, log_q_fn_apply,
-                                                              w_adjust_clip)
-    info.update(fab_loss=fab_loss)
+    loss, (log_w_adjust, log_q, info) = fab_loss_buffer_samples(params, x, log_q_old, alpha, log_q_with_extra_fn_apply,
+                                                                w_adjust_clip, aux_loss_weight=aux_loss_weight,
+                                                                use_aux_loss=use_flow_aux_loss)
     if equivariance_regularisation:
-        eq_loss = equivariance_regularisation_loss(params, log_q, x, key, log_q_fn_apply)
-        fab_loss = fab_loss + eq_loss
-        info.update(eq_loss=eq_loss, total_loss=fab_loss)
-    return fab_loss, (log_w_adjust, log_q, info)
+        eq_loss = equivariance_regularisation_loss(params, log_q, x, key, log_q_with_extra_fn_apply)
+        loss = loss + eq_loss
+        info.update(eq_loss=eq_loss, total_loss=loss)
+    return loss, (log_w_adjust, log_q, info)
 
 
 
@@ -95,12 +108,13 @@ def build_fab_with_buffer_init_step_fns(
         optimizer: optax.GradientTransformation,
         batch_size: int,
         n_updates_per_smc_forward_pass: int,
+        use_aux_loss: bool,
+        aux_loss_weight: float,
         alpha: float = 2.,
         w_adjust_clip: float = 10.,
         equivariance_regularisation: bool = False,
         use_pmap: bool = False,
-        pmap_axis_name: str = 'data'
-):
+        pmap_axis_name: str = 'data'):
     """Create the `init` and `step` functions that define the FAB algorithm."""
     assert smc.alpha == alpha
 
@@ -158,7 +172,8 @@ def build_fab_with_buffer_init_step_fns(
         x, log_q_old, key = xs
         info = {}
 
-        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply, flow_log_prob_apply_with_extra\
+            = flat_log_prob_components(
             log_p_x=log_p_x, flow=flow, params=flow_params, features_with_multiplicity=features_with_multiplicity,
             event_shape=event_shape
         )
@@ -166,7 +181,9 @@ def build_fab_with_buffer_init_step_fns(
         x = unflatten(x)
         # Estimate loss and update flow params.
         grad, (log_w_adjust, log_q, loss_info) = jax.grad(generic_loss, has_aux=True)(
-            flow_params, x, key, log_q_old, alpha, flow_log_prob_apply, w_adjust_clip, equivariance_regularisation)
+            flow_params, x, key, log_q_old, alpha, flow_log_prob_apply_with_extra, w_adjust_clip,
+            use_aux_loss, aux_loss_weight,
+            equivariance_regularisation)
         if use_pmap:
             grad = jax.lax.pmean(grad, axis_name=pmap_axis_name)
         updates, new_opt_state = optimizer.update(grad, opt_state, params=flow_params)

@@ -136,6 +136,8 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
+            use_aux_loss=cfg.training.use_flow_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             equivariance_regularisation=data_augmentation
         )
     else:
@@ -287,6 +289,8 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
             equivariance_regularisation=data_augmentation,
+            use_aux_loss=cfg.training.use_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             use_pmap=True, pmap_axis_name=pmap_axis_name
         )
     else:
