@@ -79,7 +79,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 256
+  n_epoch: 400
   batch_size: 32
   plot_batch_size: 128
   eval_batch_size: 128
@@ -92,7 +92,7 @@ training:
   save: true
   save_dir: qm9pos_results
   resume: false
-  runtime_limit: 12.
+  runtime_limit: 24.
   use_flow_aux_loss: true
   aux_loss_weight: 10.0
   last_iter_info_only: true

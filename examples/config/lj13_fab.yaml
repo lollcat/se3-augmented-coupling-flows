@@ -119,7 +119,7 @@ training:
   save: true
   save_dir: lj13_results
   resume: false
-  runtime_limit: 30.
+  runtime_limit: 31.
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
