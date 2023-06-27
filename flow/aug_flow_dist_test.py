@@ -16,8 +16,7 @@ _N_AUG = 1
 _N_NODES = 3
 _FLOW_TYPE = "nice"
 _IDENTITY_INIT = False
-_FEATURE_DIM = 2
-_ACT_NORM = True
+_SCALING_LAYER = True
 
 
 def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
@@ -45,7 +44,7 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
         base=base_aux_config,
         target_aux_config=target_aux_config,
         n_aug=n_aug,
-        act_norm=_ACT_NORM
+        scaling_layer=_SCALING_LAYER
     )
 
     flow = build_flow(config)
@@ -54,7 +53,7 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
     # Init params.
     key, subkey = jax.random.split(key)
     dummy_samples = FullGraphSample(positions=jax.random.normal(subkey, (batch_size, n_nodes, dim)),
-                                    features=jnp.zeros((batch_size, n_nodes, _FEATURE_DIM)))
+                                    features=jnp.zeros((batch_size, n_nodes, 1), dtype=int))
     key, subkey = jax.random.split(key)
     params = flow.init(subkey, dummy_samples)
     params_check = flow.init(subkey, dummy_samples[0])
@@ -64,7 +63,7 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
     # Get some info manually - useful for direct inspection.
     dummy_samples_full = FullGraphSample(
         positions=jax.random.normal(subkey, (batch_size, n_nodes, n_aug+1, dim)),
-        features=jnp.zeros((batch_size, n_nodes, 1, _FEATURE_DIM)))
+        features=jnp.zeros((batch_size, n_nodes, 1, 1), dtype=int))
     info_test = get_checks_for_flow_properties(dummy_samples_full, flow, params, subkey)
     assert info_test['mean_abs_diff_log_det_forward_reverse'] < 0.001
     info = flow.get_base_and_target_info(params)
@@ -90,7 +89,7 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
     chex.assert_tree_all_finite(log_prob)
     chex.assert_shape(log_prob, (batch_size,))
     chex.assert_shape(sample.positions, (batch_size, n_nodes, n_aug+1, dim))
-    chex.assert_shape(sample.features, (batch_size, n_nodes, 1, _FEATURE_DIM))
+    chex.assert_shape(sample.features, (batch_size, n_nodes, 1, 1))
 
     log_prob_check = flow.log_prob_apply(params, sample)
     log_prob_single_sample_check = flow.log_prob_apply(params, sample[0])
@@ -117,7 +116,7 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
     plt.show()
 
     # Test with-extra.
-    sample, log_prob, extra = flow.sample_and_log_prob_with_extra_apply(params, jnp.zeros((n_nodes, _FEATURE_DIM)),
+    sample, log_prob, extra = flow.sample_and_log_prob_with_extra_apply(params, jnp.zeros((n_nodes, 1), dtype=int),
                                                                         subkey, (batch_size,))
     chex.assert_trees_all_equal(sample, sample_old)  # Haven't change source of randomness, so should match.
     log_prob_check, extra_chex = flow.log_prob_with_extra_apply(params, sample)
@@ -127,58 +126,11 @@ def test_distribution(dim: int = 3, n_aug: int = _N_AUG):
 
     # Test log prob function is invariant.
     def invariant_log_prob(x):
-        x = FullGraphSample(positions=x, features=jnp.zeros((n_nodes, 1, _FEATURE_DIM)))
+        x = FullGraphSample(positions=x, features=jnp.zeros((n_nodes, 1, 1), dtype=int))
         log_probs = flow.log_prob_apply(params, x)
         return log_probs
 
     assert_is_invariant(invariant_log_prob, subkey, event_shape=(n_nodes, n_aug+1, dim))
-
-
-def test_target_reparam(dim: int = 3, n_aug: int = 3):
-    """Visualise samples from the distribution, and check that it's log prob is invariant to
-    translation and rotation."""
-    if jnp.ones(()).dtype == jnp.float64:
-        rtol = 1e-5
-    else:
-        rtol = 1e-4
-
-    n_nodes = _N_NODES
-    batch_size = 5
-    key = jax.random.PRNGKey(0)
-    base_aux_config = BaseConfig()
-    target_aux_config = ConditionalAuxDistConfig(trainable_augmented_scale=True)
-
-
-    config = FlowDistConfig(
-        dim=dim, n_layers=_N_FLOW_LAYERS,
-        nodes=_N_NODES,
-        identity_init=_IDENTITY_INIT,
-        type=_FLOW_TYPE,
-        compile_n_unroll=2,
-        nets_config=get_minimal_nets_config('egnn'),
-        base=base_aux_config,
-        target_aux_config=target_aux_config,
-        n_aug=n_aug
-    )
-
-    flow = build_flow(config)
-
-
-    # Init params.
-    key, subkey = jax.random.split(key)
-    dummy_samples = FullGraphSample(positions=jax.random.normal(subkey, (batch_size, n_nodes, dim)),
-                                    features=jnp.zeros((batch_size, n_nodes, _FEATURE_DIM)))
-    key, subkey = jax.random.split(key)
-    params = flow.init(subkey, dummy_samples)
-
-    def dummy_loss(params, key):
-        samples = flow.aux_target_sample_n_apply(params, dummy_samples, key, 2)
-        return jnp.sum(samples)
-
-    print(jax.grad(dummy_loss)(params.aux_target, key))
-    pass
-
-
 
 
 
@@ -193,7 +145,4 @@ if __name__ == '__main__':
 
     test_distribution(dim=3)
     print("passed distribution dist 3D")
-
-    test_target_reparam(dim=3)
-    print("passed target reparam test")
 
