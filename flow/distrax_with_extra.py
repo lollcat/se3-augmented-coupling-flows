@@ -1,6 +1,12 @@
-from typing import Tuple, Union, Sequence, Callable, Optional, NamedTuple, List
+"""
+This file edits some distrax objects to allow the flow to pass forward extra information containing
+additional per layers losses and information for logging.
+"""
+
+from typing import Tuple, Optional, NamedTuple
 
 import distrax
+from distrax._src.utils import math
 import chex
 import jax
 import jax.numpy as jnp
@@ -9,6 +15,7 @@ from distrax._src.distributions.distribution import Array, PRNGKey
 
 @jax.tree_util.register_pytree_node_class
 class Extra(NamedTuple):
+    """Extra information on the flow."""
     aux_loss: chex.Array = jnp.array(0.0)
     aux_info: Optional[dict] = {}
     info_aggregator: Optional[dict] = {}
@@ -29,7 +36,7 @@ class Extra(NamedTuple):
 
 
 class BijectorWithExtra(distrax.Bijector):
-
+    """Extend distrax bijector to include extra info."""
     def forward_and_log_det_with_extra(self, x: Array) -> Tuple[Array, Array, Extra]:
         """Like forward_and_log det, but with additional info. Defaults to just returning an empty dict for extra."""
         y, log_det = self.forward_and_log_det(x)
@@ -44,7 +51,7 @@ class BijectorWithExtra(distrax.Bijector):
 
 
 class ChainWithExtra(distrax.Chain, BijectorWithExtra):
-
+    """Extend distrax `Chain` to include extra info."""
     def forward_and_log_det(self, x: Array) -> Tuple[Array, Array]:
         """Computes y = f(x) and log|det J(f)(x)|."""
         x, log_det = self._bijectors[-1].forward_and_log_det(x)
@@ -108,9 +115,8 @@ class ChainWithExtra(distrax.Chain, BijectorWithExtra):
         return y, log_det, extras
 
 
-from distrax._src.utils import math
-
 class BlockWithExtra(distrax.Block, BijectorWithExtra):
+    """Extend distrax `Block` to include extra info."""
     def __init__(self, bijector: BijectorWithExtra, ndims: int):
         super().__init__(bijector, ndims)
 
@@ -128,7 +134,7 @@ class BlockWithExtra(distrax.Block, BijectorWithExtra):
 
 
 class DistributionWithExtra(distrax.Distribution):
-
+    """Extend distrax `Distribution` to include extra info."""
     def sample_n_and_log_prob_with_extra(self, key: PRNGKey, n: int) -> Tuple[Array, Array, Extra]:
         sample, log_prob = self._sample_n_and_log_prob(key, n)
         return sample, log_prob, Extra()
