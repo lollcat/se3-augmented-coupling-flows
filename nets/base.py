@@ -31,7 +31,6 @@ class NetsConfig(NamedTuple):
     softmax_layer_invariant_feat: bool = True
     embedding_dim: int = 32
     num_discrete_feat: Optional[int] = None  # E.g. number of atom types
-    add_centre_node: bool = True  # Center sender only node.
 
 
 def build_torso(name: str, config: NetsConfig,
@@ -99,21 +98,11 @@ class EGNN(hk.Module):
             h = full_embedding[h]
             chex.assert_shape(h, (n_nodes, self.nets_config.embedding_dim))
 
-        if self.nets_config.add_centre_node:
-            h_centre = hk.get_parameter("centre_embedding", shape=(h.shape[-1],), dtype=float,
-                                        init=hk.initializers.RandomNormal())
-            x_centre = jnp.zeros_like(x[0])
-            x = jnp.concatenate([x, x_centre[None]], axis=0)
-            h = jnp.concatenate([h, h_centre[None]], axis=0)
-            senders = jnp.concatenate([senders, jnp.ones(n_nodes)*n_nodes], axis=0, dtype=int)
-            receivers = jnp.concatenate([receivers, jnp.arange(n_nodes)], axis=0, dtype=int)
 
         # Pass through torso network.
         torso = build_torso(self.name, self.nets_config, self.n_equivariant_vectors_out, vec_multiplicity_in)
         vectors, h = torso(x, h, senders, receivers)
 
-        if self.nets_config.add_centre_node:
-            vectors, h = vectors[:-1], h[:-1]
 
         chex.assert_rank(vectors, 3)
         chex.assert_rank(h, 2)
