@@ -89,8 +89,8 @@ flow:
       mlp_units: [64, 64]
       stable: true
     non_equivariant_transformer_config:
-      output_dim: 32
-      key_size_per_node_dim_in: 2  # key_size = multiplicity * dim * key_size_per_node_dim_in
+      output_dim: 128
+      key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
       n_layers: 3
       mlp_units: [ 64, 64 ]
       num_heads: 3
@@ -108,7 +108,7 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 7000
+  n_epoch: 14000
   batch_size: 512
   plot_batch_size: 256
   eval_batch_size: 128

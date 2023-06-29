@@ -60,7 +60,7 @@ flow:
       mlp_units: [64, 64]
       stable: true
     non_equivariant_transformer_config:
-      output_dim: 32
+      output_dim: 128
       key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
       n_layers: 3
       mlp_units: [ 64, 64 ]
