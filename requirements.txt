@@ -3,7 +3,6 @@ distrax==0.1.3
 chex==0.1.7
 optax==0.1.4
 numpy==1.22.4
-torch==2.0.0+cpu
 matplotlib
 tqdm
 pandas
