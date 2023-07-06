@@ -67,19 +67,15 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
+
     training_config = dict(cfg.training)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+    logger = setup_logger(cfg)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
@@ -219,19 +215,14 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
     training_config = dict(cfg.training)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+    logger = setup_logger(cfg)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)

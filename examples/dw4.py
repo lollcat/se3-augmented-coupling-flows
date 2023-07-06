@@ -36,8 +36,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.test_set_size = 64
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 32
-    cfg.training.n_epoch = 200
-    cfg.training.save = False
+    # cfg.training.save = False
     cfg.training.n_eval = 4
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 10
@@ -46,7 +45,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['non_equivariant']
+    cfg.flow.type = 'non_equivariant'
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
@@ -72,7 +71,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
@@ -86,7 +85,7 @@ def run(cfg: DictConfig):
     else:
         load_dataset = load_dataset_original
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset,
-                                            target_log_prob_fn=log_prob_fn)
+                                            target_log_prob_fn=log_prob_fn, date_folder=False)
     train(experiment_config)
 
 
