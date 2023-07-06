@@ -1,3 +1,6 @@
+import chex
+chex.set_n_cpu_devices(2)
+
 import hydra
 from omegaconf import DictConfig
 
@@ -31,7 +34,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.fab.buffer_min_length_batches = 4
     cfg.fab.buffer_max_length_batches = 10
 
-    cfg.training.n_epoch = 32
+    cfg.training.n_epoch = 3
     cfg.training.save = True
     cfg.training.resume = True
     cfg.training.plot_batch_size = 4
