@@ -2,6 +2,7 @@
 
 
 # Install
+Uses jax 0.4.8
 For the alanine dipeptide problem we need to install openmmtools with conda:
 `conda install -c conda-forge openmm openmmtools`
 

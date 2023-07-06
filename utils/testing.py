@@ -6,7 +6,7 @@ import optax
 from molboil.utils.test import assert_is_equivariant, assert_is_invariant, random_rotate_translate_permute
 
 from utils.numerical import param_count
-from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, TransformerConfig
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, TransformerConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 

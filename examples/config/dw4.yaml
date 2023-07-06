@@ -95,7 +95,7 @@ training:
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
-  save_dir: /dw4_results/${flow.type}/${training.seed}
+  save_dir: ./dw4_results/${flow.type}/${training.seed}
   resume: false
   runtime_limit: 30.
   use_flow_aux_loss: false
