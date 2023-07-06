@@ -133,8 +133,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}_${training.optimizer.init_lr}_bs${training.batch_size}
+    name: lj13_fab_${flow.type}_${training.seed}_resume0
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,fab,final_run,v2]
+    tags: [lj13,fab,post_sub1,v1]
 

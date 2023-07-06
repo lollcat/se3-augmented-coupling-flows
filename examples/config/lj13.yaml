@@ -110,5 +110,5 @@ logger:
     name: lj13_${flow.type}_seed${training.seed}_typenet${training.nets.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,final_run,ml,v4]
+    tags: [lj13,post_sub1,ml,v1]
 
