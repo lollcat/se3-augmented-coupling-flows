@@ -94,7 +94,7 @@ class EGNN(hk.Module):
         chex.assert_rank(h, 2)
         n_vectors_torso_out = vectors.shape[-2]
 
-        assert n_vectors_torso_out != self.n_equivariant_vectors_out
+        assert n_vectors_torso_out == self.n_equivariant_vectors_out
 
         if self.nets_config.softmax_layer_invariant_feat:
             h = jax.nn.softmax(h, axis=-1)

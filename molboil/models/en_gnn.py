@@ -1,18 +1,15 @@
-from typing import NamedTuple, Callable, Sequence, Tuple, Optional
+from typing import NamedTuple, Callable, Sequence, Tuple
 
 import haiku as hk
 import jax.numpy as jnp
 import jax
 import e3nn_jax as e3nn
 import chex
-import numpy as np
-import warnings
 
 from molboil.models.base import EquivariantForwardFunction
 from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.utils.numerical import safe_norm
 from molboil.models.stable_mlp import StableMLP
-from molboil.utils.graph import get_edge_attr
 
 class EGCL(hk.Module):
     """A version of EGCL coded only with haiku (not e3nn) so works for arbitary dimension of inputs.
@@ -30,12 +27,6 @@ class EGCL(hk.Module):
         variance_scaling_init: float,
         cross_multiplicty_node_feat: bool,
         cross_multiplicity_shifts: bool,
-        use_radial_embedding: bool,
-        max_radius: Optional[float],
-        cross_multp_max_radius_frac: float,
-        n_basis: Optional[int],
-        radial_basis_type: str,
-        n_vectors_hidden_per_vec_in: int
     ):
         """
 
@@ -49,7 +40,6 @@ class EGCL(hk.Module):
             variance_scaling_init (float): Value to scale the output variance of MLP multiplying message vectors
             cross_multiplicty_node_feat (bool): Whether to use cross multiplicity for node features.
             cross_multiplicity_shifts (bool): Whether to use cross multiplicity for shifts.
-            # TODO: documentation
         """
         super().__init__(name=name)
         self.variance_scaling_init = variance_scaling_init
@@ -61,17 +51,6 @@ class EGCL(hk.Module):
         self.normalization_constant = normalization_constant
         self.cross_multiplicty_node_feat = cross_multiplicty_node_feat
         self.cross_multiplicity_shifts = cross_multiplicity_shifts
-        self.n_vectors_hidden_per_vec_in = n_vectors_hidden_per_vec_in
-
-        if use_radial_embedding:
-            assert n_basis is not None
-            assert radial_basis_type is not None
-            assert max_radius is not None
-        self.use_radial_embedding = use_radial_embedding
-        self.n_basis = n_basis
-        self.radial_basis_type = radial_basis_type
-        self.max_radius = max_radius
-        self.cross_multp_max_radius_frac = cross_multp_max_radius_frac
 
 
         self.phi_e = StableMLP(mlp_units, activation=activation_fn, activate_final=True)
@@ -83,10 +62,7 @@ class EGCL(hk.Module):
         if self.cross_multiplicity_shifts:
             self.phi_x_cross_torso = StableMLP(mlp_units, activate_final=True, activation=activation_fn)
 
-    def __call__(self,
-                 node_positions: chex.Array,
-                 node_features: chex.Array,
-                 senders: chex.Array,
+    def __call__(self, node_positions: chex.Array, node_features: chex.Array, senders: chex.Array,
                  receivers: chex.Array) -> Tuple[chex.Array, chex.Array]:
         """E(N)GNN layer implementation.
 
@@ -108,66 +84,24 @@ class EGCL(hk.Module):
         avg_num_neighbours = n_nodes - 1
         chex.assert_tree_shape_suffix(node_features, (self.n_invariant_feat_hidden,))
 
-        # Used to project invariant feat to lower dim to prevent overly wide MLP.
-        inv_feat_lowdim_n = max(self.n_invariant_feat_hidden, self.mlp_units[0]) // 4
-
         # Prepare the edge attributes.
         vectors = node_positions[receivers] - node_positions[senders]
         lengths = safe_norm(vectors, axis=-1, keepdims=False)
+        sq_lengths = lengths ** 2
 
-        if self.use_radial_embedding:
-            scalar_edge_features, edge_weight_cutoff = jax.vmap(get_edge_attr, in_axes=(1, None, None, None),
-                                            out_axes=1)(lengths, self.max_radius, self.n_basis, self.radial_basis_type)
-            max_radial_feat = max(1, self.n_invariant_feat_hidden//n_vectors)
-            if scalar_edge_features.shape[-1] > max_radial_feat:
-                # Project to lower dim to prevent overly wide MLP.
-                scalar_edge_features = hk.Linear(max_radial_feat)(scalar_edge_features)
-            scalar_edge_features = jnp.reshape(scalar_edge_features,
-                                               (scalar_edge_features.shape[0],
-                                                scalar_edge_features.shape[1]*scalar_edge_features.shape[2]))
-        else:
-            scalar_edge_features = lengths**2
-        if scalar_edge_features.shape[-1] > inv_feat_lowdim_n:
-            scalar_edge_features = hk.Linear(inv_feat_lowdim_n)(scalar_edge_features)
-
-        node_feat_low_dim = hk.Linear(inv_feat_lowdim_n)(node_features)
-        edge_feat_in = jnp.concatenate([node_feat_low_dim[senders],
-                                        node_feat_low_dim[receivers],
-                                        scalar_edge_features], axis=-1)
-
+        edge_feat_in = jnp.concatenate([node_features[senders], node_features[receivers], sq_lengths], axis=-1)
 
         if (self.cross_multiplicty_node_feat or self.cross_multiplicity_shifts) and n_vectors > 1:
-            # Create vectors between each multiplicity within each node.
-            senders_cross, receivers_cross = get_senders_and_receivers_fully_connected(n_vectors)
-            cross_vectors = node_positions[:, receivers_cross] - node_positions[:, senders_cross]
+            senders_cross, recievers_cross = get_senders_and_receivers_fully_connected(n_vectors)
+            cross_vectors = node_positions[:, recievers_cross] - node_positions[:, senders_cross]
             n_cross_vectors = n_vectors * (n_vectors - 1)
             chex.assert_shape(cross_vectors, (n_nodes, n_cross_vectors, dim))
-            cross_lengths = safe_norm(cross_vectors, axis=-1, keepdims=False)
             if self.cross_multiplicty_node_feat:
-                if self.use_radial_embedding:
-                    cross_scalar_edge_features, edge_weight_cutoff = jax.vmap(get_edge_attr, in_axes=(1, None, None, None),
-                                                                        out_axes=1)(
-                        cross_lengths,
-                        self.max_radius*self.cross_multp_max_radius_frac,
-                        self.n_basis,
-                        self.radial_basis_type)
-                    cross_scalar_edge_features = hk.Linear(max(self.n_invariant_feat_hidden // (n_cross_vectors*2), 1)
-                                                           )(cross_scalar_edge_features)
-                    # Project to lower dim to prevent overly wide MLP.
-                    cross_scalar_edge_features = jnp.reshape(cross_scalar_edge_features,
-                                                       (cross_scalar_edge_features.shape[0],
-                                                        cross_scalar_edge_features.shape[1]
-                                                        * cross_scalar_edge_features.shape[2]))
-                else:
-                    cross_scalar_edge_features = cross_lengths**2  # node features [n_nodes, n_cross_vectors]
-
-                # Project to lower dim to prevent overly wide MLP.
-                cross_scalar_edge_features = hk.Linear(inv_feat_lowdim_n)(cross_scalar_edge_features)
-                edge_feat_in = jnp.concatenate([edge_feat_in, cross_scalar_edge_features[senders],
-                                                cross_scalar_edge_features[receivers]],
+                cross_lengths = safe_norm(cross_vectors, axis=-1, keepdims=False)
+                cross_sq_lengths = cross_lengths**2  # node features [n_nodes, n_cross_vectors]
+                edge_feat_in = jnp.concatenate([edge_feat_in, cross_sq_lengths[senders], cross_sq_lengths[receivers]],
                                                axis=-1)
 
-        print(f"m_ij in (edge mlp in) shape {edge_feat_in.shape}")
         # build messages
         m_ij = self.phi_e(edge_feat_in)
 
@@ -197,10 +131,9 @@ class EGCL(hk.Module):
             cross_shifts_im = (
                 phi_x_cross_out[:, :, None]
                 * cross_vectors
-                / (self.normalization_constant + cross_lengths[:, :, None])
+                / (self.normalization_constant + cross_sq_lengths[:, :, None])
             )
-            cross_shifts_i = e3nn.scatter_sum(jnp.swapaxes(cross_shifts_im, 0, 1), dst=receivers_cross,
-                                              output_size=n_vectors)
+            cross_shifts_i = e3nn.scatter_sum(jnp.swapaxes(cross_shifts_im, 0, 1), dst=recievers_cross, output_size=n_vectors)
             cross_shifts_i = jnp.swapaxes(cross_shifts_i, 0, 1)
             chex.assert_equal_shape((cross_shifts_i, vectors_out))
             vectors_out = vectors_out + cross_shifts_i / (n_vectors - 1)
@@ -237,23 +170,19 @@ class EGNNTorsoConfig(NamedTuple):
     variance_scaling_init: float = 0.001
     cross_multiplicty_node_feat: bool = True
     cross_multiplicity_shifts: bool = True
-    use_radial_embedding: bool = False
-    max_radius: Optional[float] = None
-    n_basis: Optional[int] = None
-    radial_basis_type: str = "smooth_finite"
-    cross_multp_max_radius_frac: float = 1/2 # Distances across multiplicities are typically smaller than across nodes.
 
     def get_EGCL_kwargs(self, i):
         kwargs = self._asdict()
         del kwargs["n_blocks"]
         kwargs["name"] = kwargs["name"] + f"_{i}"
+        del kwargs["n_vectors_hidden_per_vec_in"]
         return kwargs
-
 
 
 def make_egnn_torso_forward_fn(
     torso_config: EGNNTorsoConfig,
 ) -> EquivariantForwardFunction:
+
     def forward_fn(
         positions: chex.Array,
         node_features: chex.Array,
@@ -271,9 +200,7 @@ def make_egnn_torso_forward_fn(
         vectors = positions - positions.mean(axis=0, keepdims=True)
 
         # Create n-multiplicity copies of h and vectors.
-        vectors = jnp.repeat(vectors[:, :, None], torso_config.n_vectors_hidden_per_vec_in, axis=2)
-        vectors = jnp.reshape(vectors, (n_nodes, vec_multiplicity_in*torso_config.n_vectors_hidden_per_vec_in, dim))
-
+        vectors = jnp.repeat(vectors, torso_config.n_vectors_hidden_per_vec_in, axis=1)
         initial_vectors = vectors
         h = hk.Linear(torso_config.n_invariant_feat_hidden)(node_features)
 
