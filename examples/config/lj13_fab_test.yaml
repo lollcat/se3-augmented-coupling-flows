@@ -117,7 +117,7 @@ training:
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
-  save_dir: /lj13fab_results/${flow.type}/${training.seed}
+  save_dir: ./lj13fab_results/${flow.type}/${training.seed}
   resume: true
   runtime_limit: 31.
   use_flow_aux_loss: true
