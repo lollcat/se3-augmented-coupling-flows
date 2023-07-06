@@ -22,7 +22,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = 2
     cfg.training.batch_size = 2
-    cfg.flow.type = 'nice'
+    cfg.flow.type = 'spherical'
     cfg.flow.n_aug = 1
     cfg.fab.eval_inner_batch_size = 2
     cfg.fab.eval_total_batch_size = 4
@@ -32,7 +32,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.fab.buffer_max_length_batches = 10
 
     cfg.training.n_epoch = 32
-    cfg.training.save = False
+    cfg.training.save = True
+    cfg.training.resume = True
     cfg.training.plot_batch_size = 4
     cfg.logger = DictConfig({"list_logger": None})
 

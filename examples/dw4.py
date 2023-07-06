@@ -36,7 +36,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.test_set_size = 64
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 32
-    cfg.training.save = False
+    cfg.training.eval_batch_size=8
+    # cfg.training.save = False
     cfg.training.n_eval = 4
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 10
@@ -50,6 +51,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
     cfg.flow.kwargs.spherical.spline_num_bins = 3
+    cfg.training.resume = True
+    cfg.training.n_epoch = 202
 
 
     # Configure NNs
