@@ -12,7 +12,8 @@ pytest
 hydra-core
 hydra-joblib-launcher
 joblib
-e3nn-jax
+e3nn-jax==0.17.2
 mdtraj
 tables
 git+https://github.com/VincentStimper/boltzmann-generators
+git+https://github.com/ACEsuit/mace-jax
