@@ -48,7 +48,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
     return cfg
 
-@hydra.main(config_path="./config", config_name="lj13_fab_test.yaml")
+@hydra.main(config_path="./config", config_name="lj13_fab.yaml")
 def run(cfg: DictConfig):
     local_config = False
     if local_config:
