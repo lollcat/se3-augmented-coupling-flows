@@ -1,6 +1,3 @@
-import chex
-chex.set_n_cpu_devices(2)
-
 import hydra
 from omegaconf import DictConfig
 
