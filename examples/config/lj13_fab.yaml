@@ -106,14 +106,14 @@ training:
     max_param_grad: null
     dynamic_grad_ignore_and_clip: true
   use_64_bit: false
-  n_epoch: 7000 # approx how many iter we can do in the training time
+  n_epoch: 14000 # approx how many iter we can do in the training time
   batch_size: 512
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 10
+  n_checkpoints: 20
   n_eval: 20
   K_marginal_log_lik: 20
   save: true
