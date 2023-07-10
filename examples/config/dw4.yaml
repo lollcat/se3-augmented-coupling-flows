@@ -28,7 +28,7 @@ flow:
   scaling_layer: false
   scaling_layer_conditioned: true
   identity_init: true
-  type: spherical #  nice proj spherical along_vector non_equivariant
+  type: spherical # spherical,proj,along_vector,non_equivariant  nice
   kwargs:
     non_equivariant:
       transform_type: real_nvp # spline or real_nvp
