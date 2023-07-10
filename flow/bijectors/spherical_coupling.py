@@ -128,7 +128,8 @@ class SphericalSplitCoupling(BijectorWithExtra):
             return Extra()
         else:
             # Vmap over n_nodes, multiplicity, and n_inner_transforms.
-            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(various_x_points)
+            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(
+                various_x_points)
             info = {}
             info_aggregator = {}
             info_aggregator.update(
