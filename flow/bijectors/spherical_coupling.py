@@ -110,13 +110,15 @@ class SphericalSplitCoupling(BijectorWithExtra):
         n_vectors, dim = basis_vectors.shape
         assert dim == 3
         assert n_vectors == 3
-        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
+        basis_vectors = basis_vectors
         vec1 = basis_vectors[1]
         vec2 = basis_vectors[2]
         arccos_in = jnp.dot(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
         theta = jnp.arccos(arccos_in)
         log_barrier_in = 1 - jnp.abs(arccos_in)
-        log_barrier_in = jnp.where(log_barrier_in < 1e-6, log_barrier_in + 1e-6, log_barrier_in)
+
+        # Don't penalize when very close (or on top of each other, to keep grads stable).
+        log_barrier_in = jnp.where(log_barrier_in < 1e-8, jnp.ones_like(log_barrier_in), log_barrier_in)
         aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
 
