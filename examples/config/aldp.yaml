@@ -47,7 +47,6 @@ flow:
       num_bins: 8
       lower: -10.
       upper: 10.
-      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn # mace or egnn or e3transformer or e3gnn
     embedding_dim: 32

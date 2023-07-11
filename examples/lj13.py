@@ -24,7 +24,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = 2
     cfg.training.batch_size = 2
-    cfg.flow.type = 'spherical'
+    cfg.flow.type = 'proj'  # 'spherical'
     cfg.flow.kwargs.spherical.spline_num_bins = 3
     cfg.flow.n_aug = 1
 
@@ -52,7 +52,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="lj13.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 
