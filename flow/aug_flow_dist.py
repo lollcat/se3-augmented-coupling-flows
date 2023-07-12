@@ -1,4 +1,4 @@
-from typing import NamedTuple, Callable, Tuple, Union, Any, Optional
+from typing import NamedTuple, Callable, Tuple, Any, Optional
 
 import chex
 import distrax
@@ -35,7 +35,7 @@ class AugmentedFlowRecipe(NamedTuple):
     config: Any
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
-    compile_n_unroll: int = 2
+    compile_n_unroll: int = 1
 
 
 class AugmentedFlowParams(NamedTuple):
