@@ -1,4 +1,5 @@
-#defaults:
+defaults:
+  - training/optimizer: default_lr_schedule
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -94,16 +95,6 @@ flow:
 
 
 training:
-  optimizer:
-    init_lr: 6e-5
-    optimizer_name: adam
-    use_schedule: true
-    peak_lr: 2e-4
-    end_lr: 6e-5
-    warmup_n_epoch: 10
-    max_global_norm: null
-    max_param_grad: null
-    dynamic_grad_ignore_and_clip: true
   use_64_bit: false
   n_epoch: 14000 # approx how many iter we can do in the training time
   batch_size: 512
