@@ -3,7 +3,7 @@ optimizer_name: adam
 use_schedule: true
 peak_lr: 2e-4
 end_lr: 2e-5
-warmup_n_epoch: 10
+warmup_n_epoch: 30
 max_global_norm: null
 max_param_grad: null
 dynamic_grad_ignore_and_clip: true
