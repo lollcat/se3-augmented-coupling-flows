@@ -2,9 +2,8 @@
 
 
 # Install
-Uses jax 0.4.8
 ```
-conda install jaxlib=*=*cuda* jax=0.4.8 cuda-nvcc -c conda-forge -c nvidia
+conda install jaxlib=*=*cuda* jax cuda-nvcc -c conda-forge -c nvidia
 ```
 Has dependency on pytorch (NB: use CPU version).
 ```
