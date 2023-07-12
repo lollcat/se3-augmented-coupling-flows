@@ -33,7 +33,7 @@ training:
   use_flow_aux_loss: true
   aux_loss_weight: 10.0
   last_iter_info_only: true
-  debug: false
+  use_scan: false
   verbose_info: true
   data_augmentation_for_non_eq: true
   factor_to_train_non_eq_flow: 4

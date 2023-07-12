@@ -176,10 +176,14 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                       apply_random_rotation=data_augmentation)
     training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
                                verbose_info=cfg.training.verbose_info)
-    scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
-                                         data=train_data,
-                                         last_iter_info_only=cfg.training.last_iter_info_only,
-                                         batch_size=batch_size)
+
+    if cfg.training.use_scan:
+        scan_epoch_fn = create_scan_epoch_fn(training_step_fn,
+                                             data=train_data,
+                                             last_iter_info_only=cfg.training.last_iter_info_only,
+                                             batch_size=batch_size)
+    else:
+        training_step_fn = jax.jit(training_step_fn)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:
         key1, key2 = jax.random.split(key)
@@ -188,9 +192,9 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         return TrainingState(params, opt_state, key2)
 
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
-        if not cfg.training.debug:
+        if cfg.training.use_scan:
             params, opt_state, key, info = scan_epoch_fn(state.params, state.opt_state, state.key)
-        else:  # If we want to debug.
+        else:
             batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size)
             params = state.params
             opt_state = state.opt_state
