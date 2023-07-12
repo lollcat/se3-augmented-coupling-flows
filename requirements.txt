@@ -17,3 +17,4 @@ joblib
 mdtraj
 tables
 git+https://github.com/VincentStimper/boltzmann-generators
+git+https://github.com/lollcat/fab-jax
