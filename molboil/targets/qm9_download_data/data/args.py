@@ -20,28 +20,28 @@ def setup_shared_args(parser):
     """
     # Optimizer options
     parser.add_argument('--num-epoch', type=int, default=255, metavar='N',
-                        help='number of epochs to train (default: 511)')
+                        help='number of epochs to train (default.yaml: 511)')
     parser.add_argument('--batch-size', '-bs', type=int, default=25, metavar='N',
-                        help='Mini-batch size (default: 25)')
+                        help='Mini-batch size (default.yaml: 25)')
     parser.add_argument('--alpha', type=float, default=0.9, metavar='N',
-                        help='Value of alpha to use for exponential moving average of training loss. (default: 0.9)')
+                        help='Value of alpha to use for exponential moving average of training loss. (default.yaml: 0.9)')
 
     parser.add_argument('--weight-decay', type=float, default=0, metavar='N',
-                        help='Set the weight decay used in optimizer (default: 0)')
+                        help='Set the weight decay used in optimizer (default.yaml: 0)')
     parser.add_argument('--cutoff-decay', type=float, default=0, metavar='N',
-                        help='Set the weight decay used in optimizer for learnable radial cutoffs (default: 0)')
+                        help='Set the weight decay used in optimizer for learnable radial cutoffs (default.yaml: 0)')
     parser.add_argument('--lr-init', type=float, default=1e-3, metavar='N',
-                        help='Initial learning rate (default: 1e-3)')
+                        help='Initial learning rate (default.yaml: 1e-3)')
     parser.add_argument('--lr-final', type=float, default=1e-5, metavar='N',
-                        help='Final (held) learning rate (default: 1e-5)')
+                        help='Final (held) learning rate (default.yaml: 1e-5)')
     parser.add_argument('--lr-decay', type=int, default=inf, metavar='N',
-                        help='Timescale over which to decay the learning rate (default: inf)')
+                        help='Timescale over which to decay the learning rate (default.yaml: inf)')
     parser.add_argument('--lr-decay-type', type=str, default='cos', metavar='str',
-                        help='Type of learning rate decay. (cos | linear | exponential | pow | restart) (default: cos)')
+                        help='Type of learning rate decay. (cos | linear | exponential | pow | restart) (default.yaml: cos)')
     parser.add_argument('--lr-minibatch', '--lr-mb', action=BoolArg, default=True,
                         help='Decay learning rate every minibatch instead of epoch.')
     parser.add_argument('--sgd-restart', type=int, default=-1, metavar='int',
-                        help='Restart SGD optimizer every (lr_decay)^p epochs, where p=sgd_restart. (-1 to disable) (default: -1)')
+                        help='Restart SGD optimizer every (lr_decay)^p epochs, where p=sgd_restart. (-1 to disable) (default.yaml: -1)')
 
     parser.add_argument('--optim', type=str, default='amsgrad', metavar='str',
                         help='Set optimizer. (SGD, AMSgrad, Adam, RMSprop)')
@@ -54,9 +54,9 @@ def setup_shared_args(parser):
 
     # Saving and logging options
     parser.add_argument('--save', action=BoolArg, default=True,
-                        help='Save checkpoint after each epoch. (default: True)')
+                        help='Save checkpoint after each epoch. (default.yaml: True)')
     parser.add_argument('--load', action=BoolArg, default=False,
-                        help='Load from previous checkpoint. (default: False)')
+                        help='Load from previous checkpoint. (default.yaml: False)')
 
     parser.add_argument('--test', action=BoolArg, default=True,
                         help='Perform automated network testing. (Default: True)')
@@ -68,59 +68,59 @@ def setup_shared_args(parser):
                         help='Log a summary of each mini-batch to a text file.')
 
     parser.add_argument('--predict', action=BoolArg, default=True,
-                        help='Save predictions. (default)')
+                        help='Save predictions. (default.yaml)')
 
     ### Arguments for files to save things to
     # Job prefix is used to name checkpoint/best file
     parser.add_argument('--prefix', '--jobname', type=str, default='nosave',
-                        help='Prefix to set load, save, and logfile. (default: nosave)')
+                        help='Prefix to set load, save, and logfile. (default.yaml: nosave)')
 
     # Allow to manually specify file to load
     parser.add_argument('--loadfile', type=str, default='',
-                        help='Set checkpoint file to load. Leave empty to auto-generate from prefix. (default: (empty))')
+                        help='Set checkpoint file to load. Leave empty to auto-generate from prefix. (default.yaml: (empty))')
     # Filename to save model checkpoint to
     parser.add_argument('--checkfile', type=str, default='',
-                        help='Set checkpoint file to save checkpoints to. Leave empty to auto-generate from prefix. (default: (empty))')
+                        help='Set checkpoint file to save checkpoints to. Leave empty to auto-generate from prefix. (default.yaml: (empty))')
     # Filename to best model checkpoint to
     parser.add_argument('--bestfile', type=str, default='',
-                        help='Set checkpoint file to best model to. Leave empty to auto-generate from prefix. (default: (empty))')
+                        help='Set checkpoint file to best model to. Leave empty to auto-generate from prefix. (default.yaml: (empty))')
     # Filename to save logging information to
     parser.add_argument('--logfile', type=str, default='',
-                        help='Duplicate logging.info output to logfile. Set to empty string to generate from prefix. (default: (empty))')
+                        help='Duplicate logging.info output to logfile. Set to empty string to generate from prefix. (default.yaml: (empty))')
     # Filename to save predictions to
     parser.add_argument('--predictfile', type=str, default='',
-                        help='Save predictions to file. Set to empty string to generate from prefix. (default: (empty))')
+                        help='Save predictions to file. Set to empty string to generate from prefix. (default.yaml: (empty))')
 
     # Working directory to place all files
     parser.add_argument('--workdir', type=str, default='./',
-                        help='Working directory as a default location for all files. (default: ./)')
+                        help='Working directory as a default.yaml location for all files. (default.yaml: ./)')
     # Directory to place logging information
     parser.add_argument('--logdir', type=str, default='log/',
-                        help='Directory to place log and savefiles. (default: log/)')
+                        help='Directory to place log and savefiles. (default.yaml: log/)')
     # Directory to place saved models
     parser.add_argument('--modeldir', type=str, default='model/',
-                        help='Directory to place log and savefiles. (default: model/)')
+                        help='Directory to place log and savefiles. (default.yaml: model/)')
     # Directory to place model predictions
     parser.add_argument('--predictdir', type=str, default='predict/',
-                        help='Directory to place log and savefiles. (default: predict/)')
+                        help='Directory to place log and savefiles. (default.yaml: predict/)')
     # Directory to read and save data from
     parser.add_argument('--datadir', type=str, default='qm9_download_data/temp',
-                        help='Directory to look up data from. (default: data/)')
+                        help='Directory to look up data from. (default.yaml: data/)')
 
     # Dataset options
     parser.add_argument('--num-train', type=int, default=-1, metavar='N',
-                        help='Number of samples to train on. Set to -1 to use entire dataset. (default: -1)')
+                        help='Number of samples to train on. Set to -1 to use entire dataset. (default.yaml: -1)')
     parser.add_argument('--num-valid', type=int, default=-1, metavar='N',
-                        help='Number of validation samples to use. Set to -1 to use entire dataset. (default: -1)')
+                        help='Number of validation samples to use. Set to -1 to use entire dataset. (default.yaml: -1)')
     parser.add_argument('--num-test', type=int, default=-1, metavar='N',
-                        help='Number of test samples to use. Set to -1 to use entire dataset. (default: -1)')
+                        help='Number of test samples to use. Set to -1 to use entire dataset. (default.yaml: -1)')
 
     parser.add_argument('--force-download', action=BoolArg, default=False,
                         help='Force download and processing of dataset.')
 
     # Computation options
     parser.add_argument('--cuda', dest='cuda', action='store_true',
-                        help='Use CUDA (default)')
+                        help='Use CUDA (default.yaml)')
     parser.add_argument('--no-cuda', '--cpu', dest='cuda', action='store_false',
                         help='Use CPU')
     parser.set_defaults(cuda=True)
@@ -136,45 +136,45 @@ def setup_shared_args(parser):
 
     # Model options
     parser.add_argument('--num-cg-levels', type=int, default=4, metavar='N',
-                        help='Number of CG levels (default: 4)')
+                        help='Number of CG levels (default.yaml: 4)')
 
     parser.add_argument('--maxl', nargs='*', type=int, default=[3], metavar='N',
-                        help='Cutoff in CG operations (default: [3])')
+                        help='Cutoff in CG operations (default.yaml: [3])')
     parser.add_argument('--max-sh', nargs='*', type=int, default=[3], metavar='N',
-                        help='Number of spherical harmonic powers to use (default: [3])')
+                        help='Number of spherical harmonic powers to use (default.yaml: [3])')
     parser.add_argument('--num-channels', nargs='*', type=int, default=[10], metavar='N',
-                        help='Number of channels to allow after mixing (default: [10])')
+                        help='Number of channels to allow after mixing (default.yaml: [10])')
     parser.add_argument('--level-gain', nargs='*', type=float, default=[10.], metavar='N',
-                        help='Gain at each level (default: [10.])')
+                        help='Gain at each level (default.yaml: [10.])')
 
     parser.add_argument('--charge-power', type=int, default=2, metavar='N',
-                        help='Maximum power to take in one-hot (default: 2)')
+                        help='Maximum power to take in one-hot (default.yaml: 2)')
 
     parser.add_argument('--hard-cutoff', dest='hard_cut_rad',
                         type=float, default=1.73, nargs='*', metavar='N',
-                        help='Radius of HARD cutoff in Angstroms (default: 1.73)')
+                        help='Radius of HARD cutoff in Angstroms (default.yaml: 1.73)')
     parser.add_argument('--soft-cutoff', dest='soft_cut_rad', type=float,
                         default=1.73, nargs='*', metavar='N',
-                        help='Radius of SOFT cutoff in Angstroms (default: 1.73)')
+                        help='Radius of SOFT cutoff in Angstroms (default.yaml: 1.73)')
     parser.add_argument('--soft-width', dest='soft_cut_width',
                         type=float, default=0.2, nargs='*', metavar='N',
-                        help='Width of SOFT cutoff in Angstroms (default: 0.2)')
+                        help='Width of SOFT cutoff in Angstroms (default.yaml: 0.2)')
     parser.add_argument('--cutoff-type', '--cutoff', type=str, default=['learn'], nargs='*', metavar='str',
                         help='Types of cutoffs to include')
 
     parser.add_argument('--basis-set', '--krange', type=int, default=[3, 3], nargs=2, metavar='N',
-                        help='Radial function basis set (m, n) size (default: [3, 3])')
+                        help='Radial function basis set (m, n) size (default.yaml: [3, 3])')
 
     # TODO: Update(?)
     parser.add_argument('--weight-init', type=str, default='rand', metavar='str',
-                        help='Weight initialization function to use (default: rand)')
+                        help='Weight initialization function to use (default.yaml: rand)')
 
     parser.add_argument('--input', type=str, default='linear',
-                        help='Function to apply to process l0 input (linear | MPNN) default: linear')
+                        help='Function to apply to process l0 input (linear | MPNN) default.yaml: linear')
     parser.add_argument('--num-mpnn-levels', type=int, default=1,
-                        help='Number levels to use in input featurization MPNN. (default: 1)')
+                        help='Number levels to use in input featurization MPNN. (default.yaml: 1)')
     parser.add_argument('--top', '--output', type=str, default='linear',
-                        help='Top function to use (linear | PMLP) default: linear')
+                        help='Top function to use (linear | PMLP) default.yaml: linear')
 
     parser.add_argument('--gaussian-mask', action='store_true',
                         help='Use gaussian mask instead of sigmoid mask.')
@@ -223,7 +223,7 @@ class BoolArg(argparse.Action):
         if nargs is not None:
             raise ValueError("nargs not allowed")
 
-        # Set default
+        # Set default.yaml
         if default is None:
             raise ValueError("Default must be set!")
 
@@ -237,7 +237,7 @@ class BoolArg(argparse.Action):
             # If called with an argument, convert to bool
             argval = _arg_to_bool(argstring)
         else:
-            # BoolArg will invert default option
+            # BoolArg will invert default.yaml option
             argval = True
 
         setattr(namespace, self.dest, argval)

@@ -25,7 +25,7 @@ def make_get_data_for_plotting(
         max_n_samples: int = 10000,
         plotting_n_nodes: Optional[int] = None,
         max_distance: Optional[float] = 20.,
-):  # Override default plotter
+):  # Override default.yaml plotter
     bins_x, count_list = bin_samples_by_dist([train_data.positions[:max_n_samples],
                                               test_data.positions[:max_n_samples]], max_distance=max_distance)
     n_samples = n_samples_from_flow

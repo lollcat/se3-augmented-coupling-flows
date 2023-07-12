@@ -1,0 +1,3 @@
+aux:
+  conditioned_on_x: true
+  scale_init: 0.1
