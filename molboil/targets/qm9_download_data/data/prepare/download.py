@@ -40,7 +40,7 @@ def prepare_dataset(datadir, dataset, subset=None, splits=None, cleanup=True, fo
     else:
         dataset_dir = [datadir, dataset]
 
-    # Names of splits, based upon keys if split dictionary exists, elsewise default.yaml to train/valid/test.
+    # Names of splits, based upon keys if split dictionary exists, elsewise default to train/valid/test.
     split_names = splits.keys() if splits is not None else [
         'train', 'valid', 'test']
 
