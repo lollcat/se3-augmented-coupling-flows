@@ -321,16 +321,16 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             #         eval_on_test_batch_fn=eval_on_test_batch_fn,
             #         eval_batch_free_fn=None,
             #         batch_size=cfg.training.eval_batch_size)
-            eval_info_fab = fab_eval_function(
-                state=state, key=key, flow=flow,
-                smc=smc_eval,
-                log_p_x=target_log_p_x_fn,
-                features=train_data.features[0],
-                batch_size=cfg.fab.eval_total_batch_size,
-                inner_batch_size=cfg.fab.eval_inner_batch_size
-            )
-            eval_info.update(eval_info_fab)
-            eval_info = jax.lax.pmean(eval_info_fab, axis_name=pmap_axis_name)
+            # eval_info_fab = fab_eval_function(
+            #     state=state, key=key, flow=flow,
+            #     smc=smc_eval,
+            #     log_p_x=target_log_p_x_fn,
+            #     features=train_data.features[0],
+            #     batch_size=cfg.fab.eval_total_batch_size,
+            #     inner_batch_size=cfg.fab.eval_inner_batch_size
+            # )
+            # eval_info.update(eval_info_fab)
+            # eval_info = jax.lax.pmean(eval_info_fab, axis_name=pmap_axis_name)
             return eval_info
 
         def evaluation_fn(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
