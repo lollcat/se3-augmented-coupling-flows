@@ -32,7 +32,7 @@ training:
   save: true
   save_dir: ./lj13fab_results/${flow.type}/${training.seed}
   resume: true
-  runtime_limit: 31.
+  runtime_limit: null
   use_flow_aux_loss: true
   aux_loss_weight: 1.0
   last_iter_info_only: true
