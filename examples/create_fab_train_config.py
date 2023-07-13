@@ -305,7 +305,7 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        K_per_device = np.roundup(cfg.training.K_marginal_log_lik / n_devices)
+        K_per_device = int(np.ceil(cfg.training.K_marginal_log_lik / n_devices))
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=K_per_device, test_invariances=True)
 
@@ -329,11 +329,12 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
                 inner_batch_size=cfg.fab.eval_inner_batch_size
             )
             eval_info.update(eval_info_fab)
+            eval_info = jax.lax.pmean(eval_info_fab, axis_name=pmap_axis_name)
             return eval_info
 
         def evaluation_fn(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
             keys = jax.random.split(key, n_devices)
-            info = jax.pmap(evaluation_fn_single_device)(state, keys)
+            info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(state, keys)
             return get_from_first_device(info, as_numpy=True)
 
     # Plot single device.

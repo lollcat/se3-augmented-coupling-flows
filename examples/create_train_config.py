@@ -344,6 +344,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                         flow=flow,
                                         K = cfg.training.K_marginal_log_lik,
                                         test_invariances=True)
+        info = jax.lax.pmean(info, axis_name=pmap_axis_name)
         return info
 
 
