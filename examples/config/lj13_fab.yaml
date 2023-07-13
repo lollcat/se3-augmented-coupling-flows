@@ -20,9 +20,9 @@ flow:
 training:
   use_64_bit: false
   n_epoch: 14000 # approx how many iter we can do in the training time
-  batch_size: 64
-  eval_batch_size: 64
-  plot_batch_size: 64
+  batch_size: 32
+  eval_batch_size: 32
+  plot_batch_size: 32
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
