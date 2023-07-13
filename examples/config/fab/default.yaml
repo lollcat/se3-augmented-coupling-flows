@@ -20,5 +20,5 @@ transition_operator:
 alpha: 2.  # alpha-divergence param
 n_intermediate_distributions: 8
 spacing_type: linear
-eval_inner_batch_size: 200
+eval_inner_batch_size: 128
 eval_total_batch_size: 10000

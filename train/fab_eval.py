@@ -3,6 +3,7 @@ from typing import Union, Tuple
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 from fabjax.sampling.smc import SequentialMonteCarloSampler
 from fabjax.sampling.resampling import log_effective_sample_size
 
@@ -46,7 +47,7 @@ def fab_eval_function(state: Union[TrainStateNoBuffer, TrainStateWithBuffer],
         return None, (log_w_flow, log_w)
 
     # Run scan function.
-    n_batches = (batch_size // inner_batch_size) + 1
+    n_batches = int(np.ceil(batch_size // inner_batch_size))
     _, (log_w_flow, log_w_ais) = jax.lax.scan(inner_fn, init=None, xs=jax.random.split(key, n_batches))
 
     # Compute metrics
