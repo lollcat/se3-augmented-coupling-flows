@@ -1,4 +1,5 @@
 defaults:
+  - training: default
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
@@ -13,7 +14,6 @@ flow:
   nodes: 19
 
 training:
-  use_64_bit: false
   n_epoch: 900
   batch_size: 32
   plot_batch_size: 128
@@ -21,20 +21,7 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  n_checkpoints: 10
-  n_eval: 15
-  K_marginal_log_lik: 20
-  save: true
-  save_dir: ./qm9pos_results/${flow.type}/${training.seed}
-  resume: false
-  runtime_limit: null
-  use_flow_aux_loss: true
   aux_loss_weight: 10.0
-  last_iter_info_only: true
-  use_scan: true
-  verbose_info: false
-  data_augmentation_for_non_eq: true
-  factor_to_train_non_eq_flow: 4
 
 logger:
 #  list_logger: null

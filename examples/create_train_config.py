@@ -2,6 +2,7 @@ from typing import Tuple, Optional
 
 import chex
 import jax
+import wandb
 import warnings
 import matplotlib.pyplot as plt
 import os
@@ -126,14 +127,16 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
-    logger = setup_logger(cfg)
 
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     batch_size = min(cfg.training.batch_size, train_data.positions.shape[0])
@@ -269,12 +272,15 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
-    logger = setup_logger(cfg)
 
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)

@@ -1,4 +1,5 @@
 defaults:
+  - training: default
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
@@ -14,7 +15,6 @@ flow:
 
 
 training:
-  use_64_bit: false
   n_epoch: 400
   batch_size: 32
   eval_batch_size: 128
@@ -22,21 +22,9 @@ training:
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 10
-  n_eval: 10
-  eval_model_samples: 10_000
-  K_marginal_log_lik: 20
-  save: true
-  save_dir: ./lj13_results/${flow.type}/${training.seed}
-  resume: false
-  runtime_limit: null
   use_flow_aux_loss: true
   aux_loss_weight: 10.0
-  last_iter_info_only: true
-  use_scan: true
-  verbose_info: true
-  data_augmentation_for_non_eq: true
-  factor_to_train_non_eq_flow: 4
+
 
 logger:
 #  list_logger: null

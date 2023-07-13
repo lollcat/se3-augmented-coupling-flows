@@ -1,4 +1,5 @@
 defaults:
+  - training: default
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
@@ -23,7 +24,6 @@ flow:
   nodes: 4
 
 training:
-  use_64_bit: false
   n_epoch: 14000
   batch_size: 128
   plot_batch_size: 256
@@ -31,20 +31,9 @@ training:
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 10
-  n_eval: 8
-  K_marginal_log_lik: 20
-  save: true
-  save_dir: ./dw4_results/${flow.type}/${training.seed}
-  resume: false
-  runtime_limit: null
+  n_eval: 10
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
-  last_iter_info_only: true
-  use_scan: false
-  verbose_info: true
-  data_augmentation_for_non_eq: false
-  factor_to_train_non_eq_flow: 4
 
 
 logger:
