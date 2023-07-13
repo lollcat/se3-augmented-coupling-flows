@@ -198,8 +198,6 @@ def create_scan_epoch_fn(
 
 # Evaluation
 
-
-@partial(jax.jit, static_argnums=(3, 4, 5))
 def eval_fn(
     x: FullGraphSample,
     key: chex.PRNGKey,

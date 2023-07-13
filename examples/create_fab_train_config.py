@@ -1,7 +1,7 @@
 from typing import Tuple, Optional, Union
 
 import chex
-import wandb
+import numpy as np
 import os
 import pathlib
 import jax
@@ -305,8 +305,9 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
+        K_per_device = np.roundup(cfg.training.K_marginal_log_lik / n_devices)
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+                                        flow=flow, K=K_per_device, test_invariances=True)
 
         # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,

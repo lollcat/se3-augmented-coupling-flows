@@ -221,6 +221,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         else:
             eval_batch_free_fn = None
 
+        @jax.jit
         def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
