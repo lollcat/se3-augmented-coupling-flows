@@ -41,7 +41,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_${flow.nets.type}_AUG${flow.n_aug}
+    name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,post_sub1,ml,v1]
+    tags: [qm9pos,ml,post_sub,cblgpu]

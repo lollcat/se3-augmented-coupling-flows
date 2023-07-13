@@ -48,8 +48,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_${flow.type}_Ntrain${training.train_set_size}
+    name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,post_sub1,ml,v1]
+    tags: [dw4,ml,post_sub,cblgpu]
 
