@@ -25,7 +25,7 @@ flow:
 training:
   use_64_bit: false
   n_epoch: 14000
-  batch_size: 512
+  batch_size: 128
   plot_batch_size: 256
   eval_batch_size: 128
   seed: 0

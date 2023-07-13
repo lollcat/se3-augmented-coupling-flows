@@ -2,6 +2,7 @@
 
 
 # Install
+At time of publishing was using jax 0.4.13
 ```
 conda install jaxlib=*=*cuda* jax cuda-nvcc -c conda-forge -c nvidia
 ```
