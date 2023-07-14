@@ -60,7 +60,7 @@ def make_spherical_coupling_layer(
                 range_min=-jnp.pi,
                 range_max=jnp.pi,
                 boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size=(2*jnp.pi) * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector],
                 split_indices=[1, ],
@@ -72,13 +72,13 @@ def make_spherical_coupling_layer(
                 range_min=0,
                 range_max=jnp.pi,
                 boundary_slopes='unconstrained',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size=jnp.pi * 1e-4)
             torsional_bijector = distrax.RationalQuadraticSpline(
                 params[:, :, 2:3, :],
                 range_min=-jnp.pi,
                 range_max=jnp.pi,
                 boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size= 2 * jnp.pi * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector, torsional_bijector],
                 split_indices=[1,2],
