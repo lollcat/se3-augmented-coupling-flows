@@ -3,11 +3,11 @@ import pandas as pd
 from examples.analyse_results.get_wandb_runs import get_run_history
 
 
-_TAGS = ['final_run']
+_TAGS = ["ml", "post_sub", "cblgpu"]
 
 def download_eval_metrics(problem="dw4", n_runs=3):
     flow_types = ['spherical', 'along_vector', 'proj', 'non_equivariant']
-    seeds = [0, 1, 2, 3, 4]
+    seeds = [0, 1, 2]
     tags = _TAGS.copy()
     tags.append(problem)
     data = pd.DataFrame()
@@ -17,9 +17,10 @@ def download_eval_metrics(problem="dw4", n_runs=3):
         n_runs_found = 0
         for seed in seeds:
             try:
-                hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap',
-                                                                      'ess', '_runtime', "_step"] if problem in ["dw4", "lj13"] else
-                ['marginal_log_lik', 'lower_bound_marginal_gap', '_runtime', "_step"])
+                fields = ['marginal_log_lik', 'lower_bound_marginal_gap', 'ess', '_runtime', "_step"] \
+                    if problem in ["dw4", "lj13"] else \
+                    ['marginal_log_lik', 'lower_bound_marginal_gap', '_runtime', "_step"]
+                hist = get_run_history(flow_type, tags, seed, fields=fields)
 
                 info = dict(hist.iloc[-1])
                 if info["_step"] == 0:
@@ -27,6 +28,7 @@ def download_eval_metrics(problem="dw4", n_runs=3):
                     continue
                 info.update(flow_type=flow_type, seed=seed)
                 data = data.join(pd.Series(info, name=i), how="outer")
+                data.loc[fields] = data.loc[fields].astype("float32")
                 i += 1
                 n_runs_found += 1
                 if n_runs_found == n_runs:
@@ -90,12 +92,16 @@ def create_latex_table():
             f"{means_dw4.loc[flow_type]['ess']*100:.2f},{sem_dw4.loc[flow_type]['ess']*100:.2f} & " \
             f"{means_lj13.loc[flow_type]['ess']*100:.2f},{sem_lj13.loc[flow_type]['ess']*100:.2f} \\\ \n "
 
-    # print(table_values_string)
-    # print("\n\n")
-    # print(table_lower_bound_gap)
-    # print("\n\n")
-    # print(table_ess)
+    print("************** main table ************** \n")
+    print(table_values_string)
     print("\n\n")
+    print("************** table lower bound gap ************** \n")
+    print(table_lower_bound_gap)
+    print("\n\n")
+    print("************** ess ************** \n")
+    print(table_ess)
+    print("\n\n")
+    print("************** runtimes ************** \n")
     print(table_runtimes)
 
 
