@@ -1,6 +1,6 @@
 import jax.random
-from omegaconf import DictConfig
-import yaml
+from hydra import compose, initialize
+import hydra
 
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
@@ -18,13 +18,19 @@ from examples.analyse_results.dw4_results.plot import make_get_data_for_plotting
 # rc('ytick', labelsize=20)
 # rc("lines", linewidth=4)
 
-def plot_qm9(ax: Optional = None):
-    flow_type = 'spherical'
-    download_checkpoint(flow_type=flow_type, tags=["qm9pos", "final_run"], seed=0, max_iter=256,
-                        base_path='./examples/qm9_results/models')
 
-    checkpoint_path = f"examples/qm9_results/models/{flow_type}_seed0.pkl"
-    cfg = DictConfig(yaml.safe_load(open(f"examples/config/qm9.yaml")))
+_BASE_DIR = '../../..'
+
+def plot_qm9(ax: Optional = None):
+    hydra.core.global_hydra.GlobalHydra.instance().clear()
+    initialize(config_path=f"{_BASE_DIR}/examples/config/")
+    cfg = compose(config_name="qm9.yaml")
+
+    flow_type = 'spherical'
+    download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "post_sub", "cblgpu"], seed=0, max_iter=900,
+                        base_path='./examples/analyse_results/qm9_results/models')
+
+    checkpoint_path = f"examples/analyse_results/qm9_results/models/{flow_type}_seed0.pkl"
     cfg.flow.type = flow_type
     key = jax.random.PRNGKey(0)
 
@@ -58,7 +64,7 @@ def plot_qm9(ax: Optional = None):
         axs[0].set_ylabel("normalized count")
         fig1.tight_layout()
         fig1.savefig("examples/plots/qm9.png")
-        # plt.show()
+        plt.show()
         print("done")
 
 

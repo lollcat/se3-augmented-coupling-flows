@@ -33,11 +33,12 @@ def get_wandb_run(flow_type, tags, seed):
 
 
 def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
+    assert os.path.exists(base_path)
     run = get_wandb_run(flow_type, tags, seed)
     for file in run.files():
         if re.search(fr'.*{max_iter-1}.pkl', str(file)):
             file.download(exist_ok=True)
-            path = re.search(r"([^\s]*results[^\s]*)", str(file)).group()
+            path = re.search(r"([^\s]*model_checkpoints[^\s]*)", str(file)).group()
             os.replace(path, f"{base_path}/{flow_type}_seed{seed}.pkl")
             print("saved" + path)
 

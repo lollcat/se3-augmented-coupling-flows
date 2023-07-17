@@ -1,6 +1,6 @@
 import jax.random
-from omegaconf import DictConfig
-import yaml
+from hydra import compose, initialize
+import hydra
 
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
@@ -53,12 +53,19 @@ def make_get_data_for_plotting(
     return get_data_for_plotting, count_list, bins_x
 
 
-def plot_dw4(ax: Optional = None):
-    download_checkpoint(flow_type='spherical', tags=["dw4", "final_run"], seed=0, max_iter=200,
-                        base_path='./examples/dw4_results/models')
+_BASE_DIR = '../../..'
 
-    checkpoint_path = "examples/dw4_results/models/spherical_seed0.pkl"
-    cfg = DictConfig(yaml.safe_load(open(f"examples/config/dw4.yaml")))
+
+def plot_dw4(ax: Optional = None):
+    hydra.core.global_hydra.GlobalHydra.instance().clear()
+    initialize(config_path=f"{_BASE_DIR}/examples/config/")
+    cfg = compose(config_name="dw4.yaml")
+
+    download_checkpoint(flow_type='spherical', tags=["dw4", "ml", "post_sub", "cblgpu"], seed=0, max_iter=100,
+                        base_path='./examples/analyse_results/dw4_results/models')
+
+    checkpoint_path = "examples/analyse_results/dw4_results/models/spherical_seed0.pkl"
+
     n_samples_from_flow_plotting = 1000
     key = jax.random.PRNGKey(0)
 
@@ -94,4 +101,5 @@ def plot_dw4(ax: Optional = None):
 
 
 if __name__ == '__main__':
+    # Should be run from repo base directory to work.
     plot_dw4()
