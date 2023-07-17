@@ -78,7 +78,7 @@ def make_spherical_coupling_layer(
                 range_min=-jnp.pi,
                 range_max=jnp.pi,
                 boundary_slopes='circular',
-                min_bin_size= 2 * jnp.pi * 1e-4)
+                min_bin_size=2 * jnp.pi * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector, torsional_bijector],
                 split_indices=[1,2],

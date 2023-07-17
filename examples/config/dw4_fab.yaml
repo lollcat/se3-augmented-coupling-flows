@@ -24,7 +24,7 @@ flow:
   nodes: 4
 
 training:
-  n_epoch: 14000
+  n_epoch: 20000
   batch_size: 128
   plot_batch_size: 256
   eval_batch_size: 128
