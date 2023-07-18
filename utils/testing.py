@@ -135,11 +135,11 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
 
     # Rotation.
     def group_action(x_and_a):
-        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)  # , reflect=False)
+        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)
 
 
     positions_rot = group_action(samples.positions)
-    samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
+    samples_rot = samples._replace(positions=positions_rot)
 
     chex.assert_trees_all_equal_shapes(samples, samples_rot)
     log_prob = log_prob_samples_only_fn(samples)

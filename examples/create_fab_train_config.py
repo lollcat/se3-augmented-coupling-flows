@@ -1,7 +1,6 @@
 from typing import Tuple, Optional, Union
 
 import chex
-import numpy as np
 import os
 import pathlib
 import jax
@@ -11,7 +10,7 @@ from datetime import datetime
 from omegaconf import DictConfig
 from functools import partial
 
-from molboil.train.base import eval_fn
+from molboil.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
 from molboil.utils.loggers import WandbLogger
@@ -311,21 +310,22 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        K_per_device = int(np.ceil(cfg.training.K_marginal_log_lik / n_devices))
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=K_per_device, test_invariances=True)
+                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
 
         # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
 
-
-        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
+        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey,
+                                        x_test: FullGraphSample, test_mask: chex.Array) -> dict:
+            eval_info = eval_fn(x_test, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                     eval_batch_free_fn=None,
-                    batch_size=cfg.training.eval_batch_size)
+                    batch_size=cfg.training.eval_batch_size,
+                    mask=test_mask
+                                )
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
                 smc=smc_eval,
@@ -338,9 +338,12 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             eval_info = jax.lax.pmean(eval_info_fab, axis_name=pmap_axis_name)
             return eval_info
 
+        test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
+
         def evaluation_fn(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
             keys = jax.random.split(key, n_devices)
-            info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(state, keys)
+            info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                state, keys, test_data_per_device, test_mask)
             return get_from_first_device(info, as_numpy=True)
 
     # Plot single device.

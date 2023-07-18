@@ -14,6 +14,44 @@ from ..base import FullGraphSample
 Params = chex.ArrayTree
 
 
+
+def setup_padded_reshaped_data(data: chex.ArrayTree,
+                               interval_length: int,
+                               reshape_axis=0) -> Tuple[chex.ArrayTree, chex.Array]:
+    test_set_size = jax.tree_util.tree_flatten(data)[0][0].shape[0]
+    chex.assert_tree_shape_prefix(data, (test_set_size, ))
+
+    padding_amount = (interval_length - test_set_size % interval_length) % interval_length
+    test_data_padded_size = test_set_size + padding_amount
+    test_data_padded = jax.tree_map(
+        lambda x: jnp.concatenate([x, jnp.zeros((padding_amount, *x.shape[1:]), dtype=x.dtype)], axis=0), data
+    )
+    mask = jnp.zeros(test_data_padded_size, dtype=int).at[test_set_size].set(1)
+
+
+    if reshape_axis == 0:  # Used for pmap.
+        test_data_reshaped, mask = jax.tree_map(
+            lambda x: jnp.reshape(x, (interval_length, test_data_padded_size // interval_length, *x.shape[1:])),
+            (test_data_padded, mask)
+        )
+    else:
+        assert reshape_axis == 1  # for minibatching
+        test_data_reshaped, mask = jax.tree_map(
+            lambda x: jnp.reshape(x, (test_data_padded_size // interval_length, interval_length, *x.shape[1:])),
+            (test_data_padded, mask)
+        )
+    return test_data_reshaped, mask
+
+
+def maybe_masked_mean(array: chex.Array, mask: Optional[chex.Array]):
+    chex.assert_rank(array, 1)
+    if mask is None:
+        return jnp.mean(array)
+    else:
+        chex.assert_equal_shape([array, mask])
+        return array * mask / jnp.sum(mask)
+
+
 def get_tree_leaf_norm_info(tree):
     """Returns metrics about contents of PyTree leaves.
 
@@ -198,37 +236,46 @@ def create_scan_epoch_fn(
 
 # Evaluation
 
+Mask = chex.Array
+
 def eval_fn(
     x: FullGraphSample,
     key: chex.PRNGKey,
     params: Params,
     eval_on_test_batch_fn: Optional[
-        Callable[[Params, chex.ArrayTree, chex.PRNGKey], dict]
+        Callable[[Params, chex.ArrayTree, chex.PRNGKey, Mask], dict]
     ] = None,
     eval_batch_free_fn: Optional[Callable[[Params, chex.PRNGKey], dict]] = None,
     batch_size: Optional[int] = None,
+    mask: Optional[Mask] = None
 ) -> dict:
     info = {}
     key1, key2 = jax.random.split(key)
+
+    if mask is None:
+        mask = jnp.ones(x.positions.shape[0], dtype=int)
 
     if eval_on_test_batch_fn is not None:
 
         def scan_fn(carry, xs):
             # Scan over data in the test set. Vmapping all at once causes memory issues I think?
-            x_batch, key = xs
+            x_batch, mask, key = xs
             info = eval_on_test_batch_fn(
                 params,
                 x_batch,
                 key=key,
+                mask=mask
             )
             return None, info
 
-        x_batched = batchify_data(x, batch_size=batch_size)
+        (x_batched, mask_batched), mask_batched_new = \
+            setup_padded_reshaped_data((x, mask), interval_length=batch_size, reshape_axis=1)
+        mask_batched = mask_batched * mask_batched_new
 
         _, batched_info = jax.lax.scan(
             scan_fn,
             None,
-            (x_batched, jax.random.split(key1, get_leading_axis_tree(x_batched, 1)[0])),
+            (x_batched, mask_batched, jax.random.split(key1, get_leading_axis_tree(x_batched, 1)[0])),
         )
         # Aggregate test set info across batches.
         info.update(jax.tree_map(jnp.mean, batched_info))

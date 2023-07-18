@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from flow.distrax_with_extra import Extra, BijectorWithExtra
+from molboil.base import FullGraphSample
 
 Params = hk.Params
 LogProb = chex.Array
@@ -14,15 +15,6 @@ LogDet = chex.Array
 
 GraphFeatures = chex.Array  # Non-positional information such as atom type.
 Positions = chex.Array
-
-
-class FullGraphSample(NamedTuple):
-    """Container for atom positions and ataom encoding (e.g. atom type)."""
-    positions: Positions
-    features: GraphFeatures
-
-    def __getitem__(self, i):
-        return FullGraphSample(self.positions[i], self.features[i])
 
 
 

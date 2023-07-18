@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import chex
 import jax
@@ -9,6 +9,7 @@ from molboil.utils.test import random_rotate_translate_permute
 from utils.testing import get_checks_for_flow_properties
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
+from molboil.train.base import maybe_masked_mean
 
 Params = chex.ArrayTree
 X = chex.Array
@@ -65,7 +66,9 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
                            key: chex.PRNGKey,
                            flow: AugmentedFlow,
                            K: int,
-                           test_invariances: bool = True) -> dict:
+                           test_invariances: bool = True,
+                           mask: Optional[chex.Array] = None) -> dict:
+
     key, subkey = jax.random.split(key)
     x_augmented, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x_test, subkey, K)
     x_test = jax.tree_map(lambda x: jnp.repeat(x[None, ...], K, axis=0), x_test)
@@ -76,15 +79,17 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     log_w = log_q - log_p_a
 
     info = {}
-    info.update(eval_log_lik=jnp.mean(log_q))
-    marginal_log_lik = jnp.mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)), axis=0)
+    info.update(eval_log_lik=maybe_masked_mean(jnp.mean(log_q, axis=0), mask=mask))
+    marginal_log_lik = maybe_masked_mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)),
+                                         mask=mask)
     info.update(marginal_log_lik=marginal_log_lik)
 
-    lower_bound_marginal_gap = marginal_log_lik - jnp.mean(log_w)
+    lower_bound_marginal_gap = marginal_log_lik - maybe_masked_mean(jnp.mean(log_w, axis=0), mask=mask)
     info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
 
-    info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
-    info.update(ess_aug_conditional=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
+    info.update(var_log_w=maybe_masked_mean(jnp.var(log_w, axis=0), mask=mask))
+    info.update(ess_aug_conditional=maybe_masked_mean(
+        1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0], mask=mask))
 
     if test_invariances:
         key, subkey = jax.random.split(key)
