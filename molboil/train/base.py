@@ -52,6 +52,15 @@ def maybe_masked_mean(array: chex.Array, mask: Optional[chex.Array]):
         array = jnp.where(mask, array, jnp.zeros_like(array))
         return jnp.sum(array) / jnp.sum(mask)
 
+def maybe_masked_max(array: chex.Array, mask: Optional[chex.Array]):
+    chex.assert_rank(array, 1)
+    if mask is None:
+        return jnp.max(array)
+    else:
+        chex.assert_equal_shape([array, mask])
+        array = jnp.where(mask, array, jnp.zeros_like(array)-jnp.inf)
+        return jnp.max(array)
+
 
 def get_tree_leaf_norm_info(tree):
     """Returns metrics about contents of PyTree leaves.

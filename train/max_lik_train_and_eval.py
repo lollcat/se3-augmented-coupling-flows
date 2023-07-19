@@ -93,7 +93,8 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
 
     if test_invariances:
         key, subkey = jax.random.split(key)
-        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey)
+        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey,
+                                                          mask=mask)
         info.update(invariances_info)
     return info
 
@@ -132,3 +133,4 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
              "ess": ess}
         )
     return info
+
