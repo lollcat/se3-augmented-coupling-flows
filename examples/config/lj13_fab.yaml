@@ -34,7 +34,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_fab_${flow.type}_BiggerBS
+    name: lj13_fab_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
     tags: [lj13,fab,post_sub1,cblgpu]

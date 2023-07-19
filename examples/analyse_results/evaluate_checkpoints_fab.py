@@ -84,6 +84,8 @@ def setup_eval(cfg, flow, target_log_p_x_fn, test_data):
 
 
 def download_checkpoint_and_eval(problem, seed, flow_type):
+    print(f"evaluating checkpoint for {problem} {seed} {flow_type}")
+
     # Setup
     tags, hydra_config, max_iter = get_setup_info(problem)
 
@@ -120,13 +122,17 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
     key = jax.random.PRNGKey(0)
 
-    cfg.logger.wandb.tags = [problem, "evaluation"]
+    cfg.logger.wandb.tags = [problem, "evaluation", "eval_1"]
+    cfg.logger.wandb.name = problem + "_evaluation"
     logger = setup_logger(cfg)
     info = eval_fn(state, key)
     logger.write(info)
     print(info)
     logger.close()
+    print("evaluation complete")
 
 
 if __name__ == '__main__':
-    download_checkpoint_and_eval(problem="dw4_fab", seed=0, flow_type="spherical")
+    for flow_type in ["spherical", "along_vector", "proj", "non_equivariant"]:
+        for seed in [0, 1]:
+            download_checkpoint_and_eval(problem="lj13_fab", seed=0, flow_type=flow_type)
