@@ -39,7 +39,7 @@ def get_setup_info(problem: str):
         tags.append("dw4")
         max_iter = 20000
     else:
-        assert problem == "lj13"
+        assert problem == "lj13_fab"
         tags.append("lj13")
         max_iter = 14000
     return tags, hydra_config, max_iter
