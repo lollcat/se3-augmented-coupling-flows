@@ -37,5 +37,5 @@ logger:
     name: lj13_fab_${flow.type}_SmallerBS
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,fab,post_sub,cblgpu]
+    tags: [lj13,fab,post_sub1,cblgpu]
 

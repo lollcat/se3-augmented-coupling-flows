@@ -45,5 +45,5 @@ logger:
     name: dw4_fab_${flow.type}_NEWGPU
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,post_sub,cblgpu]
+    tags: [dw4,fab,post_sub1,cblgpu]
 

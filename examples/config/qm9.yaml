@@ -31,4 +31,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub,cblgpu]
+    tags: [qm9pos,ml,post_sub1,cblgpu]
