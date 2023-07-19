@@ -108,7 +108,11 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
     checkpoint_path = f"examples/analyse_results/{hydra_config[:-4]}/models/{flow_type}_seed0.pkl"
 
     flow, state = load_flow(cfg, checkpoint_path)
-    print("loaded checkpoint")
+    if problem == "lj13_fab":
+        state = jax.tree_map(lambda x: x[0], state) # for lj13 we used multiple devices.
+        print("loaded checkpoint from first device")
+    else:
+        print("loaded checkpoint (single device)")
 
     debug = False
     if debug:
