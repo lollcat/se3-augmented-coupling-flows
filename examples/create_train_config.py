@@ -14,7 +14,8 @@ import matplotlib as mpl
 from functools import partial
 import jax.numpy as jnp
 
-from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn
+from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn, \
+    setup_padded_reshaped_data
 from train.custom_step import training_step
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
@@ -343,16 +344,6 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         params, opt_state, info = training_step_fn(state.params, x, state.opt_state, subkey)
         return TrainingState(params=params, opt_state=opt_state, key=key), info
 
-    def eval_function(state: TrainingState, x: chex.Array, key: chex.PRNGKey) -> dict:
-        info = get_eval_on_test_batch(params=state.params,
-                                        x_test=x,
-                                        key=key,
-                                        flow=flow,
-                                        K = cfg.training.K_marginal_log_lik,
-                                        test_invariances=True)
-        info = jax.lax.pmean(info, axis_name=pmap_axis_name)
-        return info
-
 
     def update_fn(state: TrainingState) -> Tuple[TrainingState, dict]:
         batchify_data = get_shuffle_and_batchify_data_fn(train_data, cfg.training.batch_size * n_devices)
@@ -375,23 +366,38 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     else:
         if evaluation_fn is None:
-            def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
-                batchify_data = get_shuffle_and_batchify_data_fn(test_data, cfg.training.eval_batch_size*n_devices)
-                key, subkey = jax.random.split(key)
-                batched_data = batchify_data(subkey)
+            # Setup eval functions
+            eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                            flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+            if target_log_prob_fn:
+                eval_batch_free_fn = partial(
+                    eval_non_batched,
+                    single_feature=test_data.features[0],
+                    flow=flow,
+                    n_samples=cfg.training.eval_model_samples,
+                    inner_batch_size=cfg.training.eval_batch_size,
+                    target_log_prob=target_log_prob_fn)
+            else:
+                eval_batch_free_fn = None
 
-                infos = []
-                for i in range(batched_data.positions.shape[0]):
-                    x = batched_data[i]
-                    # Reshape to [n_devices, batch_size]
-                    x = jax.tree_map(lambda x: jnp.reshape(x, (n_devices, cfg.training.eval_batch_size, *x.shape[1:])),
-                                     x)
-                    key, subkey = jax.random.split(key)
-                    key_per_device = jax.random.split(subkey, n_devices)
-                    info = jax.pmap(eval_function, axis_name=pmap_axis_name)(state, x, key_per_device)
-                    infos.append(get_from_first_device(info))
-                info = jax.tree_map(lambda *xs: jnp.mean(jnp.stack(xs)), *infos)  # Aggregate over whole test set.
-                return info
+            def evaluation_fn_single_device(state: TrainingState, key: chex.PRNGKey,
+                                            x_test: FullGraphSample, test_mask: chex.Array) -> dict:
+                eval_info = eval_fn(x_test, key, state.params,
+                                    eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                    eval_batch_free_fn=eval_batch_free_fn,
+                                    batch_size=cfg.training.eval_batch_size,
+                                    mask=test_mask
+                                    )
+                eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
+                return eval_info
+
+            test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
+
+            def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
+                keys = jax.random.split(key, n_devices)
+                info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                    state, keys, test_data_per_device, test_mask)
+                return get_from_first_device(info, as_numpy=True)
 
         # Plot single device.
         plotter_single_device = plotter

@@ -335,7 +335,7 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
                 inner_batch_size=cfg.fab.eval_inner_batch_size
             )
             eval_info.update(eval_info_fab)
-            eval_info = jax.lax.pmean(eval_info_fab, axis_name=pmap_axis_name)
+            eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
             return eval_info
 
         test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)

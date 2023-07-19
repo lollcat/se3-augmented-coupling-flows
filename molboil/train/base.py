@@ -26,7 +26,7 @@ def setup_padded_reshaped_data(data: chex.ArrayTree,
     test_data_padded = jax.tree_map(
         lambda x: jnp.concatenate([x, jnp.zeros((padding_amount, *x.shape[1:]), dtype=x.dtype)], axis=0), data
     )
-    mask = jnp.zeros(test_data_padded_size, dtype=int).at[test_set_size].set(1)
+    mask = jnp.zeros(test_data_padded_size, dtype=int).at[jnp.arange(test_set_size)].set(1)
 
 
     if reshape_axis == 0:  # Used for pmap.

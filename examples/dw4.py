@@ -1,3 +1,6 @@
+# import chex
+# chex.set_n_cpu_devices(2)
+
 import hydra
 from omegaconf import DictConfig
 from functools import partial
@@ -32,11 +35,11 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
-    cfg.training.train_set_size = 64
-    cfg.training.test_set_size = 64
+    cfg.training.train_set_size = 65
+    cfg.training.test_set_size = 65
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 32
-    cfg.training.eval_batch_size=8
+    cfg.training.eval_batch_size = 7
     # cfg.training.save = False
     cfg.training.n_eval = 4
     cfg.training.plot_batch_size = 32
@@ -51,7 +54,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
     cfg.flow.kwargs.spherical.spline_num_bins = 3
-    cfg.training.resume = True
+    cfg.training.resume = False
+    cfg.training.save = False
     cfg.training.n_epoch = 202
 
 
