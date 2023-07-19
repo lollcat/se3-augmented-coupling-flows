@@ -16,7 +16,7 @@ flow:
 
 training:
   n_epoch: 400
-  batch_size: 32
+  batch_size: 64
   eval_batch_size: 128
   plot_batch_size: 128
   seed: 0
