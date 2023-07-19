@@ -103,13 +103,14 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
     # Download checkpoint from WANDB.
     download_checkpoint(flow_type=flow_type, tags=tags, seed=seed, max_iter=max_iter,
                         base_path=base_dir)
+    print("checkpoint downloaded")
 
     checkpoint_path = f"examples/analyse_results/{hydra_config[:-4]}/models/{flow_type}_seed0.pkl"
 
     flow, state = load_flow(cfg, checkpoint_path)
     print("loaded checkpoint")
 
-    debug = True
+    debug = False
     if debug:
         cfg.training.test_set_size = 10
         cfg.training.eval_model_samples = 100
@@ -133,6 +134,6 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
 
 if __name__ == '__main__':
-    for flow_type in ["spherical", "along_vector", "proj", "non_equivariant"]:
+    for flow_type in ["along_vector", "spherical", "proj", "non_equivariant"]:
         for seed in [0, 1]:
-            download_checkpoint_and_eval(problem="lj13_fab", seed=0, flow_type=flow_type)
+            download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)
