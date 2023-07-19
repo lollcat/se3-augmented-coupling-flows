@@ -131,6 +131,4 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
             {
              "ess": ess}
         )
-        # TODO: Add KL to eval with batch info.
-        # "eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],
     return info

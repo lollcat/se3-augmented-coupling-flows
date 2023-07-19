@@ -49,7 +49,8 @@ def maybe_masked_mean(array: chex.Array, mask: Optional[chex.Array]):
         return jnp.mean(array)
     else:
         chex.assert_equal_shape([array, mask])
-        return array * mask / jnp.sum(mask)
+        array = jnp.where(mask, array, jnp.zeros_like(array))
+        return jnp.sum(array) / jnp.sum(mask)
 
 
 def get_tree_leaf_norm_info(tree):
@@ -278,7 +279,8 @@ def eval_fn(
             (x_batched, mask_batched, jax.random.split(key1, get_leading_axis_tree(x_batched, 1)[0])),
         )
         # Aggregate test set info across batches.
-        info.update(jax.tree_map(jnp.mean, batched_info))
+        per_batch_weighting = jnp.sum(mask_batched, axis=-1) / jnp.sum(jnp.sum(mask_batched, axis=-1))
+        info.update(jax.tree_map(lambda x: jnp.sum(per_batch_weighting*x), batched_info))
 
     if eval_batch_free_fn is not None:
         non_batched_info = eval_batch_free_fn(

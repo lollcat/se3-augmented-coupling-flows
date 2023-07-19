@@ -14,7 +14,7 @@ import wandb
 
 from .base import get_leading_axis_tree
 from ..utils.plotting import plot_history
-from ..utils.loggers import Logger, ListLogger, WandbLogger, PandasLogger
+from ..utils.loggers import Logger, ListLogger, WandbLogger
 from ..utils.checkpoints import get_latest_checkpoint
 
 
