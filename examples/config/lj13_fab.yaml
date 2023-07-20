@@ -19,7 +19,7 @@ flow:
 
 training:
   n_epoch: 14000 # approx how many iter we can do in the training time
-  batch_size: 256
+  batch_size: 128
   eval_batch_size: 16 # Will be timez by K during eval.
   plot_batch_size: 32
   seed: 0
