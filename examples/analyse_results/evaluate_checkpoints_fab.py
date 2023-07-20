@@ -139,5 +139,5 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
 if __name__ == '__main__':
     for flow_type in ["along_vector", "spherical", "proj", "non_equivariant"]:
-        for seed in [0, 1]:
+        for seed in [2]:
             download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)
