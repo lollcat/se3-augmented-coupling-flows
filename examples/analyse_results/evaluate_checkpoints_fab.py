@@ -93,6 +93,7 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
     initialize(config_path=f"{_BASE_DIR}/examples/config/")
     cfg = compose(config_name=hydra_config)
     cfg.flow.type = flow_type
+    cfg.training.seed = seed
 
     load_dataset = load_ds_dw4 if problem == "dw4_fab" else load_ds_lj13
     target_log_p_x_fn = log_prob_fn_dw4 if problem == "dw4_fab" else log_prob_fn_lj13
@@ -105,11 +106,11 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
                         base_path=base_dir)
     print("checkpoint downloaded")
 
-    checkpoint_path = f"examples/analyse_results/{hydra_config[:-4]}/models/{flow_type}_seed0.pkl"
+    checkpoint_path = f"examples/analyse_results/{hydra_config[:-4]}/models/{flow_type}_seed{seed}.pkl"
 
     flow, state = load_flow(cfg, checkpoint_path)
     if problem == "lj13_fab":
-        state = jax.tree_map(lambda x: x[0], state) # for lj13 we used multiple devices.
+        state = jax.tree_map(lambda x: x[0], state)  # for lj13 we used multiple devices.
         print("loaded checkpoint from first device")
     else:
         print("loaded checkpoint (single device)")
@@ -127,7 +128,7 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
     key = jax.random.PRNGKey(0)
 
-    cfg.logger.wandb.tags = [problem, "evaluation", "eval_1"]
+    cfg.logger.wandb.tags = [problem, "evaluation", "eval_2"]
     cfg.logger.wandb.name = problem + "_evaluation"
     logger = setup_logger(cfg)
     info = eval_fn(state, key)
@@ -139,5 +140,5 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
 if __name__ == '__main__':
     for flow_type in ["along_vector", "spherical", "proj", "non_equivariant"]:
-        for seed in [2]:
+        for seed in [0, 1, 2]:
             download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)

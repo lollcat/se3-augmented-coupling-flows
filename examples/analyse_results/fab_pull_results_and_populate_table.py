@@ -3,15 +3,15 @@ import pandas as pd
 from examples.analyse_results.get_wandb_runs import get_run_history
 
 
-_TAGS = ['final_run', 'fab']
+_TAGS_DW4 = ['final_run', 'fab', "dw4"]
+_TAGS_Lj13 = ["lj13_fab", "evaluation", "eval_1"]
 
 def download_eval_metrics(problem="dw4",
                           n_runs=3,
                           flow_types=('spherical', 'along_vector', 'proj', 'non_equivariant'),
                           step_number=-1):
-    seeds = [0, 1, 2, 3, 4]
-    tags = _TAGS.copy()
-    tags.append(problem)
+    seeds = [0, 1, 2]
+    tags = _TAGS_DW4 if problem == "dw4" else _TAGS_Lj13
     data = pd.DataFrame()
 
     i = 0
@@ -47,14 +47,14 @@ def download_eval_metrics(problem="dw4",
 
 def create_latex_table():
     step_numbers_dw4 = [2,3,3,3]
-    step_numbers_lj13 = [10,6,6,6]
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical'] #
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
                  "\\sphproj \ \eanf"]
     keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', 'runtime']
 
+    data_lj13 = download_eval_metrics("lj13", flow_types=flow_types, step_number=-1)
     data_dw4 = download_eval_metrics("dw4", flow_types=flow_types, step_number=step_numbers_dw4)
-    data_lj13 = download_eval_metrics("lj13", flow_types=flow_types, step_number=step_numbers_lj13)
+
 
 
 
