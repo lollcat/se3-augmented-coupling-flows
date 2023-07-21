@@ -14,8 +14,10 @@ flow:
   nodes: 19
 
 training:
-  n_epoch: 900
-  batch_size: 64
+  optimizer:
+    peak_lr: 1e-4
+  n_epoch: 700
+  batch_size: 32
   plot_batch_size: 128
   eval_batch_size: 128
   seed: 0
