@@ -4,12 +4,13 @@ from examples.analyse_results.get_wandb_runs import get_run_history
 
 
 _TAGS_DW4 = ['final_run', 'fab', "dw4"]
-_TAGS_Lj13 = ["lj13_fab", "evaluation", "eval_1"]
+_TAGS_Lj13 = ["lj13_fab", "evaluation", "eval_2"]
 
 def download_eval_metrics(problem="dw4",
                           n_runs=3,
                           flow_types=('spherical', 'along_vector', 'proj', 'non_equivariant'),
-                          step_number=-1):
+                          step_number=-1,
+                          allow_single_step: bool = True):
     seeds = [0, 1, 2]
     tags = _TAGS_DW4 if problem == "dw4" else _TAGS_Lj13
     data = pd.DataFrame()
@@ -27,7 +28,7 @@ def download_eval_metrics(problem="dw4",
                                                                       'eval_ess_flow', 'eval_ess_ais', '_runtime',
                                                                       "_step"])
                 info = dict(hist.iloc[iter_n])
-                if info["_step"] == 0:
+                if info["_step"] == 0 and not allow_single_step:
                     print(f"skipping {flow_type} seed={seed} as it only has 1 step")
                     continue
                 info.update(flow_type=flow_type, seed=seed)

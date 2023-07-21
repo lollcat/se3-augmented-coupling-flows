@@ -44,6 +44,8 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
         global_norm_clip = optax.clip_by_global_norm(grad_median_norm*factor_clip_norm)
         global_norm_clip_state = global_norm_clip.init(params)
         grad = global_norm_clip.update(grad, global_norm_clip_state)[0]
+        # Ensure gradients are still finite after normalization.
+        grad = jax.tree_util.tree_map(lambda p: jnp.where(jnp.isfinite(p), p, jnp.zeros_like(p)), grad)
 
         updates, new_opt_state = optimizer.update(grad, opt_state.opt_state, params=params)
 

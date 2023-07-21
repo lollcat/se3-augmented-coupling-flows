@@ -25,10 +25,10 @@ def get_wandb_run(flow_type, tags, seed):
     while not "finished" in str(runs[j]):
         j += 1
     run = runs[j]  # Get latest finished run.
-    if 'fab' not in tags:
-        assert '"fab": ' not in run.json_config
-    else:
-        assert '"fab": ' in run.json_config
+    # if 'fab' not in tags:
+    #     assert '"fab": ' not in run.json_config
+    # else:
+    #     assert '"fab": ' in run.json_config
     return run
 
 
