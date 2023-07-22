@@ -1,5 +1,5 @@
-# import chex
-# chex.set_n_cpu_devices(2)
+import chex
+chex.set_n_cpu_devices(8)
 
 import hydra
 from omegaconf import DictConfig
@@ -38,8 +38,8 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.train_set_size = 65
     cfg.training.test_set_size = 65
     cfg.training.optimizer.init_lr = 1e-4
-    cfg.training.batch_size = 32
-    cfg.training.eval_batch_size = 7
+    cfg.training.batch_size = 5
+    cfg.training.eval_batch_size = 3
     # cfg.training.save = False
     cfg.training.n_eval = 4
     cfg.training.plot_batch_size = 32
