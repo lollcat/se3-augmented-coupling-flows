@@ -105,6 +105,7 @@ def train(config: TrainConfig):
         eval_info = config.eval_and_plot_fn(state, subkey, -1, config.save, plots_dir)
         eval_info.update(iteration=-1)
         config.logger.write(eval_info)
+        print(f"initial model eval complete, eval info: \n {eval_info}")
 
     pbar = tqdm(range(start_iter, config.n_iteration))
 
