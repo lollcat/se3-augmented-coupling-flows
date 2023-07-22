@@ -14,7 +14,8 @@ flow:
   nodes: 19
 
 training:
-  n_epoch: 500
+  device_no: 0
+  n_epoch: 900
   batch_size: 32
   plot_batch_size: 128
   eval_batch_size: 128
@@ -31,4 +32,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub3,cblgpu]
+    tags: [qm9pos,ml,post_sub4,cblgpu]

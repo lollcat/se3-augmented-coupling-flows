@@ -107,12 +107,15 @@ def create_train_config(cfg: DictConfig, load_dataset, dim, n_nodes,
                         date_folder: bool = True,
                         target_log_prob_fn: Optional = None) -> TrainConfig:
     devices = jax.devices()
-    if len(devices) > 1:
+    if len(devices) > 1 and cfg.training.use_multi_device:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
                                         date_folder, target_log_prob_fn)
     else:
         print(f"Running on one device only.")
+        if len(devices) > 0:
+            jax.config.update("jax_default_device", devices[cfg.training.device_no])
+            print(f" found {len(devices)} devices, training on device {cfg.training.device_no}")
         return create_train_config_non_pmap(cfg, load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
                                         date_folder, target_log_prob_fn)
 
@@ -140,6 +143,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
 
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
+    print(train_data.positions.devices())
     batch_size = min(cfg.training.batch_size, train_data.positions.shape[0])
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
