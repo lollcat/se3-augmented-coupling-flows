@@ -143,7 +143,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
 
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
-    print(jnp.ones().devices())
+    print(jnp.ones((1,)).devices())
     batch_size = min(cfg.training.batch_size, train_data.positions.shape[0])
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
