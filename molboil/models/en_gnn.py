@@ -6,6 +6,10 @@ import jax
 import e3nn_jax as e3nn
 import chex
 
+from molboil.models.safe_haiku_linear import Linear
+TPU = True
+if TPU:
+    hk.Linear = Linear
 from molboil.models.base import EquivariantForwardFunction
 from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.utils.numerical import safe_norm
