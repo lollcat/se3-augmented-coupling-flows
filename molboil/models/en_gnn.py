@@ -1,4 +1,4 @@
-from typing import NamedTuple, Callable, Sequence, Tuple
+from typing import NamedTuple, Callable, Sequence, Tuple, Union, Any
 
 import haiku as hk
 import jax.numpy as jnp
@@ -10,6 +10,37 @@ from molboil.models.base import EquivariantForwardFunction
 from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.utils.numerical import safe_norm
 from molboil.models.stable_mlp import StableMLP
+
+
+class TruncatedNormal(hk.initializers.Initializer):
+    # Rewrite TruncatedNormal to prevent device error on TPU.
+  """Initializes by sampling from a truncated normal distribution."""
+
+  def __init__(self,
+               stddev: Union[float, jnp.ndarray] = 1.,
+               mean: Union[float, jnp.ndarray] = 0.):
+    """Constructs a :class:`TruncatedNormal` initializer.
+
+    Args:
+      stddev: The standard deviation parameter of the truncated
+        normal distribution.
+      mean: The mean of the truncated normal distribution.
+    """
+    self.stddev = stddev
+    self.mean = mean
+
+  def __call__(self, shape: Sequence[int], dtype: Any) -> jnp.ndarray:
+    real_dtype = jnp.finfo(dtype).dtype
+    m = jax.lax.convert_element_type(self.mean, dtype)
+    s = jax.lax.convert_element_type(self.stddev, real_dtype)
+    is_complex = jnp.issubdtype(dtype, jnp.complexfloating)
+    if is_complex:
+      shape = [2, *shape]
+    unscaled = jax.random.truncated_normal(hk.next_rng_key(), -2., 2., shape,
+                                           jnp.float32).astype(float)
+    if is_complex:
+      unscaled = unscaled[0] + 1j * unscaled[1]
+    return s * unscaled + m
 
 class EGCL(hk.Module):
     """A version of EGCL coded only with haiku (not e3nn) so works for arbitary dimension of inputs.
@@ -138,7 +169,8 @@ class EGCL(hk.Module):
             vectors_out = vectors_out + cross_shifts_i / (n_vectors - 1)
 
         # Get feature output
-        e = hk.Linear(1)(m_ij)
+        e = hk.Linear(1, w_init=TruncatedNormal())(m_ij)
+
         e = jax.nn.sigmoid(e)
         m_i = e3nn.scatter_sum(
             data=m_ij*e, dst=receivers, output_size=n_nodes
