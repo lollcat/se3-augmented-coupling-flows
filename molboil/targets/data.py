@@ -23,7 +23,7 @@ def load_dw4(
         path = here / "data"
     path = Path(path)
     fpath = path / "dw4-dataidx.npy"
-    dataset = jnp.asarray(np.load(fpath, allow_pickle=True)[0])
+    dataset = jnp.asarray(np.load(fpath, allow_pickle=True)[0], dtype=float)
     dataset = jnp.reshape(dataset, (-1, 4, 2))
 
     train_set = dataset[:train_set_size]
@@ -47,7 +47,7 @@ def load_dw4_3d(
         path = here / "data"
     path = Path(path)
     fpath = path / "dw_data_vertices4_dim3_temperature0.1.npy"
-    dataset = jnp.asarray(np.load(fpath, allow_pickle=True))
+    dataset = jnp.asarray(np.load(fpath, allow_pickle=True), dtype=float)
 
     train_set = dataset[:train_set_size]
     val_set = dataset[-test_set_size - val_set_size : -test_set_size]
@@ -74,9 +74,9 @@ def load_lj13(
     fpath_idx = path / "idx_LJ13.npy"
     fpath_val_test = path / "all_data_LJ13.npy"
 
-    train_data = jnp.asarray(np.load(fpath_train, allow_pickle=True))
-    idxs = jnp.asarray(np.load(fpath_idx, allow_pickle=True))
-    val_test_data = jnp.asarray(np.load(fpath_val_test, allow_pickle=True))
+    train_data = jnp.asarray(np.load(fpath_train, allow_pickle=True), dtype=float)
+    idxs = jnp.asarray(np.load(fpath_idx, allow_pickle=True), dtype=float)
+    val_test_data = jnp.asarray(np.load(fpath_val_test, allow_pickle=True), dtype=float)
 
     val_data = val_test_data[1000:2000]
     test_data = val_test_data[:1000]
@@ -115,6 +115,10 @@ def load_qm9(
     train_data = train_data[:train_set_size]
     test_data = np.load(str(fpath_test))
     valid_data = np.load(str(fpath_val))
+
+    train_data = jnp.asarray(train_data, dtype=float)
+    test_data = jnp.asarray(test_data, dtype=float)
+    valid_data = jnp.asarray(valid_data, dtype=float)
 
     return (
         positional_dataset_only_to_full_graph(train_data),
