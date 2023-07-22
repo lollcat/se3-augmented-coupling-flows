@@ -54,7 +54,6 @@ class EGCL(hk.Module):
 
 
         self.phi_e = StableMLP(mlp_units, activation=activation_fn, activate_final=True)
-        self.phi_inf = lambda x: jax.nn.sigmoid(hk.Linear(1)(x))
 
         self.phi_x_torso = StableMLP(mlp_units, activate_final=True, activation=activation_fn)
         self.phi_h = StableMLP((*mlp_units, self.n_invariant_feat_hidden), activate_final=False,
@@ -139,7 +138,8 @@ class EGCL(hk.Module):
             vectors_out = vectors_out + cross_shifts_i / (n_vectors - 1)
 
         # Get feature output
-        e = self.phi_inf(m_ij)
+        e = hk.Linear(1)(m_ij)
+        e = jax.nn.sigmoid(e)
         m_i = e3nn.scatter_sum(
             data=m_ij*e, dst=receivers, output_size=n_nodes
         ) / jnp.sqrt(avg_num_neighbours)
