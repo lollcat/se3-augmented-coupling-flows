@@ -32,9 +32,12 @@ class StableMLP(hk.Module):
                  stable_layer: bool = True,
                  activation: Callable = jax.nn.silu,
                  name: Optional[str] = None,
+                 layer_norm_inputs: bool = True
                  ):
         super().__init__(name=name)
         self.activate_final = activate_final
+        self.layer_norm_inputs = layer_norm_inputs
+        self.stable_layer = stable_layer
         if not activate_final:
             assert len(mlp_units) > 1, "MLP is single linear layer with no non-linearity"
             n_output_params = mlp_units[-1]
@@ -58,6 +61,8 @@ class StableMLP(hk.Module):
                           if output_variance_scaling else None)
 
     def __call__(self, params):
+        if self.layer_norm_inputs and self.stable_layer:
+            params = hk.LayerNorm(axis=-1, create_offset=True, create_scale=True, param_axis=-1)(params)
         out = self.mlp_function(params)
         if not self.activate_final:
             out = self.final_layer(out)

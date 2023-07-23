@@ -15,9 +15,9 @@ flow:
 
 training:
   peak_lr: 4e-4
-  use_64_bit: true
+  use_64_bit: false
   n_epoch: 500
-  batch_size: 128
+  batch_size: 32
   plot_batch_size: 16 # Can be small as we plot with big sample size later.
   eval_batch_size: 32
   seed: 0
@@ -30,7 +30,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}
+    name: qm9pos_${flow.type}_stable_mlp
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,ml,post_sub8,cblgpu]
