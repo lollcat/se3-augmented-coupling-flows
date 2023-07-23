@@ -4,11 +4,6 @@ import haiku as hk
 import jax.nn
 import jax.numpy as jnp
 
-TPU = True
-from molboil.models.safe_haiku_linear import Linear
-if TPU:
-    hk.Linear = Linear
-
 class NonLinearLayerWithResidualAndLayerNorm(hk.Module):
     def __init__(self, output_size: int, activation_fn: Callable = jax.nn.silu):
         super().__init__()

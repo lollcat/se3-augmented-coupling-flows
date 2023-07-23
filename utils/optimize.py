@@ -29,7 +29,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
 
     def init(params: chex.ArrayTree) -> IgnoreNanOptState:
         opt_state = optimizer.init(params)
-        grad_norms = jnp.ones(window_length, dtype=jnp.float32)*float('nan')
+        grad_norms = jnp.ones(window_length)*float('nan')
         # After initialisation, for first third of window length take every gradient step.
         grad_norms = grad_norms.at[0:int(window_length*2/3)].set(1e30)
         return IgnoreNanOptState(opt_state=opt_state, grad_norms=grad_norms)
@@ -37,8 +37,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
     def update(grad: chex.ArrayTree, opt_state: IgnoreNanOptState, params: chex.ArrayTree) ->\
             Tuple[chex.ArrayTree, IgnoreNanOptState]:
         grad_norm = optax.global_norm(grad)
-        # TPU doesn't like nanmedian with 64 bit.
-        grad_median_norm = jnp.nanmedian(opt_state.grad_norms).astype(jnp.float64)
+        grad_median_norm = jnp.nanmedian(opt_state.grad_norms)
         skip_update = (grad_norm > grad_median_norm * factor_allowable_norm) | (~jnp.isfinite(grad_norm))
 
         # Dynamic global norm clipping.
@@ -52,7 +51,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
 
         # Update rolling window of gradient norms
         grad_norms = opt_state.grad_norms.at[:-1].set(opt_state.grad_norms[1:])
-        grad_norms = grad_norms.at[-1].set(grad_norm.astype(jnp.float32))
+        grad_norms = grad_norms.at[-1].set(grad_norm)
 
         # If grad norm is too big then ignore update.
         updates, new_opt_state, ignored_grad_count = jax.lax.cond(skip_update,
