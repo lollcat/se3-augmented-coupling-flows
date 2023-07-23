@@ -1,6 +1,6 @@
 use_64_bit: false
 seed: 0
-n_checkpoints: 20
+n_checkpoints: 5
 n_eval: 20
 K_marginal_log_lik: 20
 save: true
