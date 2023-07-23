@@ -17,9 +17,9 @@ training:
   peak_lr: 4e-4
   use_64_bit: true
   n_epoch: 500
-  batch_size: 32
+  batch_size: 128
   plot_batch_size: 128
-  eval_batch_size: 16
+  eval_batch_size: 32
   seed: 0
   train_set_size: null
   test_set_size: null

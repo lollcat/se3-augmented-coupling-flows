@@ -262,8 +262,6 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                         target_log_prob_fn: Optional = None
                              ) -> TrainConfig:
     """Creates `mol_boil` style train config"""
-    if target_log_prob_fn is not None:
-        warnings.warn("not using target log prob in eval as this is still #TODO") # TODO still need to implement this
     devices = jax.devices()
     n_devices = len(devices)
     pmap_axis_name = 'data'

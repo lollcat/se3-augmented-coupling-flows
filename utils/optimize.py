@@ -37,6 +37,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
     def update(grad: chex.ArrayTree, opt_state: IgnoreNanOptState, params: chex.ArrayTree) ->\
             Tuple[chex.ArrayTree, IgnoreNanOptState]:
         grad_norm = optax.global_norm(grad)
+        # TPU doesn't like nanmedian with 64 bit.
         grad_median_norm = jnp.nanmedian(opt_state.grad_norms).astype(jnp.float64)
         skip_update = (grad_norm > grad_median_norm * factor_allowable_norm) | (~jnp.isfinite(grad_norm))
 

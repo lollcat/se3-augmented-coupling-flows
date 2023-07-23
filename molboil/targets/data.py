@@ -75,7 +75,7 @@ def load_lj13(
     fpath_val_test = path / "all_data_LJ13.npy"
 
     train_data = jnp.asarray(np.load(fpath_train, allow_pickle=True), dtype=float)
-    idxs = jnp.asarray(np.load(fpath_idx, allow_pickle=True), dtype=float)
+    idxs = jnp.asarray(np.load(fpath_idx, allow_pickle=True), dtype=int)
     val_test_data = jnp.asarray(np.load(fpath_val_test, allow_pickle=True), dtype=float)
 
     val_data = val_test_data[1000:2000]
