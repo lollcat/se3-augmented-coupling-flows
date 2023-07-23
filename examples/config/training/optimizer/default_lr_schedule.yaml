@@ -1,4 +1,4 @@
-init_lr: 2e-4
+init_lr: 2e-5
 optimizer_name: adam
 use_schedule: true
 peak_lr: 2e-4
