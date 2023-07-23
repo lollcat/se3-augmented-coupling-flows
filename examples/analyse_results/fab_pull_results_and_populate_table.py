@@ -3,16 +3,21 @@ import pandas as pd
 from examples.analyse_results.get_wandb_runs import get_run_history
 
 
-_TAGS_DW4 = ['final_run', 'fab', "dw4"]
-_TAGS_Lj13 = ["lj13_fab", "evaluation", "eval_2"]
+_TAGS_DW4 = ['post_sub1','cblgpu', 'fab', "dw4"]
+_TAGS_Lj13_eval = ["lj13_fab", "evaluation", "eval_2"]
+_TAGS_LJ13_run = ['post_sub','cblgpu', 'fab', "lj13"]
 
-def download_eval_metrics(problem="dw4",
+def download_eval_metrics(tags,
                           n_runs=3,
                           flow_types=('spherical', 'along_vector', 'proj', 'non_equivariant'),
                           step_number=-1,
-                          allow_single_step: bool = True):
+                          allow_single_step: bool = True,
+                          fields=('marginal_log_lik', 'lower_bound_marginal_gap',
+                                                                      'eval_ess_flow', 'eval_ess_ais',
+                                                                      '_runtime',
+                                                                      "_step")):
+    fields = list(fields)
     seeds = [0, 1, 2]
-    tags = _TAGS_DW4 if problem == "dw4" else _TAGS_Lj13
     data = pd.DataFrame()
 
     i = 0
@@ -24,9 +29,7 @@ def download_eval_metrics(problem="dw4",
             iter_n = step_number
         for seed in seeds:
             try:
-                hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap',
-                                                                      'eval_ess_flow', 'eval_ess_ais', '_runtime',
-                                                                      "_step"])
+                hist = get_run_history(flow_type, tags, seed, fields=fields)
                 info = dict(hist.iloc[iter_n])
                 if info["_step"] == 0 and not allow_single_step:
                     print(f"skipping {flow_type} seed={seed} as it only has 1 step")
@@ -47,15 +50,19 @@ def download_eval_metrics(problem="dw4",
 
 
 def create_latex_table():
-    step_numbers_dw4 = [2,3,3,3]
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical'] #
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
                  "\\sphproj \ \eanf"]
-    keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', 'runtime']
+    keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', '_runtime']
 
-    data_lj13 = download_eval_metrics("lj13", flow_types=flow_types, step_number=-1)
-    data_dw4 = download_eval_metrics("dw4", flow_types=flow_types, step_number=step_numbers_dw4)
-
+    data_lj13 = download_eval_metrics(_TAGS_Lj13_eval, flow_types=flow_types, step_number=-1,
+                fields = ('marginal_log_lik', 'lower_bound_marginal_gap',
+                          'eval_ess_flow', 'eval_ess_ais',
+                          "_step"))
+    lj13_runtime = download_eval_metrics(_TAGS_LJ13_run, flow_types=flow_types, step_number=-1,
+                                         fields=('_runtime',"_step"))
+    data_lj13["_runtime"] = lj13_runtime["_runtime"]
+    data_dw4 = download_eval_metrics(_TAGS_DW4, flow_types=flow_types, step_number=-1)
 
 
 
@@ -97,6 +104,9 @@ def create_latex_table():
             f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
             # f"0,0 & 0,0 & 0,0  \\\ \n"
 
+        ess_table_string += f"{row_names[i]} & " \
+            f"{means_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f},{sem_dw4.loc[flow_type]['eval_ess_ais'] * 100:.2f}  \\\ \n"
+
 
         runtime_table_string += \
             f"{row_names[i]} & " \
@@ -104,16 +114,20 @@ def create_latex_table():
             f"{means_lj13.loc[flow_type]['_runtime']/3600:.1f},{sem_lj13.loc[flow_type]['_runtime']/3600:.1f} \\\ \n "
 
 
-        table_lower_bound_gap += \
-            f"{row_names[i]} & " \
-            f"{means_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f} & " \
-            f"{-means_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f} \\\ \n "
+        # table_lower_bound_gap += \
+        #     f"{row_names[i]} & " \
+        #     f"{means_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_dw4.loc[flow_type]['lower_bound_marginal_gap']:.2f} & " \
+        #     f"{-means_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f},{sem_lj13.loc[flow_type]['lower_bound_marginal_gap']:.2f} \\\ \n "
     #                 f"0,0 \\\ \n"
 
-    # print(table_values_string)
-    # print("\n\n")
+    print("main table results")
+    print(table_v2_string)
+    print("\n\n")
+    print("appendix ess table results")
+    print(ess_table_string)
     # print(table_lower_bound_gap)
-    # print("\n\n")
+    print("\n\n")
+    print("runtime table")
     print(runtime_table_string)
 
 
