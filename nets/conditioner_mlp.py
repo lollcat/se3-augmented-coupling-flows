@@ -14,7 +14,7 @@ class ConditionerHead(hk.Module):
         super().__init__(name=name)
         self.mlp = StableMLP(mlp_units=(*mlp_units, n_output_params), activate_final=False,
                              output_variance_scaling=output_variance_scaling, stable_layer=stable_layer,
-                             zero_init_output=zero_init)
+                             zero_init_output=zero_init, layer_norm_inputs=True)
 
     def __call__(self, params):
         out = self.mlp(params)
