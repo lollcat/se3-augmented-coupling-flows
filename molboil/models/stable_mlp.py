@@ -27,7 +27,7 @@ class StableMLP(hk.Module):
                  stable_layer: bool = True,
                  activation: Callable = jax.nn.silu,
                  name: Optional[str] = None,
-                 layer_norm_inputs: bool = True
+                 layer_norm_inputs: bool = False
                  ):
         super().__init__(name=name)
         self.activate_final = activate_final

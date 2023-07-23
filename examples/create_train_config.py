@@ -139,8 +139,8 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
 
-    train_set_size = int(cfg.training.train_set_size) if cfg.training.train_set_size is not None else None
-    test_set_size = int(cfg.training.test_set_size) if cfg.training.test_set_size is not None else None
+    train_set_size = int(cfg.training.train_set_size) if cfg.training.train_set_size not in [None, 'None'] else None
+    test_set_size = int(cfg.training.test_set_size) if cfg.training.test_set_size not in [None, 'None'] else None
     train_data, test_data = load_dataset(train_set_size, test_set_size)
     batch_size = min(cfg.training.batch_size, train_data.positions.shape[0])
     flow_config = create_flow_config(cfg)
