@@ -35,6 +35,7 @@ training:
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
   data_augmentation_for_non_eq: false # Only use for training by maximum likelihood.
+  factor_to_train_non_eq_flow: 3
 
 
 logger:

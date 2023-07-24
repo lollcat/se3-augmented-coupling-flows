@@ -30,7 +30,10 @@ def download_eval_metrics(tags,
         for seed in seeds:
             try:
                 hist = get_run_history(flow_type, tags, seed, fields=fields)
-                info = dict(hist.iloc[iter_n])
+                if iter_n == -1:
+                    info = dict(hist.iloc[iter_n])
+                else:
+                    info = dict(hist[hist["_step"] == iter_n].iloc[0])
                 if info["_step"] == 0 and not allow_single_step:
                     print(f"skipping {flow_type} seed={seed} as it only has 1 step")
                     continue
@@ -41,11 +44,10 @@ def download_eval_metrics(tags,
                 if n_runs_found == n_runs:
                     break
             except:
-                pass
-                # print(f"No runs for for flow_type {flow_type}, tags {tags} seed {seed} found!")
+                print(f"No runs for for flow_type {flow_type}, tags {tags} seed {seed} found!")
 
         if n_runs_found != n_runs:
-            print(f"Less than {n_runs} runs found for flow {flow_type}")
+            print(f"Less than {n_runs} runs found for flow {flow_type} tags {tags}")
     return data.T
 
 
@@ -54,6 +56,10 @@ def create_latex_table():
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
                  "\\sphproj \ \eanf"]
     keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', '_runtime']
+    eval_step_number_dw4 = [64008, -1, -1, -1]
+
+
+    data_dw4 = download_eval_metrics(_TAGS_DW4, flow_types=flow_types, step_number=eval_step_number_dw4)
 
     data_lj13 = download_eval_metrics(_TAGS_Lj13_eval, flow_types=flow_types, step_number=-1,
                 fields = ('marginal_log_lik', 'lower_bound_marginal_gap',
@@ -62,7 +68,6 @@ def create_latex_table():
     lj13_runtime = download_eval_metrics(_TAGS_LJ13_run, flow_types=flow_types, step_number=-1,
                                          fields=('_runtime',"_step"))
     data_lj13["_runtime"] = lj13_runtime["_runtime"]
-    data_dw4 = download_eval_metrics(_TAGS_DW4, flow_types=flow_types, step_number=-1)
 
 
 

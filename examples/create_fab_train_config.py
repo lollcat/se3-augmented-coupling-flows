@@ -37,7 +37,7 @@ def create_train_config(cfg: DictConfig,
                         eval_and_plot_fn: Optional = None,
                         date_folder: bool = True) -> TrainConfig:
     devices = jax.devices()
-    if len(devices) > 1:
+    if len(devices) > 1 and cfg.training.use_multiple_devices:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, target_log_p_x_fn,
                                         load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,

@@ -16,3 +16,4 @@ data_augmentation_for_non_eq: true
 factor_to_train_non_eq_flow: 4
 use_scan: true
 eval_model_samples: 10_000
+use_multiple_devices: false
