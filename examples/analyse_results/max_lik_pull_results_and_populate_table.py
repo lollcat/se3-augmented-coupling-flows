@@ -2,14 +2,9 @@ import pandas as pd
 
 from examples.analyse_results.get_wandb_runs import get_run_history
 
-
-_TAGS = ["ml", "post_sub", "cblgpu"]
-
-def download_eval_metrics(problem="dw4", n_runs=3):
+def download_eval_metrics(problem, tags, n_runs=3):
     flow_types = ['spherical', 'along_vector', 'proj', 'non_equivariant']
     seeds = [0, 1, 2]
-    tags = _TAGS.copy()
-    tags.append(problem)
     data = pd.DataFrame()
 
     i = 0
@@ -46,9 +41,10 @@ def create_latex_table():
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical']
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
 
-    data_qm9 = download_eval_metrics("qm9pos")
-    data_dw4 = download_eval_metrics("dw4")
-    data_lj13 = download_eval_metrics("lj13")
+
+    data_dw4 = download_eval_metrics("dw4", ["ml", "post_sub1", "cblgpu", "dw4"])
+    data_lj13 = download_eval_metrics("lj13", ["ml", "post_sub1", "cblgpu", "lj13"])
+    data_qm9 = download_eval_metrics("qm9pos", ["ml", "post_sub1", "cblgpu10", "layer_norm"])
 
 
     means_dw4 = data_dw4.groupby("flow_type").mean()
