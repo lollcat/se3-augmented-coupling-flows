@@ -27,6 +27,7 @@ def run(cfg: DictConfig):
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=19,
                                             load_dataset=load_dataset)
+    experiment_config = experiment_config._replace(save_state_all_devices=True)
     train(experiment_config)
 
 
