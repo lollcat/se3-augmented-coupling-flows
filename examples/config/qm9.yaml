@@ -14,6 +14,8 @@ flow:
   nodes: 19
 
 training:
+  optimizer:
+    dynamic_grad_ignore_and_clip: false
   use_64_bit: false
   n_epoch: 800
   batch_size: 32
@@ -32,4 +34,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub,cblgpu10,layer_norm]
+    tags: [qm9pos,ml,post_sub,cblgpu10,no_dyn_opt]
