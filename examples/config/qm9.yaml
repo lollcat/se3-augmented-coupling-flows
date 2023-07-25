@@ -32,4 +32,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub,cblgpu10,more_aux,less_decay]
+    tags: [qm9pos,ml,post_sub,cblgpu10,alt_conditioner]
