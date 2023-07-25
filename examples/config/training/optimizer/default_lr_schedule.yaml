@@ -1,8 +1,8 @@
-init_lr: 2e-5
+init_lr: 6e-5
 optimizer_name: adam
 use_schedule: true
 peak_lr: 2e-4
-end_lr: 2e-5
+end_lr: 6e-5
 warmup_n_epoch: 30
 max_global_norm: null
 max_param_grad: null
