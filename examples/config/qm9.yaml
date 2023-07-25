@@ -14,8 +14,6 @@ flow:
   nodes: 19
 
 training:
-  optimizer:
-    peak_lr: 1e-4
   use_64_bit: false
   n_epoch: 800
   batch_size: 32
@@ -24,7 +22,7 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  aux_loss_weight: 10.0
+  aux_loss_weight: 40.0
 
 logger:
 #  list_logger: null
@@ -34,4 +32,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub,cblgpu10,lower_peak]
+    tags: [qm9pos,ml,post_sub,cblgpu10,more_aux]

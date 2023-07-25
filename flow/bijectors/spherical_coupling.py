@@ -117,8 +117,8 @@ class SphericalSplitCoupling(BijectorWithExtra):
         theta = jnp.arccos(arccos_in)
         log_barrier_in = 1 - jnp.abs(arccos_in)
 
-        # Don't penalize when very close (or on top of each other, to keep grads stable).
-        log_barrier_in = jnp.where(log_barrier_in < 1e-8, jnp.ones_like(log_barrier_in), log_barrier_in)
+        # Don't penalize when very close (or on top of each other), to keep grads stable.
+        log_barrier_in = jnp.where(log_barrier_in < 1e-4, jnp.ones_like(log_barrier_in), log_barrier_in)
         aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
 
