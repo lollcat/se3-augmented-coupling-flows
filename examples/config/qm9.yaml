@@ -22,7 +22,8 @@ training:
   seed: 0
   train_set_size: null
   test_set_size: null
-  aux_loss_weight: 40.0
+  aux_loss_weight: 10.0
+
 
 logger:
 #  list_logger: null
@@ -32,4 +33,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub,cblgpu10,alt_conditioner]
+    tags: [qm9pos,ml,post_sub1,cblgpu12]
