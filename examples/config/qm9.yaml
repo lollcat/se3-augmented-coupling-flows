@@ -14,7 +14,7 @@ flow:
   nodes: 19
 
 training:
-  use_64_bit: true
+  use_64_bit: false
   n_epoch: 800
   batch_size: 32
   plot_batch_size: 16 # Can be small as we plot with big sample size later.
