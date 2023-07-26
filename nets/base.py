@@ -70,8 +70,6 @@ class EGNN(hk.Module):
         n_nodes, vec_multiplicity_in, dim = x.shape[-3:]
         assert h.shape[0] == x.shape[0]  # n_nodes
 
-        x = jax.lax.stop_gradient(x)
-
         # Create an embedding of the non-positional features.
         chex.assert_axis_dimension(h, 1, 1)
         h = jnp.squeeze(h, axis=-1)
