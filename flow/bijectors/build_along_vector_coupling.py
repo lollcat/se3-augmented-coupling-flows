@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.along_vector_coupling import AlongVectorSplitCoupling
-from flow.bijectors.blockwise import Blockwise
 
 
 def make_along_vector_coupling_layer(
