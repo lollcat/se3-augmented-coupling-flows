@@ -12,6 +12,7 @@ hydra:
 flow:
   n_aug: 3
   nodes: 19
+  scaling_layer: true
 
 training:
   optimizer:
@@ -34,7 +35,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_HIGH_LR
+    name: qm9pos_${flow.type}_HIGH_LR_SCALING_LAYER_NO_EMA
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,ml,ema]
