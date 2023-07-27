@@ -14,8 +14,11 @@ flow:
   nodes: 19
 
 training:
+  optimizer:
+    peak_lr: 1e-3
+  per_batch_masking: true
   use_64_bit: false
-  n_epoch: 800
+  n_epoch: 200 #  800
   batch_size: 32
   plot_batch_size: 16 # Can be small as we plot with big sample size later.
   eval_batch_size: 32
@@ -33,4 +36,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,post_sub1,cblgpu12,diff_init]
+    tags: [qm9pos,ml,within_batch_masking]
