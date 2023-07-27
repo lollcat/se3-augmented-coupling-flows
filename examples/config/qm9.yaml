@@ -18,7 +18,6 @@ training:
     init_lr: 1e-3
     peak_lr: 1e-3
     end_lr: 1e-3
-  per_batch_masking: true
   use_64_bit: false
   n_epoch: 200 #  800
   batch_size: 32
