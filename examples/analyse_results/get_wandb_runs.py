@@ -5,7 +5,7 @@ import os
 api = wandb.Api()
 
 
-def get_wandb_run(flow_type, tags, seed):
+def get_wandb_run(flow_type, tags, seed, donwload_latest_completed: bool = True):
     filter_list = [{"tags": tag} for tag in tags]
     filter_list.extend([
          {"config.flow": {"$regex": f"'type': '{flow_type}',"}},
@@ -17,7 +17,10 @@ def get_wandb_run(flow_type, tags, seed):
     runs = api.runs(path='flow-ais-bootstrap/fab',
                     filters=filters)
     if len(runs) > 1:
-        print(f"Found multiple runs for flow_type {flow_type}, tags {tags}, seed {seed}. "
+        if not donwload_latest_completed:
+            print(f"found {len(runs)} multiple runs, getting first")
+            return runs[-1]
+        print(f"Found {len(runs)} runs for flow_type {flow_type}, tags {tags}, seed {seed}. "
               f"Taking the most recent.")
     elif len(runs) == 0:
         raise Exception(f"No runs for for flow_type {flow_type}, tags {tags}, seed {seed} found!")

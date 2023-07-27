@@ -16,14 +16,15 @@ import jax.numpy as jnp
 
 from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn, \
     setup_padded_reshaped_data
-from train.custom_step import training_step
+from train.custom_step import training_step, training_step_with_masking
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
 
 from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from nets.base import NetsConfig, MLPHeadConfig, EGNNTorsoConfig, TransformerConfig
-from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched
+from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched, \
+    masked_ml_loss_fn
 from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState
@@ -175,13 +176,24 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                          cfg.flow.type) and cfg.training.data_augmentation_for_non_eq
     if data_augmentation:
         print("using data augmentation")
-    loss_fn = partial(general_ml_loss_fn,
-                      flow=flow,
-                      use_flow_aux_loss=cfg.training.use_flow_aux_loss,
-                      aux_loss_weight=cfg.training.aux_loss_weight,
-                      apply_random_rotation=data_augmentation)
-    training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
-                               verbose_info=cfg.training.verbose_info)
+
+    if cfg.training.per_batch_masking:
+        loss_fn_with_mask = partial(masked_ml_loss_fn,
+                          flow=flow,
+                          use_flow_aux_loss=cfg.training.use_flow_aux_loss,
+                          aux_loss_weight=cfg.training.aux_loss_weight,
+                          apply_random_rotation=data_augmentation)
+        training_step_fn = partial(training_step_with_masking, optimizer=optimizer,
+                                   loss_fn_with_mask=loss_fn_with_mask,
+                                   verbose_info=cfg.training.verbose_info)
+    else:
+        loss_fn = partial(general_ml_loss_fn,
+                          flow=flow,
+                          use_flow_aux_loss=cfg.training.use_flow_aux_loss,
+                          aux_loss_weight=cfg.training.aux_loss_weight,
+                          apply_random_rotation=data_augmentation)
+        training_step_fn = partial(training_step, optimizer=optimizer, loss_fn=loss_fn,
+                                   verbose_info=cfg.training.verbose_info)
 
     if cfg.training.use_scan:
         scan_epoch_fn = create_scan_epoch_fn(training_step_fn,

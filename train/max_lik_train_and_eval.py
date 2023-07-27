@@ -16,6 +16,40 @@ X = chex.Array
 LogProbWithExtraFn = Callable[[Params, X], Tuple[chex.Array, Extra]]
 
 
+def masked_ml_loss_fn(
+        key: chex.PRNGKey,
+        params: AugmentedFlowParams,
+        x: FullGraphSample,
+        verbose_info: bool,
+        flow: AugmentedFlow,
+        use_flow_aux_loss: bool,
+        aux_loss_weight: float,
+        apply_random_rotation: bool = False,
+        log_q_cutoff: float = -1e3  # Ignore points outside realm of numerical stability.
+) -> Tuple[chex.Array, Tuple[chex.Array, dict]]:
+    if apply_random_rotation:
+        key, subkey = jax.random.split(key)
+        rotated_positions = random_rotate_translate_permute(x.positions, subkey, translate=False, permute=False)
+        x = x._replace(positions=rotated_positions)
+    aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
+    joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
+    log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
+    # Train by maximum likelihood.
+    loss = - log_q
+    info = {"mean_log_prob_q_joint": log_q,
+            }
+    aux_loss = jnp.mean(extra.aux_loss)
+    info.update(flow.get_base_and_target_info(params))
+    if use_flow_aux_loss:
+        loss = loss + aux_loss * aux_loss_weight
+    if verbose_info:
+        info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
+    info.update(aux_loss=aux_loss)
+
+    mask = jnp.isfinite(loss) & (log_q > log_q_cutoff)
+    return loss, (mask, info)
+
+
 def general_ml_loss_fn(
         key: chex.PRNGKey,
         params: AugmentedFlowParams,
