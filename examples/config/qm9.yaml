@@ -15,7 +15,9 @@ flow:
 
 training:
   optimizer:
+    init_lr: 1e-3
     peak_lr: 1e-3
+    end_lr: 1e-3
   per_batch_masking: true
   use_64_bit: false
   n_epoch: 200 #  800
@@ -33,7 +35,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}
+    name: qm9pos_${flow.type}_HIGH_LR
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,ml,within_batch_masking]
