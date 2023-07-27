@@ -58,6 +58,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.training.save = False
     cfg.training.n_epoch = 202
     cfg.training.use_64_bit = True
+    cfg.training.use_scan = False
 
 
     # Configure NNs

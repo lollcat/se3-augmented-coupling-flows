@@ -38,4 +38,4 @@ logger:
     name: qm9pos_${flow.type}_HIGH_LR
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,within_batch_masking]
+    tags: [qm9pos,ml,ema]

@@ -201,6 +201,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                              last_iter_info_only=cfg.training.last_iter_info_only,
                                              batch_size=batch_size)
     else:
+        # pass
         training_step_fn = jax.jit(training_step_fn)
 
     def init_fn(key: chex.PRNGKey) -> TrainingState:

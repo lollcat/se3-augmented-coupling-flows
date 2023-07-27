@@ -9,7 +9,7 @@ import optax
 
 from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.utils.graph import setup_flat_log_prob
-from utils.optimize import IgnoreNanOptState
+from utils.optimize import CustomOptimizerState
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
 

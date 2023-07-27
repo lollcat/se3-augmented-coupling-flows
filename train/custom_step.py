@@ -7,11 +7,10 @@ import optax
 
 from molboil.base import FullGraphSample
 from molboil.train.base import get_tree_leaf_norm_info
-from utils.optimize import IgnoreNanOptState
+from utils.optimize import CustomOptimizerState
 
 Params = chex.ArrayTree
 
-# TODO: Port optimizer stuff to Molboil
 
 def training_step(
     params: Params,
@@ -70,7 +69,7 @@ def training_step(
                 for key, value in get_tree_leaf_norm_info(updates).items()
             }
         )
-    if isinstance(opt_state, IgnoreNanOptState):
+    if isinstance(opt_state, CustomOptimizerState):
         info.update(ignored_grad_count=opt_state.ignored_grads_count,
                     total_optimizer_steps=opt_state.total_steps)
     return new_params, new_opt_state, info
@@ -149,7 +148,7 @@ def training_step_with_masking(
                 for key, value in get_tree_leaf_norm_info(updates).items()
             }
         )
-    if isinstance(opt_state, IgnoreNanOptState):
+    if isinstance(opt_state, CustomOptimizerState):
         info.update(ignored_grad_count=opt_state.ignored_grads_count,
                     total_optimizer_steps=opt_state.total_steps)
     return new_params, new_opt_state, info
