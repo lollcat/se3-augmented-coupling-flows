@@ -84,8 +84,7 @@ def mean_with_mask(array: chex.Array, mask: chex.Array):
     broadcasted_mask = jnp.broadcast_to(mask, array.shape)
 
     array = jnp.where(broadcasted_mask, array, jnp.zeros_like(array))
-    divisor = jnp.sum(mask, axis=0)
-    return jnp.sum(array, axis=0) / divisor
+    return jnp.sum(array, axis=0) / mask.shape[0]
 
 
 def training_step_with_masking(
