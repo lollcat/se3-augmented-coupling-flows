@@ -11,16 +11,12 @@ class CustomOptimizerState(NamedTuple):
     grad_norms: chex.Array
     ignored_grads_count: chex.Array = jnp.array(0, dtype=int)  # Keep track of how many gradients have been ignored.
     total_steps: chex.Array = jnp.array(0, dtype=int)  # Total number of optimizer steps.
-    use_ema: bool = False
-    ema_state: Optional[optax.EmaState] = None
 
 
 def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransformation,
                                              window_length: int = 100,
                                              factor_clip_norm: float = 5.,
-                                             factor_allowable_norm: float = 20.,
-                                             use_ema: bool = False,
-                                             ema_overwrite_frequency: int = 100) -> \
+                                             factor_allowable_norm: float = 20.) -> \
         optax.GradientTransformation:
     """Wraps a gradient transform to dynamically clip the gradient norm, and ignore very large gradients.
     More specifically:
@@ -37,12 +33,7 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
         # After initialisation, for first third of window length take every gradient step.
         grad_norms = grad_norms.at[0:int(window_length*2/3)].set(1e30)
 
-        if use_ema:
-            ema_state = optax.ema(decay=0.99).init(params)
-            ema_state = ema_state._replace(ema=params)
-        else:
-            ema_state = None
-        return CustomOptimizerState(opt_state=opt_state, grad_norms=grad_norms, ema_state=ema_state)
+        return CustomOptimizerState(opt_state=opt_state, grad_norms=grad_norms)
 
     def update(grad: chex.ArrayTree, opt_state: CustomOptimizerState, params: chex.ArrayTree) ->\
             Tuple[chex.ArrayTree, CustomOptimizerState]:
@@ -70,31 +61,8 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
                                        opt_state.ignored_grads_count + 1),
                               lambda: (updates, new_opt_state, opt_state.ignored_grads_count))
 
-        # Apply EMA if it is used.
-        if use_ema:
-            new_params = optax.apply_updates(params, updates)
-            _, new_ema_state = optax.ema(decay=0.99).update(updates=new_params, state=opt_state.ema_state)
-            # Only count update if it was not an ignore-nan update.
-            new_ema = jax.lax.cond(skip_update,
-                               lambda new_ema, old_ema: old_ema,
-                               lambda new_ema, old_ema: new_ema,
-                               new_ema_state.ema,
-                               opt_state.ema_state.ema)
-            new_ema_state = new_ema_state._replace(ema=new_ema)
-
-            ema_overwrite = new_ema_state.count % ema_overwrite_frequency == 0
-            # Ensure that when updates are applied, it results in the params being overwritten with new_ema.
-            updates = jax.lax.cond(ema_overwrite,
-                                  lambda updates, params, ema: jax.tree_map(lambda ema_, params_: ema_ - params_,
-                                                                            ema, params),
-                                  lambda updates, params, ema: updates,
-                                  updates, params, new_ema)
-        else:
-            new_ema_state = None
-
         state = CustomOptimizerState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
-                                     grad_norms=grad_norms, total_steps=opt_state.total_steps + 1,
-                                     ema_state=new_ema_state)
+                                     grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
         return updates, state
 
 
@@ -120,8 +88,6 @@ class OptimizerConfig(NamedTuple):
     dynamic_grad_ignore_factor: float = 20.
     dynamic_grad_norm_factor: float = 2.
     dynamic_grad_norm_window: int = 100
-    use_ema: bool = False,
-    ema_overwrite_frequency: int = 100
 
 
 def get_optimizer(optimizer_config: OptimizerConfig):
@@ -139,16 +105,14 @@ def get_optimizer(optimizer_config: OptimizerConfig):
     else:
         lr = float(optimizer_config.init_lr)
 
-    main_grad_tranform = getattr(optax, optimizer_config.optimizer_name)(lr)  # e.g. adam.
+    main_grad_transform = getattr(optax, optimizer_config.optimizer_name)(lr)  # e.g. adam.
 
     if optimizer_config.dynamic_grad_ignore_and_clip:
         optimizer = dynamic_update_ignore_and_grad_norm_clip(
-            optimizer=main_grad_tranform,
+            optimizer=main_grad_transform,
             window_length=optimizer_config.dynamic_grad_norm_window,
             factor_clip_norm=optimizer_config.dynamic_grad_norm_factor,
             factor_allowable_norm=optimizer_config.dynamic_grad_ignore_factor,
-            use_ema=optimizer_config.use_ema,
-            ema_overwrite_frequency=optimizer_config.ema_overwrite_frequency
         )
     else:
         grad_transforms = [optax.zero_nans()]
@@ -158,6 +122,6 @@ def get_optimizer(optimizer_config: OptimizerConfig):
         if optimizer_config.max_global_norm:
             clipping_fn = optax.clip_by_global_norm(float(optimizer_config.max_global_norm))
             grad_transforms.append(clipping_fn)
-        grad_transforms.append(main_grad_tranform)
+        grad_transforms.append(main_grad_transform)
         optimizer = optax.chain(*grad_transforms)
     return optimizer, lr

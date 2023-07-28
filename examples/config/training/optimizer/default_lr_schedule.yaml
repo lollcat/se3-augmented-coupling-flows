@@ -10,5 +10,3 @@ dynamic_grad_ignore_and_clip: true
 dynamic_grad_ignore_factor: 10. # When to fully ignore gradient.
 dynamic_grad_norm_factor: 2. # When to clip gradient norm.
 dynamic_grad_norm_window: 100 # Window to track median gradient norm over.
-use_ema: false
-ema_overwrite_frequency: 200

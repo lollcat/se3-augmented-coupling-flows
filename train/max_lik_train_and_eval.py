@@ -25,7 +25,7 @@ def masked_ml_loss_fn(
         use_flow_aux_loss: bool,
         aux_loss_weight: float,
         apply_random_rotation: bool = False,
-        log_q_cutoff: float = -1e6  # Ignore points outside realm of numerical stability.
+        log_q_cutoff: float = -1e4  # Ignore points outside realm of numerical stability.
 ) -> Tuple[chex.Array, Tuple[chex.Array, dict]]:
     if apply_random_rotation:
         key, subkey = jax.random.split(key)

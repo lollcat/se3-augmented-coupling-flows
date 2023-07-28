@@ -14,13 +14,8 @@ flow:
   nodes: 19
 
 training:
-  optimizer:
-    init_lr: 1e-3
-    peak_lr: 1e-3
-    end_lr: 1e-3
   use_64_bit: false
-  n_epoch: 50 #  800
-  n_eval: 5
+  n_epoch: 800
   batch_size: 32
   plot_batch_size: 16 # Can be small as we plot with big sample size later.
   eval_batch_size: 32
@@ -35,7 +30,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_NO_REGULARISATION_CBLGPU
+    name: qm9pos_${flow.type}_${training.per_batch_masking}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,ema]
+    tags: [qm9pos,ml,florence]
