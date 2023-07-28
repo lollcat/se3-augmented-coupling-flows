@@ -253,7 +253,7 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
         x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(
-            params.bijector, sample, regularise=True, base_params=params.base)
+            params.bijector, sample)  # , regularise=True, base_params=params.base)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         chex.assert_equal_shape((base_log_prob, log_det))
 
