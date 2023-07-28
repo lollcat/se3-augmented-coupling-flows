@@ -12,7 +12,6 @@ hydra:
 flow:
   n_aug: 3
   nodes: 19
-  scaling_layer: true
 
 training:
   optimizer:
@@ -20,7 +19,8 @@ training:
     peak_lr: 1e-3
     end_lr: 1e-3
   use_64_bit: false
-  n_epoch: 200 #  800
+  n_epoch: 50 #  800
+  n_eval: 5
   batch_size: 32
   plot_batch_size: 16 # Can be small as we plot with big sample size later.
   eval_batch_size: 32
@@ -35,7 +35,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: qm9pos_${flow.type}_REGULARISATION
+    name: qm9pos_${flow.type}_REGULARISATION_CBLGPU
     project: fab
     entity: flow-ais-bootstrap
     tags: [qm9pos,ml,ema]

@@ -12,37 +12,39 @@ from examples.analyse_results.dw4_results.plot import make_get_data_for_plotting
 from train.max_lik_train_and_eval import general_ml_loss_fn, masked_ml_loss_fn
 from train.custom_step import training_step, training_step_with_masking
 from molboil.utils.test import assert_is_equivariant, assert_is_invariant, random_rotate_translate_permute
+from examples.create_train_config import create_flow_config, AugmentedFlow, TrainingState
+from examples.create_train_config import build_flow
 
-
-_BASE_DIR = '../../..'
+_BASE_DIR = './'
+# _BASE_DIR = '../../..'
 
 
 
 
 
 def plot_qm9(ax: Optional = None):
-    seed = 1
+    seed = 0
 
     hydra.core.global_hydra.GlobalHydra.instance().clear()
     initialize(config_path=f"{_BASE_DIR}/examples/config/")
     cfg = compose(config_name="qm9.yaml")
 
-    flow_type = 'proj'
-    # download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "ema"], seed=seed, max_iter=200,
-    #                     base_path='./examples/analyse_results/qm9_results/models')
-
-    checkpoint_path = f"examples/analyse_results/qm9_results/models/{flow_type}_seed{seed}.pkl"
+    flow_type = 'spherical'
     cfg.flow.type = flow_type
-    key = jax.random.PRNGKey(0)
+    key = jax.random.PRNGKey(seed)
+    key, subkey = jax.random.split(key)
+    key1, key2 = jax.random.split(subkey)
 
-    flow, state = load_flow(cfg, checkpoint_path)
+    flow_config = create_flow_config(cfg)
+    flow = build_flow(flow_config)
 
 
     train_data, valid_data, test_data = load_qm9(train_set_size=1000)  # None)
     n_samples_from_flow_plotting = train_data.positions.shape[0]
 
-    batch = train_data[0:32]
-    a = flow.aux_target_sample_n_apply(state.params.aux_target, batch, key)
+    batch = test_data[0:32]
+    params = flow.init(key1, batch[0])
+    a = flow.aux_target_sample_n_apply(params.aux_target, batch, key)
     joint_samples = flow.separate_samples_to_joint(batch.features, batch.positions, a)
 
     def group_action(x_and_a):
@@ -52,39 +54,18 @@ def plot_qm9(ax: Optional = None):
     positions_rot = group_action(joint_samples.positions)
     samples_rot = joint_samples._replace(positions=positions_rot)
 
-    params_init = flow.init(jax.random.PRNGKey(5), batch[0])
-
-
-
-    # loss_fn_with_mask = partial(masked_ml_loss_fn,
-    #                             flow=flow,
-    #                             use_flow_aux_loss=cfg.training.use_flow_aux_loss,
-    #                             aux_loss_weight=cfg.training.aux_loss_weight,
-    #                             apply_random_rotation=False)
-    # optimizer = optax.adam(1e-4)
-    # opt_state = optimizer.init(params=state.params)
-    # training_step_fn = partial(training_step_with_masking, optimizer=optimizer,
-    #                            loss_fn_with_mask=loss_fn_with_mask,
-    #                            verbose_info=cfg.training.verbose_info)
-    #
-    # new_params, new_opt_state, info = training_step_fn(state.params, batch, opt_state, state.key)
 
     latent, log_det, extra = flow.bijector_inverse_and_log_det_with_extra_apply(
-        params_init.bijector, joint_samples, layer_indices=(0, None), regularise = True, base_params=params_init.base)
+        params.bijector, joint_samples, layer_indices=(-1, None), regularise = True, base_params=params.base)
     latent_r, log_det_r, extra_r = flow.bijector_inverse_and_log_det_with_extra_apply(
-        params_init.bijector, samples_rot, layer_indices=(0, None), regularise = True, base_params=params_init.base)
+        params.bijector, samples_rot, layer_indices=(-1, None), regularise = True, base_params=params.base)
 
-    log_q, extra = flow.log_prob_with_extra_apply(params_init, joint_samples)
-    log_q_r, extra = flow.log_prob_with_extra_apply(params_init, samples_rot)
+    log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
+    log_q_r, extra = flow.log_prob_with_extra_apply(params, samples_rot)
 
-    (flow.base_log_prob(params_init.base, latent) - flow.base_log_prob(params_init.base, latent_r))
-    jnp.max((flow.base_log_prob(params_init.base, latent) - flow.base_log_prob(params_init.base, latent_r)))
-
-    latent, log_det, extra = flow.bijector_inverse_and_log_det_with_extra_apply(
-        state.params.bijector, joint_samples, layer_indices=(-5, None), regularise = True, base_params=state.params.base)
-
-    log_q, extra = flow.log_prob_with_extra_apply(state.params, joint_samples)
-
+    (flow.base_log_prob(params.base, latent) - flow.base_log_prob(params.base, latent_r))
+    ((flow.base_log_prob(params.base, latent) - flow.base_log_prob(params.base, latent_r))).max()
+    (log_q - log_q_r).max()
 
 
 
