@@ -5,6 +5,7 @@ import distrax
 import haiku as hk
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from flow.distrax_with_extra import Extra, BijectorWithExtra
 from molboil.base import FullGraphSample
@@ -166,13 +167,17 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
 
     def bijector_forward_and_log_det_with_extra_apply(
             params: Params,
-            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+            sample: FullGraphSample,
+            layer_indices: Optional[Tuple[int, int]] = None  # [start, stop]
+    ) -> Tuple[FullGraphSample, LogDet, Extra]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det, extra = bijector_forward_and_log_det_with_extra_single.apply(bijector_params, x)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (y, log_det_prev + log_det), extra
 
+        if layer_indices is not None:
+            params = jax.tree_map(lambda x: x[layer_indices[0]:layer_indices[1]], params)
         (y, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(sample.positions.shape[:-3])),
                                            xs=params,
                                            unroll=recipe.compile_n_unroll)
@@ -186,11 +191,23 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
 
     def bijector_inverse_and_log_det_with_extra_apply(
             params: Params,
-            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+            sample: FullGraphSample,
+            layer_indices: Optional[Tuple[int, int]] = None,  # [start, stop]
+            regularise: bool = False,
+            base_params: Optional[Params] = None,
+    ) -> Tuple[FullGraphSample, LogDet, Extra]:
+
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
             x, log_det, extra = bijector_inverse_and_log_det_with_extra_single.apply(bijector_params, y)
             chex.assert_equal_shape((log_det_prev, log_det))
+            if regularise:
+                assert base_params is not None
+                base_log_prob = base_log_prob_fn.apply(base_params, x)
+                base_reg_loss = -0.01 * jnp.mean(base_log_prob)
+                extra.aux_info.update(base_reg_loss=base_reg_loss)
+                extra.info_aggregator.update(base_reg_loss=jnp.mean)
+                extra = extra._replace(aux_loss=extra.aux_loss + base_reg_loss)
             return (x, log_det_prev + log_det), extra
 
         # Restrict to zero-CoM subspace before passing through bijector.
@@ -198,6 +215,9 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
         centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
         sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
         log_prob_shape = sample.positions.shape[:-3]
+
+        if layer_indices is not None:
+            params = jax.tree_map(lambda x: x[layer_indices[0]:layer_indices[1]], params)
         (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
                                            xs=params,
                                            reverse=True, unroll=recipe.compile_n_unroll)
@@ -232,7 +252,8 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
         return base_log_prob + log_det
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
-        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(params.bijector, sample)
+        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(
+            params.bijector, sample, regularise=True, base_params=params.base)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         chex.assert_equal_shape((base_log_prob, log_det))
 

@@ -20,14 +20,14 @@ _BASE_DIR = '../../..'
 
 
 def plot_qm9(ax: Optional = None):
-    seed = 2
+    seed = 1
 
     hydra.core.global_hydra.GlobalHydra.instance().clear()
     initialize(config_path=f"{_BASE_DIR}/examples/config/")
     cfg = compose(config_name="qm9.yaml")
 
-    flow_type = 'spherical'
-    # download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "post_sub1", "cblgpu12"], seed=seed, max_iter=800,
+    flow_type = 'proj'
+    # download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "ema"], seed=seed, max_iter=200,
     #                     base_path='./examples/analyse_results/qm9_results/models')
 
     checkpoint_path = f"examples/analyse_results/qm9_results/models/{flow_type}_seed{seed}.pkl"
@@ -40,25 +40,28 @@ def plot_qm9(ax: Optional = None):
     n_samples_from_flow_plotting = train_data.positions.shape[0]
 
     batch = train_data[0:8]
-    a = flow.aux_target_sample_n_apply(state.params.aux_target, batch , key)
+    a = flow.aux_target_sample_n_apply(state.params.aux_target, batch, key)
     joint_samples = flow.separate_samples_to_joint(batch.features, batch.positions, a)
 
-    loss_fn_with_mask = partial(masked_ml_loss_fn,
-                                flow=flow,
-                                use_flow_aux_loss=cfg.training.use_flow_aux_loss,
-                                aux_loss_weight=cfg.training.aux_loss_weight,
-                                apply_random_rotation=False)
-    optimizer = optax.adam(1e-4)
-    opt_state = optimizer.init(params=state.params)
-    training_step_fn = partial(training_step_with_masking, optimizer=optimizer,
-                               loss_fn_with_mask=loss_fn_with_mask,
-                               verbose_info=cfg.training.verbose_info)
+    # loss_fn_with_mask = partial(masked_ml_loss_fn,
+    #                             flow=flow,
+    #                             use_flow_aux_loss=cfg.training.use_flow_aux_loss,
+    #                             aux_loss_weight=cfg.training.aux_loss_weight,
+    #                             apply_random_rotation=False)
+    # optimizer = optax.adam(1e-4)
+    # opt_state = optimizer.init(params=state.params)
+    # training_step_fn = partial(training_step_with_masking, optimizer=optimizer,
+    #                            loss_fn_with_mask=loss_fn_with_mask,
+    #                            verbose_info=cfg.training.verbose_info)
+    #
+    # new_params, new_opt_state, info = training_step_fn(state.params, batch, opt_state, state.key)
 
-    new_params, new_opt_state, info = training_step_fn(state.params, batch, opt_state, state.key)
+    latent, log_det, extra = flow.bijector_inverse_and_log_det_with_extra_apply(
+        state.params.bijector, joint_samples, layer_indices=(-5, None), regularise = True, base_params=state.params.base)
 
-    # log_q, extra = flow.log_prob_with_extra_apply(state.params, joint_samples)
+    log_q, extra = flow.log_prob_with_extra_apply(state.params, joint_samples)
 
-    # latent, extra, log_det = flow.bijector_inverse_and_log_det_with_extra_apply(state.params.bijector, joint_samples)
+
 
 
     get_data_for_plotting, count_list, bins_x = make_get_data_for_plotting(train_data=train_data, test_data=test_data,
