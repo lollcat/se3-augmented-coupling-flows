@@ -29,7 +29,8 @@ def masked_ml_loss_fn(
 ) -> Tuple[chex.Array, Tuple[chex.Array, dict]]:
     if apply_random_rotation:
         key, subkey = jax.random.split(key)
-        rotated_positions = random_rotate_translate_permute(x.positions, subkey, translate=False, permute=False)
+        rotated_positions = random_rotate_translate_permute(x.positions[:, None], subkey, translate=False, permute=False)
+        rotated_positions = jnp.squeeze(rotated_positions, axis=1)
         x = x._replace(positions=rotated_positions)
     aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
     joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
