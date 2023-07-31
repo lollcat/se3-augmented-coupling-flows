@@ -1,6 +1,6 @@
 defaults:
   - training: default
-  - training/optimizer: default_lr_schedule_fab
+  - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
   - fab: default
