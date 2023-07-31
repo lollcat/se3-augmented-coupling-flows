@@ -37,5 +37,5 @@ logger:
     name: dw4_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,ml,florence]
+    tags: [dw4,ml,florence,no1]
 
