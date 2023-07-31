@@ -341,8 +341,9 @@ def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
         sample_joint = separate_samples_to_full_joint(sample.features,
                                                       sample.positions, sample_a)
         params_base = base_log_prob_fn.init(key3, sample_joint)
-        params_bijectors = jax.vmap(bijector_inverse_and_log_det_single.init, in_axes=(0, None))(
-            jax.random.split(key4, recipe.n_layers), sample_joint)
+        params_bijector_single = bijector_inverse_and_log_det_single.init(key4, sample_joint)
+        params_bijectors = jax.tree_map(lambda x: jnp.repeat(x[None, ...], recipe.n_layers, axis=0),
+                                        params_bijector_single)
         return AugmentedFlowParams(base=params_base, bijector=params_bijectors, aux_target=params_aux_target)
 
     def sample_apply(*args, **kwargs):
