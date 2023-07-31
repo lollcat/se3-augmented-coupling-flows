@@ -23,7 +23,6 @@ training:
   train_set_size: null
   test_set_size: null
   aux_loss_weight: 10.0
-  per_batch_masking: true
 
 
 logger:
