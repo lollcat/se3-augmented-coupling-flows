@@ -34,5 +34,5 @@ logger:
     name: lj13_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,ml,florence,no1]
+    tags: [lj13,ml,florence,no2]
 
