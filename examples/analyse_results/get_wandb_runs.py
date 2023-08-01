@@ -5,7 +5,7 @@ import os
 api = wandb.Api()
 
 
-def get_wandb_run(flow_type, tags, seed):
+def get_wandb_run(flow_type, tags, seed, donwload_latest_completed: bool = True):
     filter_list = [{"tags": tag} for tag in tags]
     filter_list.extend([
          {"config.flow": {"$regex": f"'type': '{flow_type}',"}},
@@ -17,7 +17,10 @@ def get_wandb_run(flow_type, tags, seed):
     runs = api.runs(path='flow-ais-bootstrap/fab',
                     filters=filters)
     if len(runs) > 1:
-        print(f"Found multiple runs for flow_type {flow_type}, tags {tags}, seed {seed}. "
+        if not donwload_latest_completed:
+            print(f"found {len(runs)} multiple runs, getting first")
+            return runs[-1]
+        print(f"Found {len(runs)} runs for flow_type {flow_type}, tags {tags}, seed {seed}. "
               f"Taking the most recent.")
     elif len(runs) == 0:
         raise Exception(f"No runs for for flow_type {flow_type}, tags {tags}, seed {seed} found!")
@@ -25,19 +28,20 @@ def get_wandb_run(flow_type, tags, seed):
     while not "finished" in str(runs[j]):
         j += 1
     run = runs[j]  # Get latest finished run.
-    if 'fab' not in tags:
-        assert '"fab": ' not in run.json_config
-    else:
-        assert '"fab": ' in run.json_config
+    # if 'fab' not in tags:
+    #     assert '"fab": ' not in run.json_config
+    # else:
+    #     assert '"fab": ' in run.json_config
     return run
 
 
 def download_checkpoint(flow_type, tags, seed, max_iter, base_path):
+    assert os.path.exists(base_path)
     run = get_wandb_run(flow_type, tags, seed)
     for file in run.files():
         if re.search(fr'.*{max_iter-1}.pkl', str(file)):
             file.download(exist_ok=True)
-            path = re.search(r"([^\s]*results[^\s]*)", str(file)).group()
+            path = re.search(r"([^\s]*model_checkpoints[^\s]*)", str(file)).group()
             os.replace(path, f"{base_path}/{flow_type}_seed{seed}.pkl")
             print("saved" + path)
 

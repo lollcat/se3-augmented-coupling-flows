@@ -34,7 +34,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # Training
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
-    cfg.training.n_epoch = int(1e3)
+    cfg.training.n_epoch = int(1e3) + 23
     cfg.training.save = True
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
@@ -47,9 +47,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['non_equivariant']
+    cfg.flow.type = 'spherical'
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
+    cfg.training.resume = False
 
 
     # Configure NNs
@@ -71,7 +72,6 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
-    # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
     local_config = False
     if local_config:
         print("running locally")
@@ -83,7 +83,8 @@ def run(cfg: DictConfig):
     else:
         load_dataset = load_dataset_original
     experiment_config = create_train_config(cfg, target_log_p_x_fn=log_prob_fn,
-                                            dim=2, n_nodes=4, load_dataset=load_dataset)
+                                            dim=2, n_nodes=4, load_dataset=load_dataset,
+                                            date_folder=True)
     train(experiment_config)
 
 

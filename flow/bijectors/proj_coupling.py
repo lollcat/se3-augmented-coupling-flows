@@ -16,48 +16,35 @@ BijectorParams = chex.Array
 
 
 
-def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True,
-                                      method: str = 'gram-schmidt') -> chex.Array:
+def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: bool = True) -> chex.Array:
     """Takes in a set of (non-orthonormal vectors), and returns an orthonormal basis, with equivariant
     vectors as it's columns."""
-
-    assert method in ('gram-schmidt', 'loewdin')
-
     n_nodes, n_vectors, dim = vectors.shape
 
     if add_small_identity:
         # Add independant vectors to try help improve numerical stability
         vectors = vectors + jnp.eye(n_vectors, dim)[None, :, :] * 1e-6
+    # Set n_vectors to leading axis to make slicing simpler.
+    basis_vectors = jnp.swapaxes(vectors, 0, 1)
 
-    if method == 'gram-schmidt':
-        # Set n_vectors to leading axis to make slicing simpler.
-        basis_vectors = jnp.swapaxes(vectors, 0, 1)
+    z_basis_vector = basis_vectors[0]
+    z_basis_vector = z_basis_vector / safe_norm(z_basis_vector, axis=-1, keepdims=True)
+    if dim == 3:
+        # Vector rejection to get second axis orthogonal to z axis.
+        x_basis_vector = basis_vectors[1]
+        x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
+        x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
+        x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
 
-        z_basis_vector = basis_vectors[0]
-        z_basis_vector = z_basis_vector / safe_norm(z_basis_vector, axis=-1, keepdims=True)
-        if dim == 3:
-            # Vector rejection to get second axis orthogonal to z axis.
-            x_basis_vector = basis_vectors[1]
-            x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
-            x_basis_vector = vector_rejection(x_basis_vector, z_basis_vector)
-            x_basis_vector = x_basis_vector / safe_norm(x_basis_vector, axis=-1, keepdims=True)
-
-            # Cross product of z and x vector to get final vector.
-            y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
-            y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
-        else:
-            assert dim == 2
-            y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
-            y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
-            change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
-    elif method == 'loewdin':
-        if n_vectors == dim - 1:
-            c = jnp.cross(vectors[:, :1, :], vectors[:, 1:, :])
-            vectors = jnp.concatenate((vectors, c), axis=1)
-        vectors = jnp.swapaxes(vectors, 1, 2)
-        w, s, vt = jnp.linalg.svd(vectors, full_matrices=False)
-        change_of_basis_matrix = jax.vmap(jnp.matmul)(w, vt)
+        # Cross product of z and x vector to get final vector.
+        y_basis_vector = jnp.cross(z_basis_vector, x_basis_vector)
+        y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
+        change_of_basis_matrix = jnp.stack([z_basis_vector, x_basis_vector, y_basis_vector], axis=-1)
+    else:
+        assert dim == 2
+        y_basis_vector = rotate_2d(z_basis_vector, theta=jnp.pi * 0.5)
+        y_basis_vector = y_basis_vector / safe_norm(y_basis_vector, axis=-1, keepdims=True)
+        change_of_basis_matrix = jnp.stack([z_basis_vector, y_basis_vector], axis=-1)
 
     chex.assert_shape(change_of_basis_matrix, (n_nodes, dim, dim))
     return change_of_basis_matrix
@@ -72,7 +59,6 @@ class ProjSplitCoupling(BijectorWithExtra):
                  origin_on_coupled_pair: bool = True,
                  swap: bool = False,
                  add_small_identity: bool = True,
-                 orthogonalization_method: str = 'loewdin',
                  n_inner_transforms: int = 1,
                  event_ndims: int = 3,
                  split_axis: int = -2,
@@ -103,7 +89,6 @@ class ProjSplitCoupling(BijectorWithExtra):
         self._get_basis_vectors_and_invariant_vals = get_basis_vectors_and_invariant_vals
         self._graph_features = graph_features
         self._add_small_identity = add_small_identity
-        self._orthogonalization_method = orthogonalization_method
         self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
@@ -168,8 +153,8 @@ class ProjSplitCoupling(BijectorWithExtra):
             vectors = vectors_out[:, :, :, 1:]
 
         # Vmap over multiplicity.
-        change_of_basis_matrices = jax.vmap(jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None, None), out_axes=1),
-        in_axes=(1, None, None), out_axes=1)(vectors, self._add_small_identity, self._orthogonalization_method)
+        change_of_basis_matrices = jax.vmap(jax.vmap(get_equivariant_orthonormal_basis, in_axes=(1, None), out_axes=1),
+        in_axes=(1, None), out_axes=1)(vectors, self._add_small_identity)
         extra = self.get_extra(vectors)
 
         chex.assert_shape(origin, (n_nodes, multiplicity, self.n_inner_transforms, dim))
@@ -181,23 +166,25 @@ class ProjSplitCoupling(BijectorWithExtra):
         n_vectors, dim = basis_vectors.shape
         assert dim == 3
         assert n_vectors == 2 or n_vectors == 3
-        basis_vectors = basis_vectors + jnp.eye(dim)[:n_vectors] * 1e-30
+        basis_vectors = basis_vectors
         vec1 = basis_vectors[0]
         vec2 = basis_vectors[1]
         arccos_in = jnp.dot(vec1, vec2) / safe_norm(vec1, axis=-1) / safe_norm(vec2, axis=-1)
         theta = jnp.arccos(arccos_in)
         log_barrier_in = 1 - jnp.abs(arccos_in)
-        log_barrier_in = jnp.where(log_barrier_in < 1e-6, log_barrier_in + 1e-6, log_barrier_in)
+
+        # Don't penalize when very close (or on top of each other) to keep grads stable.
+        log_barrier_in = jnp.where(log_barrier_in < 1e-4, jnp.ones_like(log_barrier_in), log_barrier_in)
         aux_loss = - jnp.log(log_barrier_in)
         return theta, aux_loss, log_barrier_in
 
-    def get_extra(self, various_x_points: chex.Array) -> Extra:
-        dim = various_x_points.shape[-1]
+    def get_extra(self, vectors: chex.Array) -> Extra:
+        dim = vectors.shape[-1]
         if dim == 2:
             return Extra()
         else:
             # Vmap over n_nodes, multiplicity, and n_inner_transforms.
-            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(various_x_points)
+            theta, aux_loss, log_barrier_in = jax.vmap(jax.vmap(jax.vmap(self.get_vector_info_single)))(vectors)
             info = {}
             info_aggregator = {}
             info_aggregator.update(

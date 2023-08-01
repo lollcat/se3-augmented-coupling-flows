@@ -1,19 +1,14 @@
 from typing import NamedTuple, Optional, Sequence
 import chex
 import jax.numpy as jnp
-import e3nn_jax as e3nn
 import haiku as hk
 import jax
 import warnings
 
 from molboil.utils.graph import get_senders_and_receivers_fully_connected
 from molboil.models.base import EquivariantForwardFunction
-from molboil.models.e3_gnn import E3GNNTorsoConfig, make_e3nn_torso_forward_fn
-from molboil.models.e3gnn_linear_haiku import Linear as e3nnLinear
 from molboil.models.en_gnn import make_egnn_torso_forward_fn, EGNNTorsoConfig
 
-
-from nets.e3_transformer import make_e3transformer_torso_forward_fn, E3TransformerTorsoConfig
 from nets.transformer import TransformerConfig
 
 class MLPHeadConfig(NamedTuple):
@@ -24,8 +19,6 @@ class MLPHeadConfig(NamedTuple):
 class NetsConfig(NamedTuple):
     type: str
     egnn_torso_config: Optional[EGNNTorsoConfig] = None
-    e3gnn_torso_config: Optional[E3GNNTorsoConfig] = None
-    e3transformer_config: Optional[E3TransformerTorsoConfig] = None
     mlp_head_config: Optional[MLPHeadConfig] = None
     non_equivariant_transformer_config: Optional[TransformerConfig] = None
     softmax_layer_invariant_feat: bool = True
@@ -36,20 +29,13 @@ class NetsConfig(NamedTuple):
 def build_torso(name: str, config: NetsConfig,
                 n_vectors_out: int,
                 n_vectors_in: int) -> EquivariantForwardFunction:
-    if config.type == 'e3gnn':
-        torso = make_e3nn_torso_forward_fn(torso_config=config.e3gnn_torso_config._replace(
-            name=name + config.e3gnn_torso_config.name),
-        )
-    elif config.type == 'egnn':
+    if config.type == 'egnn':
         assert n_vectors_out % n_vectors_in == 0
         torso = make_egnn_torso_forward_fn(config.egnn_torso_config._replace(
             name=name + config.egnn_torso_config.name,
             n_vectors_hidden_per_vec_in=n_vectors_out // n_vectors_in,
         ),
         )
-    elif config.type == "e3transformer":
-        torso = make_e3transformer_torso_forward_fn(torso_config=config.e3transformer_config._replace(
-            name=name + config.e3transformer_config.name))
     else:
         raise NotImplementedError
     return torso
@@ -98,23 +84,17 @@ class EGNN(hk.Module):
             h = full_embedding[h]
             chex.assert_shape(h, (n_nodes, self.nets_config.embedding_dim))
 
+
         # Pass through torso network.
         torso = build_torso(self.name, self.nets_config, self.n_equivariant_vectors_out, vec_multiplicity_in)
         vectors, h = torso(x, h, senders, receivers)
+
 
         chex.assert_rank(vectors, 3)
         chex.assert_rank(h, 2)
         n_vectors_torso_out = vectors.shape[-2]
 
-        if n_vectors_torso_out != self.n_equivariant_vectors_out:
-            if dim != 3:
-                raise Exception("Uses e3nn so only works for dim=3")
-            vectors = e3nn.IrrepsArray("1x1o", vectors)
-            vectors = vectors.axis_to_mul(axis=-2)  # [n_nodes, n_vectors*dim]
-
-            vectors = e3nnLinear(e3nn.Irreps(f"{self.n_equivariant_vectors_out}x1o"),
-                                 biases=True)(vectors)  # [n_nodes, n_equivariant_vectors_out*dim]
-            vectors = vectors.mul_to_axis().array
+        assert n_vectors_torso_out == self.n_equivariant_vectors_out
 
         if self.nets_config.softmax_layer_invariant_feat:
             h = jax.nn.softmax(h, axis=-1)

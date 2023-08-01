@@ -1,6 +1,6 @@
 import jax.random
-from omegaconf import DictConfig
-import yaml
+from hydra import compose, initialize
+import hydra
 
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
@@ -18,14 +18,19 @@ from examples.analyse_results.get_wandb_runs import download_checkpoint
 # rc('ytick', labelsize=20)
 # rc("lines", linewidth=4)
 
+_BASE_DIR = '../../..'
 
 def plot_lj13(ax: Optional = None):
-    download_checkpoint(flow_type='spherical', tags=["lj13", "final_run"], seed=0, max_iter=256,
-                        base_path='./examples/lj13_results/models')
+    hydra.core.global_hydra.GlobalHydra.instance().clear()
+    initialize(config_path=f"{_BASE_DIR}/examples/config/")
+    cfg = compose(config_name="lj13.yaml")
+
+    download_checkpoint(flow_type='spherical', tags=["lj13", "ml", "florence"], seed=0, max_iter=400,
+                        base_path='./examples/analyse_results/lj13_results/models')
 
     flow_type = 'spherical'
-    checkpoint_path = f"examples/lj13_results/models/{flow_type}_seed0.pkl"
-    cfg = DictConfig(yaml.safe_load(open(f"examples/config/lj13.yaml")))
+    checkpoint_path = f"examples/analyse_results/lj13_results/models/{flow_type}_seed0.pkl"
+
     cfg.flow.type = flow_type
     n_samples_from_flow_plotting = 1000
     key = jax.random.PRNGKey(0)

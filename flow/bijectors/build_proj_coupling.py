@@ -23,7 +23,6 @@ def make_proj_coupling_layer(
         identity_init: bool = True,
         origin_on_coupled_pair: bool = False,
         add_small_identity: bool = True,
-        orthogonalization_method: str = 'gram-schmidt',  # or loewdin
         transform_type: str = 'real_nvp',
         num_bins: int = 10,
         lower: float = -10.,
@@ -36,7 +35,6 @@ def make_proj_coupling_layer(
 
     multiplicity_within_coupling_split = ((n_aug + 1) // 2)
     n_heads = dim - 1 if origin_on_coupled_pair else dim
-    n_heads = n_heads + _N_ADDITIONAL_BASIS_VECTORS_LOEWDIN if orthogonalization_method == 'loewdin' else n_heads
     if transform_type == "real_nvp":
         params_per_dim_channel = dim * 2
         n_invariant_params_bijector = params_per_dim_channel*multiplicity_within_coupling_split
@@ -83,10 +81,6 @@ def make_proj_coupling_layer(
 
     if nets_config.type == "egnn":
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3transformer":
-        n_invariant_feat_out = nets_config.e3transformer_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 
@@ -113,7 +107,6 @@ def make_proj_coupling_layer(
         bijector=bijector_fn,
         swap=swap,
         add_small_identity=add_small_identity,
-        orthogonalization_method=orthogonalization_method,
         n_inner_transforms=n_inner_transforms,
         event_ndims=3,  # [nodes, n_aug+1, dim]
         split_axis=-2,

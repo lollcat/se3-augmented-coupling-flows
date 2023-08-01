@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import chex
 import jax
@@ -9,10 +9,46 @@ from molboil.utils.test import random_rotate_translate_permute
 from utils.testing import get_checks_for_flow_properties
 from flow.distrax_with_extra import Extra
 from flow.aug_flow_dist import AugmentedFlow, FullGraphSample, AugmentedFlowParams
+from molboil.train.base import maybe_masked_mean
 
 Params = chex.ArrayTree
 X = chex.Array
 LogProbWithExtraFn = Callable[[Params, X], Tuple[chex.Array, Extra]]
+
+
+def masked_ml_loss_fn(
+        key: chex.PRNGKey,
+        params: AugmentedFlowParams,
+        x: FullGraphSample,
+        verbose_info: bool,
+        flow: AugmentedFlow,
+        use_flow_aux_loss: bool,
+        aux_loss_weight: float,
+        apply_random_rotation: bool = False,
+        log_q_cutoff: float = -1e4  # Ignore points outside realm of numerical stability.
+) -> Tuple[chex.Array, Tuple[chex.Array, dict]]:
+    if apply_random_rotation:
+        key, subkey = jax.random.split(key)
+        rotated_positions = random_rotate_translate_permute(x.positions[:, None], subkey, translate=False, permute=False)
+        rotated_positions = jnp.squeeze(rotated_positions, axis=1)
+        x = x._replace(positions=rotated_positions)
+    aux_samples = flow.aux_target_sample_n_apply(params.aux_target, x, key)
+    joint_samples = flow.separate_samples_to_joint(x.features, x.positions, aux_samples)
+    log_q, extra = flow.log_prob_with_extra_apply(params, joint_samples)
+    # Train by maximum likelihood.
+    loss = - log_q
+    info = {"mean_log_prob_q_joint": log_q,
+            }
+    aux_loss = jnp.mean(extra.aux_loss)
+    info.update(flow.get_base_and_target_info(params))
+    if use_flow_aux_loss:
+        loss = loss + aux_loss * aux_loss_weight
+    if verbose_info:
+        info.update({"layer_info/" + key: value for key, value in extra.aux_info.items()})
+    info.update(aux_loss=aux_loss)
+
+    mask = jnp.isfinite(loss) & (log_q > log_q_cutoff)
+    return loss, (mask, info)
 
 
 def general_ml_loss_fn(
@@ -65,7 +101,9 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
                            key: chex.PRNGKey,
                            flow: AugmentedFlow,
                            K: int,
-                           test_invariances: bool = True) -> dict:
+                           test_invariances: bool = True,
+                           mask: Optional[chex.Array] = None) -> dict:
+
     key, subkey = jax.random.split(key)
     x_augmented, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x_test, subkey, K)
     x_test = jax.tree_map(lambda x: jnp.repeat(x[None, ...], K, axis=0), x_test)
@@ -76,19 +114,22 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
     log_w = log_q - log_p_a
 
     info = {}
-    info.update(eval_log_lik=jnp.mean(log_q))
-    marginal_log_lik = jnp.mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)), axis=0)
+    info.update(eval_log_lik=maybe_masked_mean(jnp.mean(log_q, axis=0), mask=mask))
+    marginal_log_lik = maybe_masked_mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)),
+                                         mask=mask)
     info.update(marginal_log_lik=marginal_log_lik)
 
-    lower_bound_marginal_gap = marginal_log_lik - jnp.mean(log_w)
+    lower_bound_marginal_gap = marginal_log_lik - maybe_masked_mean(jnp.mean(log_w, axis=0), mask=mask)
     info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
 
-    info.update(var_log_w=jnp.mean(jnp.var(log_w, axis=0), axis=0))
-    info.update(ess_aug_conditional=jnp.mean(1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0]))
+    info.update(var_log_w=maybe_masked_mean(jnp.var(log_w, axis=0), mask=mask))
+    info.update(ess_aug_conditional=maybe_masked_mean(
+        1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0], mask=mask))
 
     if test_invariances:
         key, subkey = jax.random.split(key)
-        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey)
+        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey,
+                                                          mask=mask)
         info.update(invariances_info)
     return info
 
@@ -126,6 +167,5 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
             {
              "ess": ess}
         )
-        # TODO: Add KL to eval with batch info.
-        # "eval_kl": jnp.mean(target_log_prob(x)) - info["eval_log_lik"],
     return info
+

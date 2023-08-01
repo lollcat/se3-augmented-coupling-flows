@@ -53,14 +53,14 @@ def make_spherical_coupling_layer(
             range_min=0.0,
             range_max=dist_spline_max,
             boundary_slopes='unconstrained',
-            min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+            min_bin_size=dist_spline_max * 1e-4)
         if dim == 2:
             theta_bijector = distrax.RationalQuadraticSpline(
                 params[:, :, 1:2, :],
                 range_min=-jnp.pi,
                 range_max=jnp.pi,
                 boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size=(2*jnp.pi) * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector],
                 split_indices=[1, ],
@@ -72,13 +72,13 @@ def make_spherical_coupling_layer(
                 range_min=0,
                 range_max=jnp.pi,
                 boundary_slopes='unconstrained',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size=jnp.pi * 1e-4)
             torsional_bijector = distrax.RationalQuadraticSpline(
                 params[:, :, 2:3, :],
                 range_min=-jnp.pi,
                 range_max=jnp.pi,
                 boundary_slopes='circular',
-                min_bin_size=(dist_spline_max - 0.0) * 1e-4)
+                min_bin_size=2 * jnp.pi * 1e-4)
             bijector = Blockwise(
                 bijectors=[d_bijector, theta_bijector, torsional_bijector],
                 split_indices=[1,2],
@@ -88,10 +88,6 @@ def make_spherical_coupling_layer(
 
     if nets_config.type == "egnn":
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3transformer":
-        n_invariant_feat_out = nets_config.e3transformer_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 

@@ -1,33 +1,26 @@
-from typing import NamedTuple, Callable, Tuple, Union, Any, Optional
+from typing import NamedTuple, Callable, Tuple, Any, Optional
 
 import chex
 import distrax
 import haiku as hk
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from flow.distrax_with_extra import Extra, BijectorWithExtra
+from molboil.base import FullGraphSample
 
 Params = hk.Params
 LogProb = chex.Array
 LogDet = chex.Array
 
-GraphFeatures = chex.Array  # Non-positional information.
+GraphFeatures = chex.Array  # Non-positional information such as atom type.
 Positions = chex.Array
-
-
-class FullGraphSample(NamedTuple):
-    positions: Positions
-    features: GraphFeatures
-    # has_aux: Optional[jnp.bool_] = False   # Whether or not positions contain auxilliary variables.
-
-    def __getitem__(self, i):
-        return FullGraphSample(self.positions[i], self.features[i])  # , self.has_aux)
 
 
 
 class AugmentedFlowRecipe(NamedTuple):
-    """Defines input needed to create an instance of the `Flow` callables."""
+    """Defines input needed to create an instance of the `AugmentedFlow` callables."""
     make_base: Callable[[], distrax.Distribution]
     make_bijector: Callable[[GraphFeatures], BijectorWithExtra]
     make_aug_target: Callable[[FullGraphSample], distrax.Distribution]
@@ -35,16 +28,19 @@ class AugmentedFlowRecipe(NamedTuple):
     config: Any
     dim_x: int
     n_augmented: int  # number of augmented variables, each of dimension dim_x.
-    compile_n_unroll: int = 2
+    compile_n_unroll: int = 1
 
 
 class AugmentedFlowParams(NamedTuple):
+    """Container for the parameters of the augmented flow."""
     base: Params
     bijector: Params
     aux_target: Params
 
+
 def separate_samples_to_full_joint(features: GraphFeatures, positions_x: Positions, positions_a: Positions) -> \
         FullGraphSample:
+    """Put features, x and a positions into the `FullGraphSample` container with some checks."""
     features = jnp.expand_dims(features, axis=-2)
     assert len(features.shape) == len(positions_a.shape)
     assert len(positions_x.shape) == (len(positions_a.shape) - 1)
@@ -52,6 +48,7 @@ def separate_samples_to_full_joint(features: GraphFeatures, positions_x: Positio
     return FullGraphSample(positions=positions, features=features)
 
 def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions, Positions, GraphFeatures]:
+    """Pull out features, x and a positions from a joint `FullGraphSample`."""
     positions_x, positions_a = jnp.split(joint_sample.positions, indices_or_sections=[1],
                                          axis=-2)
     positions_x = jnp.squeeze(positions_x, axis=-2)
@@ -59,6 +56,7 @@ def joint_to_separate_samples(joint_sample: FullGraphSample) -> Tuple[Positions,
     return features, positions_x, positions_a
 
 def get_base_and_target_info(params: AugmentedFlowParams) -> dict:
+    """Get info for logging that depends on the base and target params."""
     info = {}
     if params.base:
         if "x_log_scale" in params.base["~"]:
@@ -75,6 +73,7 @@ def get_base_and_target_info(params: AugmentedFlowParams) -> dict:
 
 
 class AugmentedFlow(NamedTuple):
+    """Container that defines an augmented flow, mostly of pure jax functions."""
     init: Callable[[chex.PRNGKey, FullGraphSample], AugmentedFlowParams]
     log_prob_apply: Callable[[AugmentedFlowParams, FullGraphSample], LogProb]
     sample_and_log_prob_apply: Callable[[AugmentedFlowParams, GraphFeatures, chex.PRNGKey, chex.Shape], Tuple[FullGraphSample, LogProb]]
@@ -101,15 +100,11 @@ class AugmentedFlow(NamedTuple):
     get_base_and_target_info: Callable[[AugmentedFlowParams], dict] = get_base_and_target_info
 
 
-def create_flow(recipe: AugmentedFlowRecipe):
-    """Create a `Flow` given the provided definition. \
+def create_flow(recipe: AugmentedFlowRecipe) -> AugmentedFlow:
+    """Create an `AugmentedFlow` given the provided definition.
+
+    Make use of `jax.lax.scan` over flow blocks to keep compile time from being too long.
     """
-
-    # TODO: This has been made more general, towards being a flow on the full joint distribution, but currently
-    #   still does conditional distribution of graph.
-    # For this to be done we would make the passing of features to the sampling step optional, so the full joint
-    # may be sampled from.
-
 
     @hk.without_apply_rng
     @hk.transform
@@ -150,7 +145,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         else:
             y, log_det = bijector.forward_and_log_det(x.positions)
             extra = Extra()
-        extra.aux_info.update(mean_log_det=jnp.mean(log_det))
+        extra.aux_info.update(mean_log_det=jnp.mean(-log_det))
         extra.info_aggregator.update(mean_log_det=jnp.mean)
         return FullGraphSample(positions=y, features=x.features), log_det, extra
 
@@ -172,13 +167,17 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
     def bijector_forward_and_log_det_with_extra_apply(
             params: Params,
-            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+            sample: FullGraphSample,
+            layer_indices: Optional[Tuple[int, int]] = None  # [start, stop]
+    ) -> Tuple[FullGraphSample, LogDet, Extra]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det, extra = bijector_forward_and_log_det_with_extra_single.apply(bijector_params, x)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (y, log_det_prev + log_det), extra
 
+        if layer_indices is not None:
+            params = jax.tree_map(lambda x: x[layer_indices[0]:layer_indices[1]], params)
         (y, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(sample.positions.shape[:-3])),
                                            xs=params,
                                            unroll=recipe.compile_n_unroll)
@@ -192,18 +191,24 @@ def create_flow(recipe: AugmentedFlowRecipe):
 
     def bijector_inverse_and_log_det_with_extra_apply(
             params: Params,
-            sample: FullGraphSample) -> Tuple[FullGraphSample, LogDet, Extra]:
+            sample: FullGraphSample,
+            layer_indices: Optional[Tuple[int, int]] = None,  # [start, stop]
+    ) -> Tuple[FullGraphSample, LogDet, Extra]:
+
         def scan_fn(carry, bijector_params):
             y, log_det_prev = carry
             x, log_det, extra = bijector_inverse_and_log_det_with_extra_single.apply(bijector_params, y)
             chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), extra
 
-        # Restrict to subspace before passing through bijector.
+        # Restrict to zero-CoM subspace before passing through bijector.
         x = sample.positions[..., 0, :]
         centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
         sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
         log_prob_shape = sample.positions.shape[:-3]
+
+        if layer_indices is not None:
+            params = jax.tree_map(lambda x: x[layer_indices[0]:layer_indices[1]], params)
         (x, log_det), extra = jax.lax.scan(scan_fn, init=(sample, jnp.zeros(log_prob_shape)),
                                            xs=params,
                                            reverse=True, unroll=recipe.compile_n_unroll)
@@ -224,8 +229,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
             chex.assert_equal_shape((log_det_prev, log_det))
             return (x, log_det_prev + log_det), None
 
-        # Restrict to subspace before passing through bijector.
-        x = sample.positions[..., 0, :]   # Regular coordinates, NOT augmented.
+        # Restrict to zero CoM subspace before passing through bijector.
+        x = sample.positions[..., 0, :]   # Regular coordinates only (as we centre on this).
         centre_of_mass_x = jnp.mean(x, axis=-2, keepdims=True)
         sample = sample._replace(positions=sample.positions - jnp.expand_dims(centre_of_mass_x, axis=-2))
 
@@ -238,7 +243,8 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return base_log_prob + log_det
 
     def log_prob_with_extra_apply(params: AugmentedFlowParams, sample: FullGraphSample) -> Tuple[LogProb, Extra]:
-        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(params.bijector, sample)
+        x, log_det, extra = bijector_inverse_and_log_det_with_extra_apply(
+            params.bijector, sample)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
         chex.assert_equal_shape((base_log_prob, log_det))
 
@@ -248,7 +254,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
         return base_log_prob + log_det, extra
 
     def sample_and_log_prob_apply(params: AugmentedFlowParams, features: GraphFeatures,
-                                  key: chex.PRNGKey, shape: chex.Shape) -> Tuple[Positions, LogProb]:
+                                  key: chex.PRNGKey, shape: chex.Shape) -> Tuple[FullGraphSample, LogProb]:
         def scan_fn(carry, bijector_params):
             x, log_det_prev = carry
             y, log_det = bijector_forward_and_log_det_single.apply(bijector_params, x)
@@ -267,7 +273,7 @@ def create_flow(recipe: AugmentedFlowRecipe):
     def sample_and_log_prob_with_extra_apply(params: AugmentedFlowParams,
                                              features: GraphFeatures,
                                              key: chex.PRNGKey,
-                                             shape: chex.Shape) -> Tuple[Positions, LogProb, Extra]:
+                                             shape: chex.Shape) -> Tuple[FullGraphSample, LogProb, Extra]:
 
         x = base_sample_fn.apply(params.base, features, key, shape)
         base_log_prob = base_log_prob_fn.apply(params.base, x)
@@ -277,15 +283,15 @@ def create_flow(recipe: AugmentedFlowRecipe):
         extra.aux_info.update(mean_base_log_prob=jnp.mean(base_log_prob))
         extra.info_aggregator.update(mean_base_log_prob=jnp.mean)
 
-        return y.positions, log_prob, extra
+        return y, log_prob, extra
 
     @hk.without_apply_rng
     @hk.transform
-    def aux_target_log_prob(joint_sample: FullGraphSample) -> Tuple[Positions, LogProb]:
+    def aux_target_log_prob(joint_sample: FullGraphSample) -> LogProb:
         features, positions_x, positions_a = joint_to_separate_samples(joint_sample)
         dist = recipe.make_aug_target(FullGraphSample(positions=positions_x, features=features))
         positions_a, log_prob = dist.log_prob(positions_a)
-        return positions_a, log_prob
+        return log_prob
 
 
     @hk.without_apply_rng

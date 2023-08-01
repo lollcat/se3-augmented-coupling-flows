@@ -9,7 +9,7 @@ import optax
 
 from fabjax.sampling.smc import SequentialMonteCarloSampler, SMCState
 from fabjax.utils.graph import setup_flat_log_prob
-from utils.optimize import IgnoreNanOptState
+from utils.optimize import CustomOptimizerState
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample
 
@@ -54,6 +54,9 @@ def flat_log_prob_components(log_p_x: LogProbFn, flow: AugmentedFlow, params: Au
     def flow_log_prob_apply(params, x):
         return flow.log_prob_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
 
+    def flow_log_prob_apply_with_extra(params, x):
+        return flow.log_prob_with_extra_apply(params, FullGraphSample(positions=x, features=features_with_multiplicity))
+
     def log_q_fn(x: chex.Array) -> chex.Array:
         return flow_log_prob_apply(params, x)
 
@@ -65,7 +68,7 @@ def flat_log_prob_components(log_p_x: LogProbFn, flow: AugmentedFlow, params: Au
         x = unflatten(x)
         return joint_target_log_prob_fn(x)
 
-    return flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply
+    return flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply, flow_log_prob_apply_with_extra
 
 
 def build_smc_forward_pass(
@@ -81,7 +84,8 @@ def build_smc_forward_pass(
 
     def smc_forward_pass(params: AugmentedFlowParams, smc_state: SMCState, key: chex.PRNGKey,
                          unflatten_output: bool = True):
-        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply, flow_log_prob_apply_with_extra\
+            = flat_log_prob_components(
             log_p_x=log_p_x, flow=flow, params=params, features_with_multiplicity=features_with_multiplicity,
             event_shape=event_shape
         )
@@ -126,7 +130,8 @@ def build_fab_no_buffer_init_step_fns(
     @jax.jit
     @chex.assert_max_traces(4)
     def step(state: TrainStateNoBuffer) -> Tuple[TrainStateNoBuffer, Info]:
-        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply = flat_log_prob_components(
+        flatten, unflatten, log_p_flat_fn, log_q_flat_fn, flow_log_prob_apply, flow_log_prob_apply_with_extra = \
+            flat_log_prob_components(
             log_p_x=log_p_x, flow=flow, params=state.params, features_with_multiplicity=features_with_multiplicity,
             event_shape=event_shape
         )

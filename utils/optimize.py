@@ -6,7 +6,7 @@ import optax
 import jax.numpy as jnp
 
 
-class IgnoreNanOptState(NamedTuple):
+class CustomOptimizerState(NamedTuple):
     opt_state: optax.OptState
     grad_norms: chex.Array
     ignored_grads_count: chex.Array = jnp.array(0, dtype=int)  # Keep track of how many gradients have been ignored.
@@ -27,15 +27,17 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
     3. Otherwise the gradient is clipped to a maximum norm of `factor_clip_norm * grad_median_norm`.
     """
 
-    def init(params: chex.ArrayTree) -> IgnoreNanOptState:
+    def init(params: chex.ArrayTree) -> CustomOptimizerState:
         opt_state = optimizer.init(params)
         grad_norms = jnp.ones(window_length)*float('nan')
         # After initialisation, for first third of window length take every gradient step.
         grad_norms = grad_norms.at[0:int(window_length*2/3)].set(1e30)
-        return IgnoreNanOptState(opt_state=opt_state, grad_norms=grad_norms)
 
-    def update(grad: chex.ArrayTree, opt_state: IgnoreNanOptState, params: chex.ArrayTree) ->\
-            Tuple[chex.ArrayTree, IgnoreNanOptState]:
+        return CustomOptimizerState(opt_state=opt_state, grad_norms=grad_norms)
+
+    def update(grad: chex.ArrayTree, opt_state: CustomOptimizerState, params: chex.ArrayTree) ->\
+            Tuple[chex.ArrayTree, CustomOptimizerState]:
+
         grad_norm = optax.global_norm(grad)
         grad_median_norm = jnp.nanmedian(opt_state.grad_norms)
         skip_update = (grad_norm > grad_median_norm * factor_allowable_norm) | (~jnp.isfinite(grad_norm))
@@ -44,6 +46,8 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
         global_norm_clip = optax.clip_by_global_norm(grad_median_norm*factor_clip_norm)
         global_norm_clip_state = global_norm_clip.init(params)
         grad = global_norm_clip.update(grad, global_norm_clip_state)[0]
+        # Ensure gradients are still finite after normalization.
+        grad = jax.tree_util.tree_map(lambda p: jnp.where(jnp.isfinite(p), p, jnp.zeros_like(p)), grad)
 
         updates, new_opt_state = optimizer.update(grad, opt_state.opt_state, params=params)
 
@@ -57,8 +61,8 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
                                        opt_state.ignored_grads_count + 1),
                               lambda: (updates, new_opt_state, opt_state.ignored_grads_count))
 
-        state = IgnoreNanOptState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
-                                  grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
+        state = CustomOptimizerState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
+                                     grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
         return updates, state
 
 
@@ -101,14 +105,14 @@ def get_optimizer(optimizer_config: OptimizerConfig):
     else:
         lr = float(optimizer_config.init_lr)
 
-    main_grad_tranform = getattr(optax, optimizer_config.optimizer_name)(lr)  # e.g. adam.
+    main_grad_transform = getattr(optax, optimizer_config.optimizer_name)(lr)  # e.g. adam.
 
     if optimizer_config.dynamic_grad_ignore_and_clip:
         optimizer = dynamic_update_ignore_and_grad_norm_clip(
-            optimizer=main_grad_tranform,
+            optimizer=main_grad_transform,
             window_length=optimizer_config.dynamic_grad_norm_window,
             factor_clip_norm=optimizer_config.dynamic_grad_norm_factor,
-            factor_allowable_norm=optimizer_config.dynamic_grad_ignore_factor
+            factor_allowable_norm=optimizer_config.dynamic_grad_ignore_factor,
         )
     else:
         grad_transforms = [optax.zero_nans()]
@@ -118,6 +122,6 @@ def get_optimizer(optimizer_config: OptimizerConfig):
         if optimizer_config.max_global_norm:
             clipping_fn = optax.clip_by_global_norm(float(optimizer_config.max_global_norm))
             grad_transforms.append(clipping_fn)
-        grad_transforms.append(main_grad_tranform)
+        grad_transforms.append(main_grad_transform)
         optimizer = optax.chain(*grad_transforms)
     return optimizer, lr

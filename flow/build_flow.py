@@ -46,7 +46,7 @@ class FlowDistConfig(NamedTuple):
     nets_config: NetsConfig
     type: Union[str, Sequence[str]]
     identity_init: bool = True
-    compile_n_unroll: int = 2
+    compile_n_unroll: int = 1
     scaling_layer: bool = False
     scaling_layer_conditioned: bool = True
     kwargs: dict = {}

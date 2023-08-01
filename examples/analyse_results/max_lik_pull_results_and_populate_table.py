@@ -2,14 +2,9 @@ import pandas as pd
 
 from examples.analyse_results.get_wandb_runs import get_run_history
 
-
-_TAGS = ['final_run']
-
-def download_eval_metrics(problem="dw4", n_runs=3):
+def download_eval_metrics(problem, tags, n_runs=3):
     flow_types = ['spherical', 'along_vector', 'proj', 'non_equivariant']
-    seeds = [0, 1, 2, 3, 4]
-    tags = _TAGS.copy()
-    tags.append(problem)
+    seeds = [0, 1, 2]
     data = pd.DataFrame()
 
     i = 0
@@ -17,9 +12,10 @@ def download_eval_metrics(problem="dw4", n_runs=3):
         n_runs_found = 0
         for seed in seeds:
             try:
-                hist = get_run_history(flow_type, tags, seed, fields=['marginal_log_lik', 'lower_bound_marginal_gap',
-                                                                      'ess', '_runtime', "_step"] if problem in ["dw4", "lj13"] else
-                ['marginal_log_lik', 'lower_bound_marginal_gap', '_runtime', "_step"])
+                fields = ['marginal_log_lik', 'lower_bound_marginal_gap', 'ess', '_runtime', "_step"] \
+                    if problem in ["dw4", "lj13"] else \
+                    ['marginal_log_lik', 'lower_bound_marginal_gap', '_runtime', "_step"]
+                hist = get_run_history(flow_type, tags, seed, fields=fields)
 
                 info = dict(hist.iloc[-1])
                 if info["_step"] == 0:
@@ -27,6 +23,7 @@ def download_eval_metrics(problem="dw4", n_runs=3):
                     continue
                 info.update(flow_type=flow_type, seed=seed)
                 data = data.join(pd.Series(info, name=i), how="outer")
+                data.loc[fields] = data.loc[fields].astype("float32")
                 i += 1
                 n_runs_found += 1
                 if n_runs_found == n_runs:
@@ -44,9 +41,10 @@ def create_latex_table():
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical']
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
 
-    data_qm9 = download_eval_metrics("qm9pos")
-    data_dw4 = download_eval_metrics("dw4")
-    data_lj13 = download_eval_metrics("lj13")
+
+    data_dw4 = download_eval_metrics("dw4", ["ml", "florence", "dw4"])
+    data_lj13 = download_eval_metrics("lj13", ["ml", "florence", "lj13"])
+    data_qm9 = download_eval_metrics("qm9pos", ["ml", "florence", "qm9pos"])
 
 
     means_dw4 = data_dw4.groupby("flow_type").mean()
@@ -90,12 +88,16 @@ def create_latex_table():
             f"{means_dw4.loc[flow_type]['ess']*100:.2f},{sem_dw4.loc[flow_type]['ess']*100:.2f} & " \
             f"{means_lj13.loc[flow_type]['ess']*100:.2f},{sem_lj13.loc[flow_type]['ess']*100:.2f} \\\ \n "
 
-    # print(table_values_string)
-    # print("\n\n")
-    # print(table_lower_bound_gap)
-    # print("\n\n")
-    # print(table_ess)
+    print("************** main table ************** \n")
+    print(table_values_string)
     print("\n\n")
+    print("************** table lower bound gap ************** \n")
+    print(table_lower_bound_gap)
+    print("\n\n")
+    print("************** ess ************** \n")
+    print(table_ess)
+    print("\n\n")
+    print("************** runtimes ************** \n")
     print(table_runtimes)
 
 

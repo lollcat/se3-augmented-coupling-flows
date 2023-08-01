@@ -11,7 +11,9 @@ from flow.distrax_with_extra import DistributionWithExtra, Extra
 
 
 class JointBaseDistribution(DistributionWithExtra):
-    """x ~ x_dist, a ~ x + Gaussian."""
+    """Joint distribution of x and a, where a is conditional on x.
+       x ~ x_dist, a ~ x + Gaussian.
+    """
     def __init__(self,
                  dim,
                  n_nodes: int,

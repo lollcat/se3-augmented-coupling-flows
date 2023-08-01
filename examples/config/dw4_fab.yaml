@@ -1,4 +1,9 @@
-#defaults:
+defaults:
+  - training: default
+  - training/optimizer: default_lr_schedule
+  - flow: default
+  - target: default
+  - fab: default
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -6,132 +11,31 @@ hydra:
     chdir: false
 
 fab:
-  with_buffer: true
-  buffer_max_length_batches: 512
-  buffer_min_length_batches: 64
-  n_updates_per_smc_forward_pass: 8
-  w_adjust_clip: 10.
-  use_resampling: false
-  use_hmc: true
-  transition_operator:
-    hmc:
-      n_outer_steps: 1
-      n_inner_steps: 5
-      init_step_size: 1.
-      target_p_accept: 0.65
-      adapt_step_size: true
-    metropolis:
-      n_steps: 1
-      init_step_size: 1.
-      target_p_accept: 0.65
-      tune_step_size: true
-  alpha: 2.  # alpha-divergence param
   n_intermediate_distributions: 2
-  spacing_type: linear
-  eval_inner_batch_size: 100
-  eval_total_batch_size: 10000
 
 target:
-  aux:
-    conditioned_on_x: true
-    scale_init: 0.1
   custom_samples: false
   temperature: 0.1  # 0.1 or 1 are two good options
 
 
 flow:
-  base:
-    x_dist:
-      type: centre_gravity_gaussian
-    aux:
-      conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: ${target.aux.scale_init}
   dim: 2
-  nodes: 4
   n_aug: 1
-  n_layers: 12
-  scaling_layer: false
-  scaling_layer_conditioned: true
-  identity_init: true
-  type: spherical #  nice proj spherical along_vector non_equivariant
-  kwargs:
-    n_inner_transforms: 2
-    non_equivariant:
-      transform_type: real_nvp # spline or real_nvp
-      spline_num_bins: 8
-      spline_max_abs_min: 10.
-      n_inner_transforms: 1
-    along_vector:
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
-      spline_num_bins: 8
-    spherical:
-      reflection_invariant: false
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
-      spline_num_bins: 8
-    proj:
-      transform_type: real_nvp # spline or real_nvp
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      origin_on_coupled_pair: false
-      num_bins: 8
-      lower: -10..
-      upper: 10.
-      orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
-  nets:
-    type: egnn
-    egnn:
-        name: egnn
-        n_blocks: 3 # number of layers
-        mlp_units: [ 32, 32 ]
-        n_invariant_feat_hidden: 32
-        cross_multiplicity_shifts: true
-        centre_mass: false
-        norm_wrt_centre_feat: true
-    mlp_head_config:
-      mlp_units: [32,]
-      stable: true
-    non_equivariant_transformer_config:
-      output_dim: 32
-      key_size_per_node_dim_in: 2  # key_size = multiplicity * dim * key_size_per_node_dim_in
-      n_layers: 3
-      mlp_units: [ 32, 32 ]
-      num_heads: 3
-
+  nodes: 4
 
 training:
-  optimizer:
-    init_lr: 2e-4
-    optimizer_name: adam
-    use_schedule: false
-    peak_lr: 1e-3 # can be null
-    end_lr: 1e-5 # can be null
-    warmup_n_epoch: 2. # can be null
-    max_global_norm: null
-    max_param_grad: null
-    dynamic_grad_ignore_and_clip: true
-  use_64_bit: false
-  n_epoch: 7000
-  batch_size: 512
+  n_epoch: 20000
+  batch_size: 128
   plot_batch_size: 256
-  eval_batch_size: 128
+  eval_batch_size: 16
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 10
-  n_eval: 8
-  K_marginal_log_lik: 20
-  save: true
-  save_dir: dw4_results
-  resume: false
-  runtime_limit: 8.
+  n_eval: 10
   use_flow_aux_loss: false
   aux_loss_weight: 1.0
-  last_iter_info_only: true
-  debug: false
-  verbose_info: true
-  data_augmentation_for_non_eq: false
-  factor_to_train_non_eq_flow: 4
+  data_augmentation_for_non_eq: false # Only use for training by maximum likelihood.
+  factor_to_train_non_eq_flow: 3
 
 
 logger:
@@ -139,8 +43,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: dw4_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}
+    name: dw4_fab_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,final_run,v2]
+    tags: [dw4,fab,post_sub1,cblgpu]
 

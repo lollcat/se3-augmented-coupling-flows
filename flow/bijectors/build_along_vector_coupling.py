@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from nets.base import NetsConfig, EGNN
 from nets.conditioner_mlp import ConditionerHead
 from flow.bijectors.along_vector_coupling import AlongVectorSplitCoupling
-from flow.bijectors.blockwise import Blockwise
 
 
 def make_along_vector_coupling_layer(
@@ -57,10 +56,6 @@ def make_along_vector_coupling_layer(
 
     if nets_config.type == "egnn":
         n_invariant_feat_out = nets_config.egnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3gnn":
-        n_invariant_feat_out = nets_config.e3gnn_torso_config.n_invariant_feat_hidden
-    elif nets_config.type == "e3transformer":
-        n_invariant_feat_out = nets_config.e3transformer_config.n_invariant_feat_hidden
     else:
         raise NotImplementedError
 

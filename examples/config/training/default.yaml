@@ -1,0 +1,20 @@
+use_64_bit: false
+seed: 0
+n_checkpoints: 5
+n_eval: 20
+K_marginal_log_lik: 20
+save: true
+save_dir: ''
+save_in_wandb_dir: true # Save in temp wandb directory, which then ensures it get's uploaded after the run.
+resume: false
+runtime_limit: null
+use_flow_aux_loss: true
+aux_loss_weight: 1.0
+last_iter_info_only: true
+verbose_info: false
+data_augmentation_for_non_eq: true
+factor_to_train_non_eq_flow: 4
+use_scan: true
+eval_model_samples: 10_000
+use_multiple_devices: false
+per_batch_masking: true

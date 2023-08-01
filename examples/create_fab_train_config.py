@@ -1,19 +1,19 @@
 from typing import Tuple, Optional, Union
 
 import chex
-import wandb
 import os
 import pathlib
 import jax
+import wandb
 import jax.numpy as jnp
 from datetime import datetime
 from omegaconf import DictConfig
 from functools import partial
 
-from molboil.train.base import eval_fn
+from molboil.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
 from molboil.train.train import TrainConfig
 from molboil.eval.base import get_eval_and_plot_fn
-
+from molboil.utils.loggers import WandbLogger
 
 from flow.build_flow import build_flow
 from examples.default_plotter_fab import make_default_plotter
@@ -37,7 +37,7 @@ def create_train_config(cfg: DictConfig,
                         eval_and_plot_fn: Optional = None,
                         date_folder: bool = True) -> TrainConfig:
     devices = jax.devices()
-    if len(devices) > 1:
+    if len(devices) > 1 and cfg.training.use_multiple_devices:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, target_log_p_x_fn,
                                         load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
@@ -67,19 +67,17 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
@@ -136,6 +134,8 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
+            use_aux_loss=cfg.training.use_flow_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             equivariance_regularisation=data_augmentation
         )
     else:
@@ -217,19 +217,17 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
@@ -287,6 +285,8 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
             equivariance_regularisation=data_augmentation,
+            use_aux_loss=cfg.training.use_flow_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             use_pmap=True, pmap_axis_name=pmap_axis_name
         )
     else:
@@ -318,12 +318,14 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
 
-
-        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
+        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey,
+                                        x_test: FullGraphSample, test_mask: chex.Array) -> dict:
+            eval_info = eval_fn(x_test, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                     eval_batch_free_fn=None,
-                    batch_size=cfg.training.eval_batch_size)
+                    batch_size=cfg.training.eval_batch_size,
+                    mask=test_mask
+                                )
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
                 smc=smc_eval,
@@ -333,11 +335,15 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
                 inner_batch_size=cfg.fab.eval_inner_batch_size
             )
             eval_info.update(eval_info_fab)
+            eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
             return eval_info
+
+        test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
 
         def evaluation_fn(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
             keys = jax.random.split(key, n_devices)
-            info = jax.pmap(evaluation_fn_single_device)(state, keys)
+            info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                state, keys, test_data_per_device, test_mask)
             return get_from_first_device(info, as_numpy=True)
 
     # Plot single device.
@@ -365,4 +371,4 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
         use_64_bit=cfg.training.use_64_bit,
         runtime_limit=cfg.training.runtime_limit,
         save_state_all_devices=True
-                       )
+    )

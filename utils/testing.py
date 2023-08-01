@@ -1,18 +1,20 @@
+from typing import Optional
+
 import chex
 import jax.numpy as jnp
 import jax
 import optax
 
 from molboil.utils.test import assert_is_equivariant, assert_is_invariant, random_rotate_translate_permute
+from molboil.train.base import maybe_masked_mean, maybe_masked_max
 
 from utils.numerical import param_count
-from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, E3GNNTorsoConfig, TransformerConfig
+from nets.base import NetsConfig, EGNNTorsoConfig, MLPHeadConfig, TransformerConfig
 from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 def get_minimal_nets_config(type = 'egnn'):
     nets_config = NetsConfig(type=type,
-                            embedding_for_non_positional_feat=True,
                             embedding_dim = 32,
                             num_discrete_feat=2,
                              egnn_torso_config=EGNNTorsoConfig(
@@ -20,14 +22,7 @@ def get_minimal_nets_config(type = 'egnn'):
                                     mlp_units=(4,),
                                     n_vectors_hidden_per_vec_in=2,
                                     n_invariant_feat_hidden=3,
-                                    name='e3gnn_v0_torso'),
-                             e3gnn_torso_config=E3GNNTorsoConfig(
-                                 n_blocks=2,
-                                 mlp_units=(4,),
-                                 n_vectors_hidden_per_vec_in=2,
-                                 n_invariant_feat_hidden=3,
-                                 name='e3gnn_torso'
-                             ),
+                                    name='egnn_v0_torso'),
                              mlp_head_config=MLPHeadConfig((4,)),
                              non_equivariant_transformer_config=TransformerConfig(output_dim=6,
                                                                                   key_size_per_node_dim_in=2,
@@ -131,7 +126,8 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
                                    flow: AugmentedFlow,
                                    params: AugmentedFlowParams,
                                    key: chex.PRNGKey,
-                                   permute: bool = False):
+                                   permute: bool = False,
+                                   mask: Optional[chex.Array] = None):
     """Tests invariance of the flow log prob. Also check that the
      forward and reverse of the bijector is consistent.
     """
@@ -143,18 +139,18 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
 
     # Rotation.
     def group_action(x_and_a):
-        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)  # , reflect=False)
+        return random_rotate_translate_permute(x_and_a, key1, permute=permute, translate=True)
 
 
     positions_rot = group_action(samples.positions)
-    samples_rot = FullGraphSample(features=samples.features, positions=positions_rot)
+    samples_rot = samples._replace(positions=positions_rot)
 
     chex.assert_trees_all_equal_shapes(samples, samples_rot)
     log_prob = log_prob_samples_only_fn(samples)
     log_prob_alt = log_prob_samples_only_fn(samples_rot)
 
-    max_abs_diff = jnp.max(jnp.abs(log_prob_alt - log_prob))
-    mean_abs_diff = jnp.mean(jnp.abs(log_prob_alt - log_prob))
+    max_abs_diff = maybe_masked_max(jnp.abs(log_prob_alt - log_prob), mask)
+    mean_abs_diff = maybe_masked_mean(jnp.abs(log_prob_alt - log_prob), mask)
     info = {"max_abs_diff_log_prob_after_group_action": max_abs_diff,
             "mean_abs_diff_log_prob_after_group_action": mean_abs_diff}
 
@@ -165,8 +161,8 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     samples_flip = FullGraphSample(features=samples.features, positions=samples.positions*flip)
     log_prob_flip = log_prob_samples_only_fn(samples_flip)
     abs_diff = jnp.abs(log_prob_flip - log_prob)
-    max_abs_diff = jnp.max(abs_diff)
-    mean_abs_diff = jnp.mean(abs_diff)
+    max_abs_diff = maybe_masked_max(abs_diff, mask)
+    mean_abs_diff = maybe_masked_mean(abs_diff, mask)
     info.update(max_abs_diff_log_prob_after_reflection=max_abs_diff,
             mean_abs_diff_log_prob_after_reflection=mean_abs_diff)
 
@@ -177,8 +173,8 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     samples_flip = FullGraphSample(features=samples.features, positions=samples.positions*flip)
     log_prob_flip_ = log_prob_samples_only_fn(samples_flip)
     abs_diff = jnp.abs(log_prob_flip - log_prob_flip_)
-    max_abs_diff = jnp.max(abs_diff)
-    mean_abs_diff = jnp.mean(abs_diff)
+    max_abs_diff = maybe_masked_max(abs_diff, mask)
+    mean_abs_diff = maybe_masked_mean(abs_diff, mask)
     info.update(max_abs_diff_log_prob_two_reflections=max_abs_diff,
             mean_abs_diff_log_prob_two_reflections=mean_abs_diff)
 
@@ -190,13 +186,18 @@ def get_checks_for_flow_properties(samples: FullGraphSample,
     sample_latent, log_det_rv, extra_rv = flow.bijector_inverse_and_log_det_with_extra_apply(params.bijector, samples)
     samples_, log_det_fwd, extra_fwd = flow.bijector_forward_and_log_det_with_extra_apply(
         params.bijector, sample_latent)
-    info.update(max_abs_diff_log_det_forward_reverse=jnp.max(jnp.abs(log_det_fwd + log_det_rv)))
-    info.update(mean_abs_diff_log_det_forward_reverse=jnp.mean(jnp.abs(log_det_fwd + log_det_rv)))
-    info.update(mean_diff_samples_flow_inverse_forward=jnp.mean(jnp.abs(samples_.positions - samples.positions)))
+    info.update(max_abs_diff_log_det_forward_reverse=maybe_masked_max(jnp.abs(log_det_fwd + log_det_rv), mask=mask))
+    info.update(mean_abs_diff_log_det_forward_reverse=maybe_masked_mean(jnp.abs(log_det_fwd + log_det_rv), mask=mask))
+    info.update(mean_diff_samples_flow_inverse_forward=maybe_masked_mean(
+        jnp.mean(jnp.abs(samples_.positions - samples.positions), axis=(1,2,3)), mask=mask))
 
     # Test 0 mean subspace restriction.
     samples = flow.sample_apply(params, samples.features[0, :, 0], key3, samples.positions.shape[0:1])
-    info.update(mean_abs_x_centre_of_mass=jnp.mean(jnp.abs(jnp.mean(samples.positions[:, :, 0], axis=1))))
+    info.update(mean_abs_x_centre_of_mass=
+                maybe_masked_mean(jnp.mean(jnp.abs(jnp.mean(samples.positions[:, :, 0], axis=1)), axis=1), mask=mask))
     info.update(latent_x_mean_abs_centre_of_mass=
-                jnp.mean(jnp.abs(jnp.mean(sample_latent.positions[:, :, 0, :], axis=1))))
+                maybe_masked_mean(jnp.mean(jnp.abs(jnp.mean(sample_latent.positions[:, :, 0, :], axis=1)), axis=1),
+                                  mask=mask))
     return info
+
+

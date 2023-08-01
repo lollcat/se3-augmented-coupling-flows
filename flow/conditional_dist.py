@@ -12,6 +12,7 @@ from flow.aug_flow_dist import FullGraphSample
 
 class ConditionalGaussian(DistributionWithExtra):
     """
+    Conditional distribution of the augmented coordinates.
     Either:
         a ~ x + Normal
         or

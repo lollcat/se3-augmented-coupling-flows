@@ -47,7 +47,6 @@ flow:
       num_bins: 8
       lower: -10.
       upper: 10.
-      orthogonalization_method: gram-schmidt  #  gram-schmidt or loewdin
   nets:
     type: egnn # mace or egnn or e3transformer or e3gnn
     embedding_dim: 32
@@ -58,8 +57,6 @@ flow:
       mlp_units: [ 128, 128 ]
       n_invariant_feat_hidden: 128
       cross_multiplicity_shifts: true
-      centre_mass: false
-      norm_wrt_centre_feat: true
     mlp_head_config:
       mlp_units: [ 64, 64 ]
       stable: true
