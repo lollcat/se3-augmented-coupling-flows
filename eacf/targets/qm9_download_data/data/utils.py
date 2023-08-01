@@ -4,7 +4,7 @@ import numpy as np
 import logging
 
 from eacf.targets.qm9_download_data.data.dataset_class import ProcessedDataset
-from molboil.targets.qm9_download_data.data.prepare import prepare_dataset
+from eacf.targets.qm9_download_data.data.prepare.download import prepare_dataset
 
 
 def initialize_datasets(args, datadir, dataset, subset=None, splits=None,
