@@ -7,11 +7,9 @@ Results can be obtained by running the commands in the [Experiments](#experiment
 Additionally, we will add a Quickstart jupyter notebook. 
 
 # Install
-At time of publishing was using jax 0.4.13 with python 3.10. 
-```
-conda install jaxlib=*=*cuda* jax cuda-nvcc -c conda-forge -c nvidia
-```
-Has dependency on pytorch (NB: use CPU version so it doesn't clash with JAX).
+JAX needs to be installed independently following the instruction on the [JAX homepage](https://github.com/google/jax#installation).
+At time of publishing we used JAX 0.4.13 with python 3.10.
+This repo also has dependency on pytorch (NB: use CPU version so it doesn't clash with JAX) which may be installed with:
 ```
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
@@ -26,6 +24,8 @@ pip install -e .
 
 ## Experiments
 Experiments may be run with the following commands. The flow type may be set as shown in the first line.
+For Alanine Dipeptide the data must first be downloaded from [Zenodo](https://zenodo.org/record/6993124/) which may be 
+done with the script `eacf/targets/aldp.sh`.
 ```shell
 python examples/dw4.py flow.type=spherical # Flow types: spherical,proj,along_vector,non_equivariant
 python examples/lj13.py
