@@ -1,8 +1,8 @@
 *__pychache*
 */.ipynb_checkpoints
-*/target/data/qm9_valid.npy
-*/target/data/qm9_train.npy
-*/target/data/qm9_test.npy
+eacf/targets/target_energy/data/qm9_valid.npy
+eacf/targets/target_energy/data/qm9_train.npy
+eacf/targets/target_energy/data/qm9_test.npy
 */temp/*
 *.pyc
 *.npz

@@ -10,23 +10,23 @@ from datetime import datetime
 from omegaconf import DictConfig
 from functools import partial
 
-from molboil.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
-from molboil.train.train import TrainConfig
-from molboil.eval.base import get_eval_and_plot_fn
-from molboil.utils.loggers import WandbLogger
-
-from flow.build_flow import build_flow
-from examples.default_plotter_fab import make_default_plotter
-from train.max_lik_train_and_eval import get_eval_on_test_batch
-from examples.create_train_config import setup_logger, create_flow_config
-from utils.optimize import get_optimizer, OptimizerConfig
-
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
 from fabjax.buffer import build_prioritised_buffer
-from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
-from train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
-from train.fab_eval import fab_eval_function
-from utils.pmap import get_from_first_device
+
+from examples.default_plotter_fab import make_default_plotter
+from examples.create_train_config import setup_logger, create_flow_config
+
+from eacf.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
+from eacf.train.train import TrainConfig
+from eacf.eval.base import get_eval_and_plot_fn
+from eacf.utils.loggers import WandbLogger
+from eacf.flow.build_flow import build_flow
+from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
+from eacf.utils.optimize import get_optimizer, OptimizerConfig
+from eacf.train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
+from eacf.train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
+from eacf.train.fab_eval import fab_eval_function
+from eacf.utils.pmap import get_from_first_device
 
 
 def create_train_config(cfg: DictConfig,
@@ -151,7 +151,7 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
 
-        # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+        # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
@@ -313,7 +313,7 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
         eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                         flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
 
-        # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+        # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)

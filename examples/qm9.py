@@ -2,8 +2,8 @@ import hydra
 from omegaconf import DictConfig
 import jax
 
-from molboil.targets.data import load_qm9
-from molboil.train.train import train
+from eacf.targets.data import load_qm9
+from eacf.train.train import train
 from examples.create_train_config import create_train_config
 from examples.lj13 import to_local_config
 

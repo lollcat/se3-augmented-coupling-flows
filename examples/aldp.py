@@ -6,14 +6,14 @@ from omegaconf import DictConfig, open_dict
 import jax.numpy as jnp
 import jax
 
-from molboil.targets.data import load_aldp
-from molboil.train.train import train
-from molboil.train.base import eval_fn
-from molboil.eval.aldp import eval_and_plot_fn
-
-from flow.build_flow import build_flow
 from examples.create_train_config import create_train_config, create_flow_config
-from train.max_lik_train_and_eval import get_eval_on_test_batch
+
+from eacf.targets.data import load_aldp
+from eacf.train.train import train
+from eacf.train.base import eval_fn
+from eacf.eval.aldp import eval_and_plot_fn
+from eacf.flow.build_flow import build_flow
+from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")

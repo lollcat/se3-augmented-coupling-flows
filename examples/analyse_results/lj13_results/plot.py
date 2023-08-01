@@ -4,7 +4,7 @@ import hydra
 
 from examples.load_flow_and_checkpoint import load_flow
 from examples.default_plotter import *
-from molboil.targets.data import load_lj13
+from eacf.targets import load_lj13
 from examples.analyse_results.dw4_results.plot import make_get_data_for_plotting
 from examples.analyse_results.get_wandb_runs import download_checkpoint
 #

@@ -1,11 +1,11 @@
 import hydra
 from omegaconf import DictConfig
 
-from molboil.train.train import train
-from molboil.targets.data import load_lj13
 from examples.create_fab_train_config import create_train_config
 
-from target.leonard_jones import log_prob_fn
+from eacf.train.train import train
+from eacf.targets.data import load_lj13
+from eacf.targets.target_energy.leonard_jones import log_prob_fn
 
 
 def load_dataset(train_set_size: int, valid_set_size: int, final_run: bool = True):
@@ -47,7 +47,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="lj13_fab.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         cfg = to_local_config(cfg)
 

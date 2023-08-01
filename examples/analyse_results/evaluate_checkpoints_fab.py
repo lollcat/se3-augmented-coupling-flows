@@ -18,7 +18,7 @@ import chex
 import jax
 from functools import partial
 
-from molboil.train.base import eval_fn
+from eacf.train import eval_fn
 from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
@@ -60,7 +60,7 @@ def setup_eval(cfg, flow, target_log_p_x_fn, test_data):
     eval_on_test_batch_fn = partial(get_eval_on_test_batch,
                                     flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
 
-    # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+    # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
     smc_eval = build_smc(transition_operator=transition_operator,
                          n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                          alpha=1., use_resampling=False)

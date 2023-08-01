@@ -3,7 +3,6 @@ from typing import Tuple, Optional
 import chex
 import jax
 import wandb
-import warnings
 import matplotlib.pyplot as plt
 import os
 import pathlib
@@ -14,22 +13,23 @@ import matplotlib as mpl
 from functools import partial
 import jax.numpy as jnp
 
-from molboil.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn, \
-    setup_padded_reshaped_data
-from train.custom_step import training_step, training_step_with_masking
-from molboil.train.train import TrainConfig
-from molboil.eval.base import get_eval_and_plot_fn
-
-from flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
-from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
-from nets.base import NetsConfig, MLPHeadConfig, EGNNTorsoConfig, TransformerConfig
-from train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched, \
-    masked_ml_loss_fn
-from molboil.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from examples.default_plotter import make_default_plotter
 from examples.configs import TrainingState
-from utils.optimize import get_optimizer, OptimizerConfig
-from utils.pmap import get_from_first_device
+
+from eacf.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn, \
+    setup_padded_reshaped_data
+from eacf.train.custom_step import training_step, training_step_with_masking
+from eacf.train.train import TrainConfig
+from eacf.eval.base import get_eval_and_plot_fn
+
+from eacf.flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
+from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
+from eacf.nets.make_egnn import NetsConfig, MLPHeadConfig, EGNNTorsoConfig, TransformerConfig
+from eacf.train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched, \
+    masked_ml_loss_fn
+from eacf.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
+from eacf.utils.optimize import get_optimizer, OptimizerConfig
+from eacf.utils.pmap import get_from_first_device
 
 mpl.rcParams['figure.dpi'] = 150
 

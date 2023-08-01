@@ -1,13 +1,10 @@
-# import chex
-# chex.set_n_cpu_devices(4)
-
 import hydra
 from omegaconf import DictConfig
 import jax
 
-from molboil.train.train import train
-from molboil.targets.data import load_lj13
-from target.leonard_jones import log_prob_fn
+from eacf.train.train import train
+from eacf.targets.data import load_lj13
+from eacf.targets.target_energy.leonard_jones import log_prob_fn
 from examples.create_train_config import create_train_config
 
 

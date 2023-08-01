@@ -7,11 +7,11 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from molboil.utils.plotting import bin_samples_by_dist
+from eacf.utils.plotting import bin_samples_by_dist
 
-from train.fab_train_no_buffer import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
-from train.fab_train_with_buffer import TrainStateWithBuffer
-from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
+from eacf.train.fab_train_no_buffer import SequentialMonteCarloSampler, build_smc_forward_pass, LogProbFn, TrainStateNoBuffer
+from eacf.train.fab_train_with_buffer import TrainStateWithBuffer
+from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 mpl.rcParams['figure.dpi'] = 150
@@ -76,7 +76,7 @@ def make_default_plotter(
 
 
     def default_plotter(state: TrainStateNoBuffer, key: chex.PRNGKey) -> dict:
-        labels = ['flow', 'ais', 'target']
+        labels = ['flow', 'ais', 'target_energy']
         n_plots = len(labels) - 1
 
         # Plot interatomic distance histograms.
