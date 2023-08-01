@@ -94,6 +94,7 @@ training:
   debug: false
   verbose_info: true
   per_batch_masking: false
+  use_scan: true
 
 
 eval:
