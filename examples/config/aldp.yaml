@@ -7,8 +7,8 @@ hydra:
 
 target:
   data:
-    train: eacf/targets/data/aldp_500K_train_mini.h5 # eacf/targets/data/aldp_train.h5
-    val: eacf/targets/data/aldp_500K_train_mini.h5 # eacf/targets/data/aldp_val.h5
+    train: eacf/targets/data/aldp_train.h5
+    val: eacf/targets/data/aldp_val.h5
   aux:
     conditioned_on_x: true
     scale_init: 0.5
