@@ -93,6 +93,7 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: true
+  per_batch_masking: false
 
 
 eval:
