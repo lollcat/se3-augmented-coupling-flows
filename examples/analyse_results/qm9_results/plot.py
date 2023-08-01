@@ -30,7 +30,7 @@ def plot_qm9(ax: Optional = None):
     cfg = compose(config_name="qm9.yaml")
 
     flow_type = 'spherical'
-    download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "post_sub1", "cblgpu12"], seed=seed, max_iter=800,
+    download_checkpoint(flow_type=flow_type, tags=["qm9pos", "ml", "florence"], seed=seed, max_iter=800,
                         base_path='./examples/analyse_results/qm9_results/models')
 
     checkpoint_path = f"examples/analyse_results/qm9_results/models/{flow_type}_seed{seed}.pkl"

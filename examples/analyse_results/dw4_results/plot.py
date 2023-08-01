@@ -61,7 +61,7 @@ def plot_dw4(ax: Optional = None):
     initialize(config_path=f"{_BASE_DIR}/examples/config/")
     cfg = compose(config_name="dw4.yaml")
 
-    download_checkpoint(flow_type='spherical', tags=["dw4", "ml", "post_sub", "cblgpu"], seed=0, max_iter=100,
+    download_checkpoint(flow_type='spherical', tags=["dw4", "ml", "florence"], seed=0, max_iter=100,
                         base_path='./examples/analyse_results/dw4_results/models')
 
     checkpoint_path = "examples/analyse_results/dw4_results/models/spherical_seed0.pkl"

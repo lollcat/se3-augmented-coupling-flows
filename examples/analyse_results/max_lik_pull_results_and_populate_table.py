@@ -42,9 +42,9 @@ def create_latex_table():
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf", "\\sphproj \ \eanf"]
 
 
-    data_dw4 = download_eval_metrics("dw4", ["ml", "post_sub1", "cblgpu", "dw4"])
-    data_lj13 = download_eval_metrics("lj13", ["ml", "post_sub1", "cblgpu", "lj13"])
-    data_qm9 = download_eval_metrics("qm9pos", ["ml", "post_sub1", "cblgpu10", "layer_norm"])
+    data_dw4 = download_eval_metrics("dw4", ["ml", "florence", "dw4"])
+    data_lj13 = download_eval_metrics("lj13", ["ml", "florence", "lj13"])
+    data_qm9 = download_eval_metrics("qm9pos", ["ml", "florence", "qm9pos"])
 
 
     means_dw4 = data_dw4.groupby("flow_type").mean()

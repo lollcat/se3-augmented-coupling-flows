@@ -25,7 +25,7 @@ def plot_lj13(ax: Optional = None):
     initialize(config_path=f"{_BASE_DIR}/examples/config/")
     cfg = compose(config_name="lj13.yaml")
 
-    download_checkpoint(flow_type='spherical', tags=["lj13", "ml", "post_sub", "cblgpu"], seed=0, max_iter=400,
+    download_checkpoint(flow_type='spherical', tags=["lj13", "ml", "florence"], seed=0, max_iter=400,
                         base_path='./examples/analyse_results/lj13_results/models')
 
     flow_type = 'spherical'
