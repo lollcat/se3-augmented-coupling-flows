@@ -10,9 +10,9 @@ import jax.numpy as jnp
 import jax
 import haiku as hk
 
-from molboil.utils.checkpoints import get_latest_checkpoint
+from eacf.utils.checkpoints import get_latest_checkpoint
 
-from flow.build_flow import build_flow
+from eacf.flow.build_flow import build_flow
 from examples.create_train_config import create_flow_config
 
 

@@ -6,10 +6,10 @@ import jax
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from molboil.utils.plotting import bin_samples_by_dist, get_counts, get_pairwise_distances_for_plotting
+from eacf.utils.plotting import bin_samples_by_dist, get_counts, get_pairwise_distances_for_plotting
 
 from examples.configs import TrainingState
-from flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
+from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 
 mpl.rcParams['figure.dpi'] = 150

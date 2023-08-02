@@ -1,9 +1,9 @@
-from typing import Optional, NamedTuple
+from typing import NamedTuple
 
 import chex
 import optax
 
-from flow.aug_flow_dist import AugmentedFlowParams
+from eacf.flow.aug_flow_dist import AugmentedFlowParams
 
 class TrainingState(NamedTuple):
     params: AugmentedFlowParams

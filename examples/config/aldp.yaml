@@ -7,8 +7,8 @@ hydra:
 
 target:
   data:
-    train: data/train.h5
-    val: data/val.h5
+    train: eacf/targets/data/aldp_train.h5
+    val: eacf/targets/data/aldp_val.h5
   aux:
     conditioned_on_x: true
     scale_init: 0.5
@@ -84,7 +84,8 @@ training:
   n_eval: 10
   K_marginal_log_lik: 1
   save: true
-  save_dir: experiments/spherical/00
+  save_dir: ''
+  save_in_wandb_dir: true
   resume: true
   runtime_limit: 23.5
   use_flow_aux_loss: true
@@ -92,6 +93,8 @@ training:
   last_iter_info_only: true
   debug: false
   verbose_info: true
+  per_batch_masking: false
+  use_scan: true
 
 
 eval:
@@ -99,10 +102,10 @@ eval:
 
 
 logger:
-  pandas_logger:
-    save_period: 1 # how often to save the pandas dataframe as a csv
-#  wandb:
-#    name: aldp
-#    project: fab
-#    entity: flow-ais-bootstrap
-#    tags: [aldp,loll]
+#  pandas_logger:
+#    save_period: 1 # how often to save the pandas dataframe as a csv
+  wandb:
+    name: aldp
+    project: fab
+    entity: flow-ais-bootstrap
+    tags: [aldp,loll,Leucadendron]
