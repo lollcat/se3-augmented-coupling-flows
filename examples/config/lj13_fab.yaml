@@ -4,6 +4,7 @@ defaults:
   - flow: default
   - target: default
   - fab: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:

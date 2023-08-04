@@ -3,6 +3,7 @@ defaults:
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:
