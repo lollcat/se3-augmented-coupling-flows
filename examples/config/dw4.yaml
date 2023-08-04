@@ -27,7 +27,7 @@ training:
   train_set_size: 1000
   test_set_size: 1000
   use_flow_aux_loss: false
-  final_run: false # eval on test set instead of validation set.
+  final_run: true # eval on test set instead of validation set.
 
 
 logger:
@@ -38,5 +38,5 @@ logger:
     name: dw4_${flow.type}_${training.train_set_size}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,ml,diff_ds_sizes_pick]
+    tags: [dw4,ml,diff_ds_sizes]
 
