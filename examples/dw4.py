@@ -10,7 +10,7 @@ from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
 from eacf.utils.data import positional_dataset_only_to_full_graph
 import jax
 
-def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
+def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool):
     train, valid, test = load_dw4(train_set_size)
     if not final_run:
         return train, valid[:valid_set_size]
@@ -89,7 +89,7 @@ def run(cfg: DictConfig):
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
-        load_dataset = load_dataset_original
+        load_dataset = partial(load_dataset_original, final_run=cfg.training.final_run)
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset,
                                             target_log_prob_fn=log_prob_fn, date_folder=False)
     train(experiment_config)

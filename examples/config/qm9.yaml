@@ -26,6 +26,7 @@ training:
   train_set_size: null
   test_set_size: null
   aux_loss_weight: 10.0
+  final_run: true # eval on test set instead of validation set.
 
 
 logger:

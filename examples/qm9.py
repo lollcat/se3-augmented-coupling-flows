@@ -1,6 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 import jax
+from functools import partial
 
 from eacf.targets.data import load_qm9
 from eacf.train.train import train
@@ -8,7 +9,7 @@ from examples.create_train_config import create_train_config
 from examples.lj13 import to_local_config
 
 
-def load_dataset(train_set_size, valid_set_size, final_run: bool = True):
+def load_dataset(train_set_size, valid_set_size, final_run: bool):
     train_data, valid_data, test_data = load_qm9(train_set_size=train_set_size)
     if not final_run:
         return train_data, valid_data[:valid_set_size]
@@ -26,7 +27,7 @@ def run(cfg: DictConfig):
         jax.config.update("jax_enable_x64", True)
 
     experiment_config = create_train_config(cfg, dim=3, n_nodes=19,
-                                            load_dataset=load_dataset)
+                                            load_dataset=partial(load_dataset, final_run=cfg.training.final_run))
     experiment_config = experiment_config._replace(save_state_all_devices=True)
     train(experiment_config)
 

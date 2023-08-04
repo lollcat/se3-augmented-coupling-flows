@@ -1,6 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 import jax
+from functools import partial
 
 from eacf.train.train import train
 from eacf.targets.data import load_lj13
@@ -8,7 +9,7 @@ from eacf.targets.target_energy.leonard_jones import log_prob_fn
 from examples.create_train_config import create_train_config
 
 
-def load_dataset(train_set_size: int, valid_set_size: int, final_run=True):
+def load_dataset(train_set_size: int, valid_set_size: int, final_run: bool):
     train, valid, test = load_lj13(train_set_size)
     if not final_run:
         return train, valid[:valid_set_size]
@@ -62,7 +63,7 @@ def run(cfg: DictConfig):
     experiment_config = create_train_config(cfg,
                                             dim=3,
                                             n_nodes=13,
-                                            load_dataset=load_dataset,
+                                            load_dataset=partial(load_dataset, final_run=cfg.training.final_run),
                                             target_log_prob_fn=log_prob_fn)
     train(experiment_config)
 
