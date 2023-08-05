@@ -27,7 +27,7 @@ training:
   aux_loss_weight: 10.0
   final_run: false # eval on test set instead of validation set.
   data_augmentation_for_non_eq: false
-  factor_to_train_non_eq_flow: 4
+  factor_to_train_non_eq_flow: 1
 
 
 logger:
