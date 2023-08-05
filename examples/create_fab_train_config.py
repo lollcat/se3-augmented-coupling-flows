@@ -234,7 +234,7 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
     n_epoch = cfg.training.n_epoch
     if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
-        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+        n_epoch = int(n_epoch * cfg.training.factor_to_train_non_eq_flow)
 
 
     opt_cfg = dict(training_config.pop("optimizer"))
