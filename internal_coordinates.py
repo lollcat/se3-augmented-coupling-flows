@@ -16,7 +16,7 @@ if __name__ == '__main__':
     key = jax.random.PRNGKey(0)
     n_nodes = 8
     dim = 3
-    x_0_centered = jax.random.normal(key, (n_nodes, dim))
+    x_0_centered = jax.random.normal(key, (n_nodes - 1, dim))
     x_zeroCom = x0_centered_to_zero_CoM(x_0_centered)
     x0_in_zeroCom = - jnp.sum(x_zeroCom, axis=0)
 
@@ -24,3 +24,22 @@ if __name__ == '__main__':
 
     chex.assert_trees_all_close(x_0_centered, x_0_centered_, atol=1e-6)
 
+    jac = jax.jacfwd(x0_centered_to_zero_CoM)(x_0_centered)
+
+    assert (jac[:, 1, :, 0] == 0).all()
+
+    A = jnp.eye(n_nodes-1)
+    u = 1 / n_nodes * jnp.ones(n_nodes-1)
+    v = jnp.ones(n_nodes-1)
+    u = u[:, None]
+    v = v[:, None]
+    expected_jac_dim_0 = A - u @ v.T
+
+
+    chex.assert_trees_all_close(expected_jac_dim_0, jac[:, 0, :, 0])
+
+    sign, log_det = jnp.linalg.slogdet(jac[:, 0, :, 0])
+
+    expected_log_det_dim_0 = - jnp.log(n_nodes)
+
+    log_det_ovall = - dim * jnp.log(n_nodes)
