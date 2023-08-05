@@ -38,4 +38,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,Leucadendron]
+    tags: [qm9pos,ml,protea]
