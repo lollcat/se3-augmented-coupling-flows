@@ -21,7 +21,7 @@ from eacf.train.train import TrainConfig
 from eacf.eval.base import get_eval_and_plot_fn
 from eacf.utils.loggers import WandbLogger
 from eacf.flow.build_flow import build_flow
-from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
+from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch, get_eval_on_test_batch_with_further
 from eacf.utils.optimize import get_optimizer, OptimizerConfig
 from eacf.train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
 from eacf.train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
@@ -148,20 +148,31 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+        eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True,
+                                        target_log_prob=target_log_p_x_fn)
 
         # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
 
+        def further_fn(log_w: chex.Array, mask: chex.Array) -> dict:
+            chex.assert_equal_shape((log_w, mask))
+            log_w = jnp.where(mask, log_w, jnp.zeros_like(log_w))  # make sure log_w finite
+            Z_inv = jnp.sum(jnp.exp(-log_w) * mask) / jnp.sum(mask)
+            forward_ess = Z_inv / (jnp.sum(jnp.exp(log_w) * mask) / jnp.sum(mask))
+            info = {}
+            info.update(forward_ess=forward_ess)
+            return info
+
         @jax.jit
         def evaluation_fn(state: Union[TrainStateNoBuffer, TrainStateWithBuffer], key: chex.PRNGKey) -> dict:
             eval_info = eval_fn(test_data, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                     eval_batch_free_fn=None,
-                    batch_size=cfg.training.eval_batch_size)
+                    batch_size=cfg.training.eval_batch_size,
+                    further_processing_fn=further_fn)
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
                 smc=smc_eval,

@@ -6,16 +6,17 @@ import boltzgen as bg
 import torch
 
 from eacf.targets.data import load_aldp
+from eacf.utils.coordinate_transform import internal
 
 
-def test_internal_transform():
+def tesst_internal_transform():
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
         config.update("jax_enable_x64", True)
 
     # Load aldp data
-    train_set, _, _ = load_aldp(train_path='molboil/targets/data/aldp_500K_train_mini.h5')
+    train_set, _, _ = load_aldp(train_path='eacf/targets/data/aldp_500K_train_mini.h5')
     # Get positions
     ndim = 66
     if jax.config.jax_enable_x64:
@@ -55,8 +56,8 @@ def test_internal_transform():
                                                                          ind_circ_dih=ind_circ_dih)
 
     # jax transform
-    transform_jax = eacf.utils.coordinate_transform.internal.CompleteInternalCoordinateTransform(ndim, z_matrix, cart_indices,
-                                                                                                 data_jax, ind_circ_dih=ind_circ_dih)
+    transform_jax = internal.CompleteInternalCoordinateTransform(
+        ndim, z_matrix, cart_indices, data_jax, ind_circ_dih=ind_circ_dih)
 
     # Check forward consistency
     batch_size = 10
@@ -98,5 +99,5 @@ def test_internal_transform():
 
 
 if __name__ == '__main__':
-    test_internal_transform()
+    tesst_internal_transform()
 
