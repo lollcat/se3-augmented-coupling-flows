@@ -160,8 +160,12 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
         def further_fn(log_w: chex.Array, mask: chex.Array) -> dict:
             chex.assert_equal_shape((log_w, mask))
             log_w = jnp.where(mask, log_w, jnp.zeros_like(log_w))  # make sure log_w finite
-            Z_inv = jnp.sum(jnp.exp(-log_w) * mask) / jnp.sum(mask)
-            forward_ess = Z_inv / (jnp.sum(jnp.exp(log_w) * mask) / jnp.sum(mask))
+            log_z_inv = jax.nn.logsumexp(-log_w, b=mask) - jnp.log(jnp.sum(mask))
+            log_z_expectation_p_over_q = jax.nn.logsumexp(log_w, b=mask) - jnp.log(jnp.sum(mask))
+            # Z_inv = jnp.sum(jnp.exp(-log_w) * mask) / jnp.sum(mask)
+            # forward_ess = 1 / (jnp.sum(jnp.exp(log_w) * mask) / jnp.sum(mask)) / Z_inv
+            log_forward_ess = - log_z_inv - log_z_expectation_p_over_q
+            forward_ess = jnp.exp(log_forward_ess)
             info = {}
             info.update(forward_ess=forward_ess)
             return info
