@@ -6,7 +6,7 @@ import optax
 import jax.numpy as jnp
 
 
-class CustomOptimizerState(NamedTuple):
+class IgnoreNanOptState(NamedTuple):
     opt_state: optax.OptState
     grad_norms: chex.Array
     ignored_grads_count: chex.Array = jnp.array(0, dtype=int)  # Keep track of how many gradients have been ignored.
@@ -27,16 +27,16 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
     3. Otherwise the gradient is clipped to a maximum norm of `factor_clip_norm * grad_median_norm`.
     """
 
-    def init(params: chex.ArrayTree) -> CustomOptimizerState:
+    def init(params: chex.ArrayTree) -> IgnoreNanOptState:
         opt_state = optimizer.init(params)
         grad_norms = jnp.ones(window_length)*float('nan')
         # After initialisation, for first third of window length take every gradient step.
         grad_norms = grad_norms.at[0:int(window_length*2/3)].set(1e30)
 
-        return CustomOptimizerState(opt_state=opt_state, grad_norms=grad_norms)
+        return IgnoreNanOptState(opt_state=opt_state, grad_norms=grad_norms)
 
-    def update(grad: chex.ArrayTree, opt_state: CustomOptimizerState, params: chex.ArrayTree) ->\
-            Tuple[chex.ArrayTree, CustomOptimizerState]:
+    def update(grad: chex.ArrayTree, opt_state: IgnoreNanOptState, params: chex.ArrayTree) ->\
+            Tuple[chex.ArrayTree, IgnoreNanOptState]:
 
         grad_norm = optax.global_norm(grad)
         grad_median_norm = jnp.nanmedian(opt_state.grad_norms)
@@ -61,8 +61,8 @@ def dynamic_update_ignore_and_grad_norm_clip(optimizer: optax.GradientTransforma
                                        opt_state.ignored_grads_count + 1),
                               lambda: (updates, new_opt_state, opt_state.ignored_grads_count))
 
-        state = CustomOptimizerState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
-                                     grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
+        state = IgnoreNanOptState(opt_state=new_opt_state, ignored_grads_count=ignored_grad_count,
+                                  grad_norms=grad_norms, total_steps=opt_state.total_steps + 1)
         return updates, state
 
 

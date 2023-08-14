@@ -1,7 +1,7 @@
 import chex
 import jax
 import jax.numpy as jnp
-from typing import Callable, Tuple, Optional, Any
+from typing import Callable, Tuple, Optional, Any, Union
 
 import chex
 import jax
@@ -250,16 +250,19 @@ def create_scan_epoch_fn(
 
 Mask = chex.Array
 
+FurtherData = Any
+
 def eval_fn(
     x: FullGraphSample,
     key: chex.PRNGKey,
     params: Params,
-    eval_on_test_batch_fn: Optional[
-        Callable[[Params, chex.ArrayTree, chex.PRNGKey, Mask], dict]
-    ] = None,
+        eval_on_test_batch_fn: Optional[
+            Callable[[Params, chex.ArrayTree, chex.PRNGKey, Mask], Union[Tuple[FurtherData, dict], dict]]
+        ] = None,
     eval_batch_free_fn: Optional[Callable[[Params, chex.PRNGKey], dict]] = None,
     batch_size: Optional[int] = None,
-    mask: Optional[Mask] = None
+    mask: Optional[Mask] = None,
+    further_processing_fn: Optional[Callable[[FurtherData, Mask], dict]] = None,
 ) -> dict:
     info = {}
     key1, key2 = jax.random.split(key)
@@ -289,9 +292,20 @@ def eval_fn(
             None,
             (x_batched, mask_batched, jax.random.split(key1, get_leading_axis_tree(x_batched, 1)[0])),
         )
-        # Aggregate test set info across batches.
-        per_batch_weighting = jnp.sum(mask_batched, axis=-1) / jnp.sum(jnp.sum(mask_batched, axis=-1))
-        info.update(jax.tree_map(lambda x: jnp.sum(per_batch_weighting*x), batched_info))
+        if isinstance(batched_info, dict):
+            # Aggregate test set info across batches.
+            per_batch_weighting = jnp.sum(mask_batched, axis=-1) / jnp.sum(jnp.sum(mask_batched, axis=-1))
+            info.update(jax.tree_map(lambda x: jnp.sum(per_batch_weighting*x), batched_info))
+        else:
+            assert further_processing_fn is not None
+            per_batch_weighting = jnp.sum(mask_batched, axis=-1) / jnp.sum(jnp.sum(mask_batched, axis=-1))
+            info.update(jax.tree_map(lambda x: jnp.sum(per_batch_weighting * x), batched_info[1]))
+
+            flat_mask, processing_in = jax.tree_map(lambda x: x.reshape(x.shape[0]*x.shape[1],
+                                                                        *x.shape[2:]), (mask_batched, batched_info[0]))
+            further_info = further_processing_fn(processing_in, flat_mask)
+            info.update(further_info)
+
 
     if eval_batch_free_fn is not None:
         non_batched_info = eval_batch_free_fn(

@@ -14,7 +14,7 @@ from fabjax.buffer import PrioritisedBuffer, PrioritisedBufferState
 from molboil.utils.test import random_rotate_translate_permute
 
 from flow.aug_flow_dist import AugmentedFlow, AugmentedFlowParams, GraphFeatures, FullGraphSample, Extra
-from utils.optimize import CustomOptimizerState
+from utils.optimize import IgnoreNanOptState
 from train.fab_train_no_buffer import flat_log_prob_components, build_smc_forward_pass
 
 Params = chex.ArrayTree
@@ -192,7 +192,7 @@ def build_fab_with_buffer_init_step_fns(
         info.update(loss_info)
         info.update(log10_grad_norm=jnp.log10(grad_norm))  # Makes scale nice for plotting
         info.update(log10_max_param_grad=jnp.log(jnp.max(ravel_pytree(grad)[0])))
-        if isinstance(opt_state, CustomOptimizerState):
+        if isinstance(opt_state, IgnoreNanOptState):
             info.update(ignored_grad_count=opt_state.ignored_grads_count,
                         total_optimizer_steps=opt_state.total_steps)
         return (new_params, new_opt_state), (info, log_w_adjust, log_q)
