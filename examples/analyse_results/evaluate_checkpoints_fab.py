@@ -45,6 +45,7 @@ def get_setup_info(problem: str):
         tags.append("lj13")
         tags.append("post_sub")
         max_iter = 14000
+
     return tags, hydra_config, max_iter
 
 
@@ -111,6 +112,16 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
     cfg.flow.type = flow_type
     cfg.training.seed = seed
 
+    if flow_type == "non_equivariant":
+        max_iter = int(max_iter * 4)  # cfg.training.factor_to_train_non_eq_flow)
+    if problem == "dw4_fab":
+        checkpoint_iter_np = jnp.flip(
+            jnp.linspace(
+                max_iter - 1, 0, 20, dtype="int", endpoint=False
+            )
+        )
+        max_iter = checkpoint_iter_np[15]
+
     load_dataset = load_ds_dw4 if problem == "dw4_fab" else load_ds_lj13
     target_log_p_x_fn = log_prob_fn_dw4 if problem == "dw4_fab" else log_prob_fn_lj13
 
@@ -155,7 +166,9 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
 
 if __name__ == '__main__':
+    for seed in [0, 1, 2]:
+        download_checkpoint_and_eval(problem="dw4_fab", seed=seed, flow_type='non_equivariant')
     # download_checkpoint_and_eval(problem="dw4_fab", seed=0, flow_type="spherical")
-    for flow_type in ["along_vector", "proj", "non_equivariant"]:  # ["along_vector", "spherical", "proj", "non_equivariant"]
-        for seed in [0, 1, 2]:
-            download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)
+    # for flow_type in ["along_vector", "proj", "non_equivariant"]:  # ["along_vector", "spherical", "proj", "non_equivariant"]
+    #     for seed in [0, 1, 2]:
+    #         download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)

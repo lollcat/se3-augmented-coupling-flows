@@ -3,9 +3,10 @@ import pandas as pd
 from examples.analyse_results.get_wandb_runs import get_run_history
 
 
-_TAGS_DW4 = ['post_sub1','cblgpu', 'fab', "dw4"]
-_TAGS_Lj13_eval = ["lj13_fab", "evaluation", "eval_2"]
-_TAGS_LJ13_run = ['post_sub','cblgpu', 'fab', "lj13"]
+_TAGS_DW4_run = ['post_sub1','cblgpu', 'fab', "dw4"]
+_TAGS_DW4_eval = ["dw4_fab", "evaluation", "eval_3", "with_fwd_ess"]
+_TAGS_Lj13_eval = ["lj13_fab", "evaluation", "eval_3", "with_fwd_ess"]
+_TAGS_LJ13_run = ['post_sub', 'cblgpu', 'fab', "lj13"]
 
 def download_eval_metrics(tags,
                           n_runs=3,
@@ -56,20 +57,23 @@ def create_latex_table():
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
                  "\\sphproj \ \eanf"]
     keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', '_runtime']
-    eval_step_number_dw4 = [64008, -1, -1, -1]
 
-
-    data_dw4 = download_eval_metrics(_TAGS_DW4, flow_types=flow_types, step_number=eval_step_number_dw4)
+    data_dw4 = download_eval_metrics(_TAGS_DW4_eval, flow_types=flow_types, step_number=-1,
+                fields = ('marginal_log_lik', 'lower_bound_marginal_gap',
+                          'eval_ess_flow', 'eval_ess_ais', 'forward_ess',
+                          "_step"))
+    dw4_runtime = download_eval_metrics(_TAGS_DW4_run, flow_types=flow_types,
+                                        step_number=[64008, -1, -1, -1],
+                                         fields=('_runtime', "_step"))
+    data_dw4["_runtime"] = dw4_runtime["_runtime"]
 
     data_lj13 = download_eval_metrics(_TAGS_Lj13_eval, flow_types=flow_types, step_number=-1,
                 fields = ('marginal_log_lik', 'lower_bound_marginal_gap',
-                          'eval_ess_flow', 'eval_ess_ais',
+                          'eval_ess_flow', 'eval_ess_ais', 'forward_ess',
                           "_step"))
     lj13_runtime = download_eval_metrics(_TAGS_LJ13_run, flow_types=flow_types, step_number=-1,
                                          fields=('_runtime',"_step"))
     data_lj13["_runtime"] = lj13_runtime["_runtime"]
-
-
 
 
     means_dw4 = data_dw4.groupby("flow_type")[keys].mean()
