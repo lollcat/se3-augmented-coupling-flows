@@ -156,6 +156,6 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
 
 if __name__ == '__main__':
     # download_checkpoint_and_eval(problem="dw4_fab", seed=0, flow_type="spherical")
-    for flow_type in ["spherical"]: # ["along_vector", "spherical", "proj", "non_equivariant"]:
+    for flow_type in ["along_vector", "proj", "non_equivariant"]:  # ["along_vector", "spherical", "proj", "non_equivariant"]
         for seed in [0, 1, 2]:
             download_checkpoint_and_eval(problem="lj13_fab", seed=seed, flow_type=flow_type)
