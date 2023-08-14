@@ -113,7 +113,7 @@ def download_checkpoint_and_eval(problem, seed, flow_type):
     cfg.training.seed = seed
 
     if flow_type == "non_equivariant":
-        max_iter = int(max_iter * 4)  # cfg.training.factor_to_train_non_eq_flow)
+        max_iter = int(max_iter * 4) # cfg.training.factor_to_train_non_eq_flow)
     if problem == "dw4_fab":
         checkpoint_iter_np = jnp.flip(
             jnp.linspace(

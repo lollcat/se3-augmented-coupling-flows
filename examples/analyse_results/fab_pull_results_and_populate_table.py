@@ -34,7 +34,8 @@ def download_eval_metrics(tags,
                 if iter_n == -1:
                     info = dict(hist.iloc[iter_n])
                 else:
-                    info = dict(hist[hist["_step"] == iter_n].iloc[0])
+                    bounds = (hist["_step"] <= iter_n + 200) & (hist["_step"] >= iter_n - 200)
+                    info = dict(hist[bounds].iloc[-1])
                 if info["_step"] == 0 and not allow_single_step:
                     print(f"skipping {flow_type} seed={seed} as it only has 1 step")
                     continue
@@ -56,14 +57,14 @@ def create_latex_table():
     flow_types = ['non_equivariant', 'along_vector', 'proj', 'spherical'] #
     row_names = ['\\' + "noneanf", "\\vecproj \ \eanf", "\\cartproj \ \eanf",
                  "\\sphproj \ \eanf"]
-    keys = ['eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', '_runtime']
+    keys = ['forward_ess', 'eval_ess_flow', 'eval_ess_ais', 'marginal_log_lik', 'lower_bound_marginal_gap', '_runtime']
 
     data_dw4 = download_eval_metrics(_TAGS_DW4_eval, flow_types=flow_types, step_number=-1,
                 fields = ('marginal_log_lik', 'lower_bound_marginal_gap',
                           'eval_ess_flow', 'eval_ess_ais', 'forward_ess',
                           "_step"))
     dw4_runtime = download_eval_metrics(_TAGS_DW4_run, flow_types=flow_types,
-                                        step_number=[64008, -1, -1, -1],
+                                        step_number=[64037, -1, -1, -1],
                                          fields=('_runtime', "_step"))
     data_dw4["_runtime"] = dw4_runtime["_runtime"]
 
@@ -108,8 +109,10 @@ def create_latex_table():
         table_v2_string += \
             f"{row_names[i]} & " \
             f"{means_dw4.loc[flow_type]['eval_ess_flow']*100:.2f},{sem_dw4.loc[flow_type]['eval_ess_flow']*100:.2f} & " \
+            f"{means_dw4.loc[flow_type]['forward_ess'] * 100:.2f},{sem_dw4.loc[flow_type]['forward_ess'] * 100:.2f} & " \
             f"{-means_dw4.loc[flow_type]['marginal_log_lik']:.2f},{sem_dw4.loc[flow_type]['marginal_log_lik']:.2f} & " \
             f"{means_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f},{sem_lj13.loc[flow_type]['eval_ess_flow'] * 100:.2f} & " \
+            f"{means_lj13.loc[flow_type]['forward_ess'] * 100:.2f},{sem_lj13.loc[flow_type]['forward_ess'] * 100:.2f} & " \
             f"{-means_lj13.loc[flow_type]['marginal_log_lik']:.2f},{sem_lj13.loc[flow_type]['marginal_log_lik']:.2f} \\\ \n"
             # f"0,0 & 0,0 & 0,0  \\\ \n"
 
