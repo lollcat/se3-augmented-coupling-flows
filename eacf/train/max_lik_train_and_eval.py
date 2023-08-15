@@ -211,3 +211,19 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
         )
     return info
 
+
+def calculate_forward_ess(log_w: chex.Array, mask: chex.Array) -> dict:
+    """Calculate forward ess.
+    log_w = p(x)/q(x), where x ~ p(x).
+    This can be passed as the `further_fn` to `eacf.train.base.eval_fn`."""
+    chex.assert_equal_shape((log_w, mask))
+    log_w = jnp.where(mask, log_w, jnp.zeros_like(log_w))  # make sure log_w finite
+    log_z_inv = jax.nn.logsumexp(-log_w, b=mask) - jnp.log(jnp.sum(mask))
+    log_z_expectation_p_over_q = jax.nn.logsumexp(log_w, b=mask) - jnp.log(jnp.sum(mask))
+    log_forward_ess = - log_z_inv - log_z_expectation_p_over_q
+    forward_ess = jnp.exp(log_forward_ess)
+    info = {}
+    info.update(forward_ess=forward_ess)
+    return info
+
+

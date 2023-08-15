@@ -1,3 +1,6 @@
+import chex
+chex.set_n_cpu_devices(4)
+
 import hydra
 from omegaconf import DictConfig
 from functools import partial
@@ -61,6 +64,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,)
     cfg.flow.nets.non_equivariant_transformer_config.n_layers = 2
     cfg.flow.nets.non_equivariant_transformer_config.num_heads = 1
+    cfg.training.use_multiple_devices = True
 
     debug = False
     if debug:
@@ -72,7 +76,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
