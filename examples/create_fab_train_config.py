@@ -348,9 +348,10 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             keys = jax.random.split(key, n_devices)
             info, log_w_test, mask = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
                 state, keys, test_data_per_device, test_mask)
+            info = get_from_first_device(info, as_numpy=True)
             further_info = calculate_forward_ess(log_w_test.flatten(), mask=mask.flatten())
             info.update(further_info)
-            return get_from_first_device(info, as_numpy=True)
+            return info
 
     # Plot single device.
     plotter_single_device = plotter
