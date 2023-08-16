@@ -9,7 +9,7 @@ from eacf.targets.data import load_aldp
 from eacf.utils.coordinate_transform import internal
 
 
-def tesst_internal_transform():
+def test_internal_transform():
     USE_64_BIT = True
     if USE_64_BIT:
         from jax.config import config
@@ -99,5 +99,5 @@ def tesst_internal_transform():
 
 
 if __name__ == '__main__':
-    tesst_internal_transform()
+    test_internal_transform()
 
