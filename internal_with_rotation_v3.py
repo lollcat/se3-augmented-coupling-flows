@@ -38,11 +38,11 @@ def forward(x: chex.Array) -> chex.Array:
     z1: z coordinate of atom 1 [-1, 1]
     t1: torsion of atom 1: [-jnp.pi, jnp.pi]
     b1: bond length of atom 1
-    a2: angle of atom 2
+    x2: x coord of atom 2
+    y2: y coord of atom 2
     t2: torsion of angle 2
-    b2: bond length of atom 2
     """
-    z1, t1, b1, a2, t2, b2 = x
+    z1, t1, b1, x2, y2, t2 = x
 
     x1 = jnp.sqrt(1 - z1**2)
     angle_1 = jnp.arctan2(z1, x1)
@@ -52,7 +52,7 @@ def forward(x: chex.Array) -> chex.Array:
     R3 = get_rotation_matrix(angle=t1, fixed_axis=2)
 
     atom_1_coords = jnp.array([jnp.squeeze(b1), 0, 0.])
-    atom_2_coords = jnp.array([jnp.cos(a2) * b2, jnp.sin(a2) * b2, 0.0])
+    atom_2_coords = jnp.array([x2, y2, 0.0])
 
     # Apply rotation to y.
     y_un_rotated = jnp.concatenate([atom_1_coords[None], atom_2_coords[None]], axis=0)
@@ -77,19 +77,18 @@ if __name__ == '__main__':
     b1, a2, b2 = jax.random.uniform(key1, shape=(3,))
     (z1, t1, t2), log_prob = sample_and_log_prob_z1_t1_t2(key2)
 
-    x = jnp.stack([z1, t1, b1, a2, t2, b2 ])
+    x2, y2 = jnp.cos(a2) * b2, jnp.sin(a2) * b2
+    x = jnp.stack([z1, t1, b1, x2, y2, t2])
     y = forward(x)
 
     jac = jax.jacfwd(forward)(x)
     sign, log_det = jnp.linalg.slogdet(jac)
 
 
-    expected_log_det = 2*jnp.log(b1) + 2*jnp.log(b2) + jnp.log(jnp.sin(a2))
+    expected_log_det = 2*jnp.log(b1) + jnp.log(b2) + jnp.log(jnp.sin(a2))
 
     print(f"log prob {log_prob}")
     print(f"log det {expected_log_det}")
     print(expected_log_det - log_det)
 
-    change_log_det = 2 * jnp.log(b1) + jnp.log(b2) + jnp.log(jnp.sin(a2))
-    print(f"change in log det relative to what's already included : {change_log_det}")
 
