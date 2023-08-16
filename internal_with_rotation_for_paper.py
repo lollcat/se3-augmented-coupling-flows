@@ -71,10 +71,10 @@ def endow_cartesian_coords_with_rotation(
     x = jnp.concatenate([atom_1_coords[None],
                          atom_2_coords[None],
                          a3_n_minus_1_xyz], axis=0)
-    y = jax.vmap(lambda y_unrot: R3 @ R2 @ R1 @ y_unrot)(x)
-    chex.assert_shape(y, (n_nodes-1, 3))
+    w = jax.vmap(lambda x_: R3 @ R2 @ R1 @ x_)(x)
+    chex.assert_shape(w, (n_nodes-1, 3))
 
-    return y
+    return w
 
 
 def forward(x: chex.Array) -> chex.Array:
