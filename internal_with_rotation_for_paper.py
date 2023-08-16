@@ -17,19 +17,24 @@ def endow_cartesian_coords_with_rotation(
         a3_n_minus_1_xyz: chex.Array
         ) -> chex.Array:
     """
-    Function that takes in the Cartesian coordinates calculated from the internal coordinates
-    (which is invariant to global rotation) and lifts it into a space that includes degrees of
-    freedom for global rotation.
+    Function that takes in the Cartesian coordinates calculated
+    from the internal coordinates (which is invariant to global
+    rotation) and lifts it into a space that includes degrees
+    of freedom for global rotation.
 
     Args:
-        a1_z_component: z component of the direction of the unit vector u_1 (for atom 1).
-            Between -1 and 1.
-        a1_rot: Rotation of atom 1 coordinates about the Z-axis. Between -\pi and \pi.
+        a1_z_component: z component of the direction of the
+            unit vector u_1 (for atom 1). Between -1 and 1.
+        a1_rot: Rotation of atom 1 coordinates about the Z-axis.
+            Between -\pi and \pi.
         a1_x: x component of atom 1 (equal to bond length 1).
-        a2_x: x component of atom 2 (equal to cos(a2) * b2 where a2 is the angle between atom 1 and atom 2 and b2
-            is the bond length between atom 0 and atom 2).
+        a2_x: x component of atom 2 (equal to cos(a2) * b2
+            where a2 is the angle between atom 1 and atom 2
+            and b2 is the bond length between atom 0 and
+            atom 2).
         a2_y: y component of atom 2 (equal to cos(a2) * b2).
-        a2_rot: Rotation that determines which plane atom 2 lies on.
+        a2_rot: Rotation that determines which plane atom 2
+            lies on.
 
     Returns:
         y: Cartesian coordinates of atoms 1 to N-1.
@@ -41,7 +46,7 @@ def endow_cartesian_coords_with_rotation(
     # Rotation about X-axis.
     # Effects plane that atom 2 lies on.
     R1 = jnp.array([
-            [1., 0.,           0.         ],
+            [1., 0., 0.],
             [0., jnp.cos(a2_rot), -jnp.sin(a2_rot)],
             [0., jnp.sin(a2_rot), jnp.cos(a2_rot)]
         ])
@@ -50,21 +55,23 @@ def endow_cartesian_coords_with_rotation(
     # the first atom is placed.
     R2 = jnp.array([
             [jnp.cos(a1_angle),  0., jnp.sin(a1_angle)],
-            [0.,                1., 0               ],
+            [0., 1., 0],
             [-jnp.sin(a1_angle), 0., jnp.cos(a1_angle)]
         ])  # Rotate about Y-axis.
     R3 = jnp.array([
             [jnp.cos(a1_rot), -jnp.sin(a1_rot), 0],
             [jnp.sin(a1_rot), jnp.cos(a1_rot), 0],
-            [0.,           0.,           1]
+            [0., 0., 1]
         ])  # Rotate about Z-axis.
 
     atom_1_coords = jnp.array([jnp.squeeze(a1_x), 0, 0.])
     atom_2_coords = jnp.array([a2_x, a2_y, 0.0])
 
-    # Apply rotation to y.
-    y_un_rotated = jnp.concatenate([atom_1_coords[None], atom_2_coords[None], a3_n_minus_1_xyz], axis=0)
-    y = jax.vmap(lambda y_unrot: R3 @ R2 @ R1 @ y_unrot)(y_un_rotated)
+    # Apply rotation to x to lift it into the full space endowed with rotation.
+    x = jnp.concatenate([atom_1_coords[None],
+                         atom_2_coords[None],
+                         a3_n_minus_1_xyz], axis=0)
+    y = jax.vmap(lambda y_unrot: R3 @ R2 @ R1 @ y_unrot)(x)
     chex.assert_shape(y, (n_nodes-1, 3))
 
     return y
