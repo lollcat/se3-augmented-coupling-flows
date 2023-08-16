@@ -4,6 +4,7 @@ defaults:
   - flow: default
   - target: default
   - fab: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -46,5 +47,5 @@ logger:
     name: dw4_fab_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [dw4,fab,Leucadendron]
+    tags: [dw4,fab,Leucadendron1]
 

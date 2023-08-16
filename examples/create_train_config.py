@@ -26,7 +26,7 @@ from eacf.flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistC
 from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 from eacf.nets.make_egnn import NetsConfig, MLPHeadConfig, EGNNTorsoConfig, TransformerConfig
 from eacf.train.max_lik_train_and_eval import general_ml_loss_fn, get_eval_on_test_batch, eval_non_batched, \
-    masked_ml_loss_fn
+    masked_ml_loss_fn, get_eval_on_test_batch_with_further, calculate_forward_ess
 from eacf.utils.loggers import Logger, WandbLogger, ListLogger, PandasLogger
 from eacf.utils.optimize import get_optimizer, OptimizerConfig
 from eacf.utils.pmap import get_from_first_device
@@ -149,7 +149,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     n_epoch = cfg.training.n_epoch
     if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
-        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+        n_epoch = int(n_epoch * cfg.training.factor_to_train_non_eq_flow)
 
     # Setup Optimizer.
     opt_cfg = dict(training_config.pop("optimizer"))
@@ -227,9 +227,11 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
         if target_log_prob_fn:
+            eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                            flow=flow, K=cfg.training.K_marginal_log_lik,
+                                            test_invariances=True,
+                                            target_log_prob=target_log_prob_fn)
             eval_batch_free_fn = partial(
                                     eval_non_batched,
                                     single_feature=test_data.features[0],
@@ -238,14 +240,19 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                                     inner_batch_size=cfg.training.eval_batch_size,
                                     target_log_prob=target_log_prob_fn)
         else:
+            eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                            flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
             eval_batch_free_fn = None
 
         @jax.jit
         def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
-                    eval_on_test_batch_fn=eval_on_test_batch_fn,
-                    eval_batch_free_fn=eval_batch_free_fn,
-                    batch_size=cfg.training.eval_batch_size)
+            eval_info, log_w_test_data, flat_mask = eval_fn(test_data, key, state.params,
+                                                            eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                                            eval_batch_free_fn=eval_batch_free_fn,
+                                                            batch_size=cfg.training.eval_batch_size)
+            if target_log_prob_fn is not None:
+                further_info = calculate_forward_ess(log_w_test_data, flat_mask)
+                eval_info.update(further_info)
             return eval_info
 
     if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):
@@ -381,10 +388,13 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
     else:
         if evaluation_fn is None:
+
             # Setup eval functions
-            eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                            flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
             if target_log_prob_fn:
+                eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                                flow=flow, K=cfg.training.K_marginal_log_lik,
+                                                test_invariances=True,
+                                                target_log_prob=target_log_prob_fn)
                 eval_batch_free_fn = partial(
                     eval_non_batched,
                     single_feature=test_data.features[0],
@@ -393,25 +403,31 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                     inner_batch_size=cfg.training.eval_batch_size,
                     target_log_prob=target_log_prob_fn)
             else:
+                eval_on_test_batch_fn = partial(get_eval_on_test_batch,
+                                                flow=flow, K=cfg.training.K_marginal_log_lik,
+                                                test_invariances=True)
                 eval_batch_free_fn = None
 
             def evaluation_fn_single_device(state: TrainingState, key: chex.PRNGKey,
-                                            x_test: FullGraphSample, test_mask: chex.Array) -> dict:
-                eval_info = eval_fn(x_test, key, state.params,
+                                            x_test: FullGraphSample, test_mask: chex.Array) -> \
+                    Tuple[dict, chex.Array, chex.Array]:
+                eval_info, log_w_test, flat_mask = eval_fn(x_test, key, state.params,
                                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                                     eval_batch_free_fn=eval_batch_free_fn,
                                     batch_size=cfg.training.eval_batch_size,
-                                    mask=test_mask
-                                    )
+                                    mask=test_mask)
                 eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
-                return eval_info
+                return eval_info, log_w_test, flat_mask
 
             test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
 
             def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
                 keys = jax.random.split(key, n_devices)
-                info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                info, log_w_test, mask = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
                     state, keys, test_data_per_device, test_mask)
+                if target_log_prob_fn is not None:
+                    further_info = calculate_forward_ess(log_w_test.flatten(), mask=mask.flatten())
+                    info.update(further_info)
                 return get_from_first_device(info, as_numpy=True)
 
         # Plot single device.

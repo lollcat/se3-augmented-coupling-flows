@@ -3,6 +3,7 @@ defaults:
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -24,6 +25,7 @@ training:
   test_set_size: 1000
   use_flow_aux_loss: true
   aux_loss_weight: 10.0
+  final_run: true # eval on test set instead of validation set.
 
 
 logger:
@@ -31,8 +33,8 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_${flow.type}
+    name: lj13_${flow.type}_${training.train_set_size}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,ml,Leucadendron]
+    tags: [lj13,ml,protea]
 

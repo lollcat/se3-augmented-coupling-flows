@@ -32,7 +32,6 @@ def test_bijector_with_proj(
                 add_small_identity=False,
                 num_bins=4,
                 n_inner_transforms=1,
-                orthogonalization_method=orth_type
             )
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

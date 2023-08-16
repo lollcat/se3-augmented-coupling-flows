@@ -133,6 +133,48 @@ def get_eval_on_test_batch(params: AugmentedFlowParams,
         info.update(invariances_info)
     return info
 
+def get_eval_on_test_batch_with_further(
+        params: AugmentedFlowParams,
+        x_test: FullGraphSample,
+        key: chex.PRNGKey,
+        flow: AugmentedFlow,
+        K: int,
+        target_log_prob: Callable,
+        test_invariances: bool = True,
+        mask: Optional[chex.Array] = None,
+        ) -> Tuple[chex.Array, dict]:
+    # First copy and paste `get_eval_on_test_batch` function. Then additionally return log_w
+    key, subkey = jax.random.split(key)
+    x_augmented, log_p_a = flow.aux_target_sample_n_and_log_prob_apply(params.aux_target, x_test, subkey, K)
+    x_test = jax.tree_map(lambda x: jnp.repeat(x[None, ...], K, axis=0), x_test)
+    joint_sample = flow.separate_samples_to_joint(x_test.features, x_test.positions, x_augmented)
+
+    log_q = jax.vmap(flow.log_prob_apply, in_axes=(None, 0))(params, joint_sample)
+    chex.assert_equal_shape((log_p_a, log_q))
+    log_w = log_q - log_p_a
+
+    info = {}
+    info.update(eval_log_lik=maybe_masked_mean(jnp.mean(log_q, axis=0), mask=mask))
+    marginal_log_lik = maybe_masked_mean(jax.nn.logsumexp(log_w, axis=0) - jnp.log(jnp.array(K)),
+                                         mask=mask)
+    info.update(marginal_log_lik=marginal_log_lik)
+
+    lower_bound_marginal_gap = marginal_log_lik - maybe_masked_mean(jnp.mean(log_w, axis=0), mask=mask)
+    info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
+
+    info.update(var_log_w=maybe_masked_mean(jnp.var(log_w, axis=0), mask=mask))
+    info.update(ess_aug_conditional=maybe_masked_mean(
+        1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0], mask=mask))
+
+    if test_invariances:
+        key, subkey = jax.random.split(key)
+        invariances_info = get_checks_for_flow_properties(joint_sample[0], flow=flow, params=params, key=subkey,
+                                                          mask=mask)
+        info.update(invariances_info)
+
+    log_w_joint = target_log_prob(x_test.positions[0]) - log_w[0]
+    return log_w_joint, info
+
 
 def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
                      key: chex.PRNGKey, flow: AugmentedFlow,
@@ -168,4 +210,20 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
              "ess": ess}
         )
     return info
+
+
+def calculate_forward_ess(log_w: chex.Array, mask: chex.Array) -> dict:
+    """Calculate forward ess.
+    log_w = p(x)/q(x), where x ~ p(x).
+    This can be passed as the `further_fn` to `eacf.train.base.eval_fn`."""
+    chex.assert_equal_shape((log_w, mask))
+    log_w = jnp.where(mask, log_w, jnp.zeros_like(log_w))  # make sure log_w finite
+    log_z_inv = jax.nn.logsumexp(-log_w, b=mask) - jnp.log(jnp.sum(mask))
+    log_z_expectation_p_over_q = jax.nn.logsumexp(log_w, b=mask) - jnp.log(jnp.sum(mask))
+    log_forward_ess = - log_z_inv - log_z_expectation_p_over_q
+    forward_ess = jnp.exp(log_forward_ess)
+    info = {}
+    info.update(forward_ess=forward_ess)
+    return info
+
 

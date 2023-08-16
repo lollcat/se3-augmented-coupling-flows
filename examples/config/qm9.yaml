@@ -3,6 +3,7 @@ defaults:
   - training/optimizer: default_lr_schedule
   - flow: default
   - target: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -26,6 +27,7 @@ training:
   train_set_size: null
   test_set_size: null
   aux_loss_weight: 10.0
+  final_run: true # eval on test set instead of validation set.
 
 
 logger:
@@ -36,4 +38,4 @@ logger:
     name: qm9pos_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [qm9pos,ml,Leucadendron]
+    tags: [qm9pos,ml,protea]
