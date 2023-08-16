@@ -32,16 +32,8 @@ def get_rotation_matrix(angle: chex.Array, fixed_axis: int) -> chex.Array:
         ])
     return rotation
 
+
 def forward(x: chex.Array) -> chex.Array:
-    """
-    z1, t1, b1, a2, t2, b2 = x
-    z1: z coordinate of atom 1 [-1, 1]
-    t1: torsion of atom 1: [-jnp.pi, jnp.pi]
-    b1: bond length of atom 1
-    x2: x coord of atom 2
-    y2: y coord of atom 2
-    t2: torsion of angle 2
-    """
     z1, t1, b1, x2, y2, t2 = x
 
     x1 = jnp.sqrt(1 - z1**2)
