@@ -41,7 +41,7 @@ def endow_cartesian_coords_with_rotation(
     """
     n_nodes = a3_n_minus_1_xyz.shape[0] + 3
 
-    a1_angle = jnp.arctan2(a1_z_component, jnp.sqrt(1 - a1_z_component ** 2))
+    a1_angle = jnp.pi / 2 - jnp.arccos(a1_z_component)
 
     # Rotation about X-axis.
     # Effects plane that atom 2 lies on.
@@ -91,7 +91,7 @@ def forward(x: chex.Array) -> chex.Array:
 
 def sample_and_log_prob_z1_t1_t2(key: chex.PRNGKey) -> Tuple[chex.Array, chex.Array]:
     key1, key2, key3 = jax.random.split(key, 3)
-    z1, log_p_z1 = distrax.Uniform(low=-1., high=1.).sample_and_log_prob(seed=key1)
+    z1, log_p_z1 = distrax.Uniform(low=-1, high=1.).sample_and_log_prob(seed=key1)
     t1, log_p_t1 = distrax.Uniform(low=-jnp.pi, high=jnp.pi).sample_and_log_prob(seed=key2)
     t2, log_p_t2 = distrax.Uniform(low=-jnp.pi, high=jnp.pi).sample_and_log_prob(seed=key2)
     return jnp.stack([z1, t1, t2]), log_p_z1 + log_p_t1 + log_p_t2
@@ -99,6 +99,7 @@ def sample_and_log_prob_z1_t1_t2(key: chex.PRNGKey) -> Tuple[chex.Array, chex.Ar
 
 if __name__ == '__main__':
 
+    # https://mathworld.wolfram.com/SpherePointPicking.html
 
     key = jax.random.PRNGKey(0)
     n_nodes = 8
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     expected_log_det = 2*jnp.log(b1) + jnp.log(b2) + jnp.log(jnp.sin(a2))
 
     print(f"log prob {log_prob}")
-    print(f"log det {expected_log_det}")
+    print(f"log det {log_det}")
     print(expected_log_det - log_det)
 
 
