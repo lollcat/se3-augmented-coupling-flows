@@ -246,11 +246,13 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
 
         @jax.jit
         def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
-                    eval_on_test_batch_fn=eval_on_test_batch_fn,
-                    eval_batch_free_fn=eval_batch_free_fn,
-                    batch_size=cfg.training.eval_batch_size,
-                    further_processing_fn=calculate_forward_ess if target_log_prob_fn is not None else None)
+            eval_info, log_w_test_data, flat_mask = eval_fn(test_data, key, state.params,
+                                                            eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                                            eval_batch_free_fn=eval_batch_free_fn,
+                                                            batch_size=cfg.training.eval_batch_size)
+            if target_log_prob_fn is not None:
+                further_info = calculate_forward_ess(log_w_test_data, flat_mask)
+                eval_info.update(further_info)
             return eval_info
 
     if eval_and_plot_fn is None and (plotter is not None or evaluation_fn is not None):
@@ -407,23 +409,25 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
                 eval_batch_free_fn = None
 
             def evaluation_fn_single_device(state: TrainingState, key: chex.PRNGKey,
-                                            x_test: FullGraphSample, test_mask: chex.Array) -> dict:
-                eval_info = eval_fn(x_test, key, state.params,
+                                            x_test: FullGraphSample, test_mask: chex.Array) -> \
+                    Tuple[dict, chex.Array, chex.Array]:
+                eval_info, log_w_test, flat_mask = eval_fn(x_test, key, state.params,
                                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                                     eval_batch_free_fn=eval_batch_free_fn,
                                     batch_size=cfg.training.eval_batch_size,
-                                    further_processing_fn=calculate_forward_ess
-                                    if target_log_prob_fn is not None else None,
                                     mask=test_mask)
                 eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
-                return eval_info
+                return eval_info, log_w_test, flat_mask
 
             test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
 
             def evaluation_fn(state: TrainingState, key: chex.PRNGKey) -> dict:
                 keys = jax.random.split(key, n_devices)
-                info = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                info, log_w_test, mask = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
                     state, keys, test_data_per_device, test_mask)
+                if target_log_prob_fn is not None:
+                    further_info = calculate_forward_ess(log_w_test.flatten(), mask=mask.flatten())
+                    info.update(further_info)
                 return get_from_first_device(info, as_numpy=True)
 
         # Plot single device.
