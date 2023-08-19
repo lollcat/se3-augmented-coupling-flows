@@ -34,6 +34,21 @@ def openmm_energy(x: np.ndarray, openmm_context, temperature: float = 800.):
         return energy
 
 
+def openmm_multi_proc_init(sys, temp):
+    """
+    Method to initialize temperature and openmm context for workers
+    of multiprocessing pool
+    """
+    global temperature, openmm_context
+    temperature = temp
+    sim = openmm.app.Simulation(sys.topology, sys.system,
+                                openmm.LangevinIntegrator(temp * openmm.unit.kelvin,
+                                                          1.0 / openmm.unit.picosecond,
+                                                          1.0 * openmm.unit.femtosecond),
+                                platform=openmm.Platform.getPlatformByName('Reference'))
+    openmm_context = sim.context
+
+
 def openmm_energy_multi_proc(x: np.ndarray):
     """Compute the energy of a single configuration using OpenMM using global
     temperature and context.
@@ -56,20 +71,6 @@ def openmm_energy_multi_proc(x: np.ndarray):
         energy = state.getPotentialEnergy().value_in_unit(
             openmm.unit.kilojoule / openmm.unit.mole) / kBT
         return energy
-
-def openmm_multi_proc_init(sys, temp):
-    """
-    Method to initialize temperature and openmm context for workers
-    of multiprocessing pool
-    """
-    global temperature, openmm_context
-    temperature = temp
-    sim = openmm.app.Simulation(sys.topology, sys.system,
-                                openmm.LangevinIntegrator(temp * openmm.unit.kelvin,
-                                                          1.0 / openmm.unit.picosecond,
-                                                          1.0 * openmm.unit.femtosecond),
-                                platform=openmm.Platform.getPlatformByName('Reference'))
-    openmm_context = sim.context
 
 
 def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 800.):
@@ -94,7 +95,7 @@ def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 80
 
 
 def openmm_energy_multi_proc_batched(x: chex.Array, pool):
-    x_np = np.array(x)
+    x_np = np.asarray(x)
     energies_out = pool.map(openmm_energy_multi_proc, x_np)
     energies = jnp.array(energies_out)
     return energies
@@ -158,7 +159,7 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
         raise NotImplementedError('This environment is not implemented.')
 
     # Initialize multiprocessing pool
-    pool = mp.Pool(n_threads, openmm_multi_proc_init, (system, temperature))
+    pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(system, temperature))
 
     # Define function
     def log_prob_fn(x: chex.Array):
