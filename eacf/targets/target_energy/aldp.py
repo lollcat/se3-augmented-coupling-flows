@@ -66,7 +66,7 @@ def openmm_energy_multi_proc(x: np.ndarray):
     Returns:
         The energy of the configuration.
     """
-    kBT = R * temperature
+    kBT = 8.31447e-3 * temperature
     # Handle nans and infinities
     if np.any(np.isnan(x)) or np.any(np.isinf(x)):
         return np.nan
