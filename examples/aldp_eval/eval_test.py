@@ -63,7 +63,7 @@ def run(cfg: DictConfig):
     target_log_p_x_fn = get_log_prob_fn(scale=0.16626292)
     eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
                                     flow=flow, K=K, test_invariances=True,
-                                    target_log_prob=target_log_p_x_fn)
+                                    target_log_prob=None)
 
     # Load checkpoint
     checkpoints_dir = os.path.join(cfg.training.save_dir, f"model_checkpoints")
@@ -78,10 +78,11 @@ def run(cfg: DictConfig):
 
     # Run eval fn
     key = jax.random.PRNGKey(seed)
-    eval_info, log_w_test_data, flat_mask = eval_fn(test_data, key, state.params,
-                                                    eval_on_test_batch_fn=eval_on_test_batch_fn,
-                                                    eval_batch_free_fn=None,
-                                                    batch_size=batch_size)
+    eval_info, log_w, flat_mask = eval_fn(test_data, key, state.params,
+                                          eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                          eval_batch_free_fn=None,
+                                          batch_size=batch_size)
+    log_w_test_data = target_log_p_x_fn(test_data.positions) - log_w
     further_info = calculate_forward_ess(log_w_test_data, flat_mask)
     eval_info.update(further_info)
 
