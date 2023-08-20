@@ -1,3 +1,5 @@
+from typing import Optional
+
 import chex
 import jax.numpy as jnp
 import numpy as np
@@ -34,13 +36,13 @@ def openmm_energy(x: np.ndarray, openmm_context, temperature: float = 800.):
         return energy
 
 
-def openmm_multi_proc_init(env, temp):
+def openmm_multi_proc_init(env, temp, plat):
     """
     Method to initialize temperature and openmm context for workers
     of multiprocessing pool
     """
-    global temperature, openmm_context
-    temperature = temp
+    global temperature_g, openmm_context_g
+    temperature_g = temp
     # System setup
     if env == 'vacuum':
         system = testsystems.AlanineDipeptideVacuum(constraints=None)
@@ -52,8 +54,8 @@ def openmm_multi_proc_init(env, temp):
                                 openmm.LangevinIntegrator(temp * openmm.unit.kelvin,
                                                           1.0 / openmm.unit.picosecond,
                                                           1.0 * openmm.unit.femtosecond),
-                                platform=openmm.Platform.getPlatformByName('Reference'))
-    openmm_context = sim.context
+                                platform=openmm.Platform.getPlatformByName(plat))
+    openmm_context_g = sim.context
 
 
 def openmm_energy_multi_proc(x: np.ndarray):
@@ -66,13 +68,13 @@ def openmm_energy_multi_proc(x: np.ndarray):
     Returns:
         The energy of the configuration.
     """
-    kBT = 8.31447e-3 * temperature
+    kBT = R * temperature_g
     # Handle nans and infinities
     if np.any(np.isnan(x)) or np.any(np.isinf(x)):
         return np.nan
     else:
-        openmm_context.setPositions(x)
-        state = openmm_context.getState(getForces=False, getEnergy=True)
+        openmm_context_g.setPositions(x)
+        state = openmm_context_g.getState(getForces=False, getEnergy=True)
 
         # get energy
         energy = state.getPotentialEnergy().value_in_unit(
@@ -102,19 +104,21 @@ def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 80
 
 
 def openmm_energy_multi_proc_batched(x: chex.Array, pool):
-    x_np = np.asarray(x).copy()
+    x_np = np.asarray(x)
     energies_out = pool.map(openmm_energy_multi_proc, x_np)
     energies = jnp.array(energies_out)
     return energies
 
 
-def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit'):
+def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', platform: str = 'Reference'):
     """Get a function that computes the energy of a batch of configurations.
 
     Args:
         temperature (float, optional): The temperature in Kelvin. Defaults to 800.
         environment (str, optional): The environment in which the energy is computed. Can be implicit or vacuum.
         Defaults to 'implicit'.
+        platform (str, optional): The compute platform that OpenMM shall use. Can be 'Reference', 'CUDA', 'OpenCL',
+        and 'CPU'. Defaults to 'Reference'.
 
     Returns:
         A function that computes the energy of a batch of configurations.
@@ -126,11 +130,12 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit'):
         system = testsystems.AlanineDipeptideImplicit(constraints=None)
     else:
         raise NotImplementedError('This environment is not implemented.')
+    assert platform in ['Reference', 'CUDA', 'OpenCL', 'CPU']
     sim = openmm.app.Simulation(system.topology, system.system,
                                 openmm.LangevinIntegrator(temperature * openmm.unit.kelvin,
                                                           1. / openmm.unit.picosecond,
                                                           1. * openmm.unit.femtosecond),
-                                openmm.Platform.getPlatformByName('Reference'))
+                                openmm.Platform.getPlatformByName(platform))
 
     def log_prob_fn(x: chex.Array):
         if len(x.shape) == 2:
@@ -145,21 +150,26 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit'):
     return log_prob_fn
 
 
-def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'implicit', n_threads: int = 18):
+def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'implicit', platform: str = 'Reference',
+                               n_threads: Optional[int] = None):
     """Get a function that computes the energy of a batch of configurations via multiprocessing.
 
     Args:
         temperature (float, optional): The temperature in Kelvin. Defaults to 800.
         environment (str, optional): The environment in which the energy is computed. Can be implicit or vacuum.
         Defaults to 'implicit'.
-        n_threads (int, optional): Number of threads for multiprocessing. Defaults to 18.
+        n_threads (Optional[int], optional): Number of threads for multiprocessing. If None, the number of CPUs is
+        taken. Defaults to None.
 
     Returns:
         A function that computes the energy of a batch of configurations.
     """
     assert environment in ['implicit', 'vacuum'], 'Environment must be either implicit or vacuum'
+    assert platform in ['Reference', 'CUDA', 'OpenCL', 'CPU'], 'Platform must be either Reference, CUDA, OpenCL, or CPU'
+    if n_threads is None:
+        n_threads = mp.cpu_count()
     # Initialize multiprocessing pool
-    pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature))
+    pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature, platform))
 
     # Define function
     def log_prob_fn(x: chex.Array):

@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 from eacf.targets.data import load_aldp
 from eacf.targets.target_energy.aldp import get_log_prob_fn, get_multi_proc_log_prob_fn
+from time import time
 
 
 def test_aldp_log_prob():
@@ -28,15 +29,16 @@ def test_aldp_multi_proc_log_prob():
 
     # Load sample data
     path = Path(__file__).parent.parent / "data" / "aldp_500K_train_mini.h5"
-    aldp_data = load_aldp(train_path=path, train_n_points=100)[0]
+    n_data = 1000
+    aldp_data = load_aldp(train_path=path, train_n_points=n_data)[0]
 
     # Compute log prob
     log_prob_mp = log_prob_mp_fn(aldp_data.positions)
     log_prob = log_prob_fn(aldp_data.positions)
 
     # Check log prob
-    assert jnp.shape(log_prob_mp) == (100,)
-    assert jnp.shape(log_prob) == (100,)
+    assert jnp.shape(log_prob_mp) == (n_data,)
+    assert jnp.shape(log_prob) == (n_data,)
     assert jnp.all(jnp.isfinite(log_prob_mp))
     assert jnp.all(jnp.isfinite(log_prob))
     assert jnp.allclose(log_prob_mp, log_prob)
