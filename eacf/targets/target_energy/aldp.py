@@ -34,14 +34,21 @@ def openmm_energy(x: np.ndarray, openmm_context, temperature: float = 800.):
         return energy
 
 
-def openmm_multi_proc_init(sys, temp):
+def openmm_multi_proc_init(env, temp):
     """
     Method to initialize temperature and openmm context for workers
     of multiprocessing pool
     """
     global temperature, openmm_context
     temperature = temp
-    sim = openmm.app.Simulation(sys.topology, sys.system,
+    # System setup
+    if env == 'vacuum':
+        system = testsystems.AlanineDipeptideVacuum(constraints=None)
+    elif env == 'implicit':
+        system = testsystems.AlanineDipeptideImplicit(constraints=None)
+    else:
+        raise NotImplementedError('This environment is not implemented.')
+    sim = openmm.app.Simulation(system.topology, system.system,
                                 openmm.LangevinIntegrator(temp * openmm.unit.kelvin,
                                                           1.0 / openmm.unit.picosecond,
                                                           1.0 * openmm.unit.femtosecond),
@@ -150,16 +157,9 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     Returns:
         A function that computes the energy of a batch of configurations.
     """
-    # System setup
-    if environment == 'vacuum':
-        system = testsystems.AlanineDipeptideVacuum(constraints=None)
-    elif environment == 'implicit':
-        system = testsystems.AlanineDipeptideImplicit(constraints=None)
-    else:
-        raise NotImplementedError('This environment is not implemented.')
-
+    assert environment in ['implicit', 'vacuum'], 'Environment must be either implicit or vacuum'
     # Initialize multiprocessing pool
-    pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(system, temperature))
+    pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature))
 
     # Define function
     def log_prob_fn(x: chex.Array):
