@@ -139,7 +139,7 @@ def get_eval_on_test_batch_with_further(
         key: chex.PRNGKey,
         flow: AugmentedFlow,
         K: int,
-        target_log_prob: Callable,
+        target_log_prob: Optional[Callable] = None,
         test_invariances: bool = True,
         mask: Optional[chex.Array] = None,
         ) -> Tuple[chex.Array, dict]:
@@ -172,7 +172,10 @@ def get_eval_on_test_batch_with_further(
                                                           mask=mask)
         info.update(invariances_info)
 
-    log_w_joint = target_log_prob(x_test.positions[0]) - log_w[0]
+    if target_log_prob is None:
+        log_w_joint = log_w[0]
+    else:
+        log_w_joint = target_log_prob(x_test.positions[0]) - log_w[0]
     return log_w_joint, info
 
 
