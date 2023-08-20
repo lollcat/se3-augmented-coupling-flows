@@ -57,6 +57,8 @@ def run(cfg: DictConfig):
                 cfg.flow.base.x_dist.edges = edges
     except:
         pass
+    if 'centre_mass' in cfg['flow']['nets']['egnn']:
+        cfg['flow']['nets']['egnn'].pop('centre_mass')
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
