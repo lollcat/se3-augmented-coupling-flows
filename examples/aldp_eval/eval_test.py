@@ -61,6 +61,8 @@ def run(cfg: DictConfig):
         del cfg.flow.nets.egnn.centre_mass
     if 'norm_wrt_centre_feat' in cfg['flow']['nets']['egnn']:
         del cfg.flow.nets.egnn.norm_wrt_centre_feat
+    if 'embedding_for_non_positional_feat' in cfg['flow']['nets']:
+        del cfg.flow.nets.embedding_for_non_positional_feat
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
