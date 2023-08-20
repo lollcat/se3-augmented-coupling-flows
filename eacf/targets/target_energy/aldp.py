@@ -95,7 +95,7 @@ def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 80
 
 
 def openmm_energy_multi_proc_batched(x: chex.Array, pool):
-    x_np = np.asarray(x)
+    x_np = np.asarray(x).copy()
     energies_out = pool.map(openmm_energy_multi_proc, x_np)
     energies = jnp.array(energies_out)
     return energies
