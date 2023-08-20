@@ -59,6 +59,8 @@ def run(cfg: DictConfig):
         pass
     if 'centre_mass' in cfg['flow']['nets']['egnn']:
         del cfg.flow.nets.egnn.centre_mass
+    if 'norm_wrt_centre_mass' in cfg['flow']['nets']['egnn']:
+        del cfg.flow.nets.egnn.norm_wrt_centre_mass
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
