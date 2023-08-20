@@ -110,7 +110,8 @@ def openmm_energy_multi_proc_batched(x: chex.Array, pool):
     return energies
 
 
-def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', platform: str = 'Reference'):
+def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', platform: str = 'Reference',
+                    scale: Optional[float] = None):
     """Get a function that computes the energy of a batch of configurations.
 
     Args:
@@ -119,6 +120,7 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
         Defaults to 'implicit'.
         platform (str, optional): The compute platform that OpenMM shall use. Can be 'Reference', 'CUDA', 'OpenCL',
         and 'CPU'. Defaults to 'Reference'.
+        scale (Optional[float], optional): A scaling factor applied to the input batch. Defaults to None.
 
     Returns:
         A function that computes the energy of a batch of configurations.
@@ -138,6 +140,8 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
                                 openmm.Platform.getPlatformByName(platform))
 
     def log_prob_fn(x: chex.Array):
+        if scale is not None:
+            x = x * scale
         if len(x.shape) == 2:
             energy = openmm_energy_batched(x[None, ...], sim.context, temperature=temperature)
             return -energy[0, ...]
