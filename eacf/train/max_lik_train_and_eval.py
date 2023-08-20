@@ -183,12 +183,13 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
                      key: chex.PRNGKey, flow: AugmentedFlow,
                      n_samples: int,
                      inner_batch_size: int,
-                     target_log_prob: Callable = None):
+                     target_log_prob: Callable = None,
+                     target_log_prob_tracable: bool = True):
 
     def forward(carry, key: chex.PRNGKey):
         joint_x_flow, log_prob_flow = flow.sample_and_log_prob_apply(params, single_feature, key, (inner_batch_size,))
         features, x_positions, a_positions = flow.joint_to_separate_samples(joint_x_flow)
-        log_p_x = target_log_prob(x_positions) if target_log_prob else None
+        log_p_x = target_log_prob(x_positions) if target_log_prob is not None and target_log_prob_tracable else None
         log_p_a_given_x = flow.aux_target_log_prob_apply(params.aux_target,
                                        FullGraphSample(features=features, positions=x_positions), a_positions)
         return None, (x_positions, a_positions, log_prob_flow, log_p_x, log_p_a_given_x)
@@ -205,6 +206,8 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
     info.update(mean_aug_orig_norm=jnp.mean(jnp.linalg.norm(original_centre-aug_centre, axis=-1)))
 
     if target_log_prob is not None:
+        if not target_log_prob_tracable:
+            log_p_x = target_log_prob(x_positions)
         # Calculate ESS
         log_w = log_p_x + log_p_a_given_x - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
