@@ -82,7 +82,7 @@ def run(cfg: DictConfig):
                                  n_samples=n_points,
                                  inner_batch_size=batch_size,
                                  target_log_prob=target_log_p_x_fn,
-                                 target_lob_prob_traceable=False)
+                                 target_log_prob_traceable=False)
 
     # Run eval fn
     key = jax.random.PRNGKey(seed)
