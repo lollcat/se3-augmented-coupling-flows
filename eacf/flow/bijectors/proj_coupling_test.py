@@ -2,9 +2,10 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.testing import check_bijector_properties
+from eacf.utils.testing import check_bijector_properties
 from eacf.flow.bijectors.build_proj_coupling import make_proj_coupling_layer
-from utils.testing import get_minimal_nets_config
+from eacf.utils.testing import get_minimal_nets_config
+
 
 def test_bijector_with_proj(
         transform_type: str = 'spline',
@@ -12,9 +13,7 @@ def test_bijector_with_proj(
                              n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
-    graph_features = jnp.zeros((n_nodes, 1, 1))
-
-    orth_type = ['loewdin', 'gram-schmidt'][1]
+    graph_features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     def make_flow():
         bijectors = []
@@ -64,12 +63,3 @@ if __name__ == '__main__':
 
         test_bijector_with_proj(transform_type=transform_type, dim=2)
         print('passed test in 2D')
-
-
-
-
-
-
-
-
-

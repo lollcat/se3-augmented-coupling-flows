@@ -1,16 +1,22 @@
 import haiku as hk
 import distrax
-
-from utils.testing import check_bijector_properties
-from eacf.flow.bijectors.equi_nice import make_se_equivariant_nice
-from utils.testing import get_minimal_nets_config
 import jax.numpy as jnp
+
+USE_64_BIT = True
+if USE_64_BIT:
+    from jax.config import config
+
+    config.update("jax_enable_x64", True)
+
+from eacf.utils.testing import check_bijector_properties
+from eacf.flow.bijectors.equi_nice import make_se_equivariant_nice
+from eacf.utils.testing import get_minimal_nets_config
 
 
 def test_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn', n_nodes: int = 4, n_aux=3):
     nets_config = get_minimal_nets_config(type=type)
 
-    graph_features = jnp.zeros((n_nodes, 1, 1))
+    graph_features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     def make_flow():
         bijectors = []
@@ -44,11 +50,6 @@ def test_bijector_nice(dim: int = 3, n_layers: int = 4, type='egnn', n_nodes: in
 
 
 if __name__ == '__main__':
-    USE_64_BIT = True
-    if USE_64_BIT:
-        from jax.config import config
-        config.update("jax_enable_x64", True)
-
     test_bijector_nice(dim=3)
     print('passed test in 3D')
     test_bijector_nice(dim=2)

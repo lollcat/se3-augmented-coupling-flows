@@ -23,7 +23,9 @@ pip install -e .
 ```
 
 ## Experiments
-Experiments may be run with the following commands. The flow type may be set as shown in the first line.
+Experiments may be run with the following commands. 
+We use hydra to configure all experiments. 
+The flow type may be set as shown in the first line.
 For Alanine Dipeptide the data must first be downloaded from [Zenodo](https://zenodo.org/record/6993124/) which may be 
 done with the script `eacf/targets/aldp.sh`.
 ```shell
@@ -34,6 +36,11 @@ python examples/aldp.py
 python examples/dw4_fab.py
 python examples/lj13_fab.py
 ```
+
+## Upcoming additions
+- Add diffusion training/results
+- Further cleaning
+- Quickstart notebook
 
 ## Citation
 

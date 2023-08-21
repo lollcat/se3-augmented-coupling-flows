@@ -54,7 +54,7 @@ def test_harmonic_potential():
 
 
 def test_aldp_transformed_internals():
-    data_path = '../eacf/targets/target_energy/data/aldp_500K_train_mini.h5'
+    data_path = 'eacf/targets/data/aldp_500K_train_mini.h5'
 
     dist = AldpTransformedInternals(data_path)
 

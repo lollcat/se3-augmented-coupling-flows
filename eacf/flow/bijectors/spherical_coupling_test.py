@@ -2,9 +2,15 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.testing import check_bijector_properties
+USE_64_BIT = True
+if USE_64_BIT:
+    from jax.config import config
+    config.update("jax_enable_x64", True)
+
+
+from eacf.utils.testing import check_bijector_properties
 from eacf.flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
-from utils.testing import get_minimal_nets_config
+from eacf.utils.testing import get_minimal_nets_config
 
 def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
                             n_nodes: int = 19, n_aux: int = 1):
@@ -47,21 +53,9 @@ def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',
 
 
 if __name__ == '__main__':
-    USE_64_BIT = True
-    if USE_64_BIT:
-        from jax.config import config
-        config.update("jax_enable_x64", True)
-
-
     test_bijector_spherical(dim=2)
     print('passed test in 2D')
 
     test_bijector_spherical(dim=3)
     print('passed test in 3D')
-
-
-
-
-
-
 
