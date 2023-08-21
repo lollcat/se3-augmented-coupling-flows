@@ -11,7 +11,7 @@ from examples.create_train_config import create_train_config, create_flow_config
 from eacf.targets.data import load_aldp
 from eacf.train.train import train
 from eacf.train.base import eval_fn
-from eacf.eval.aldp import eval_and_plot_fn
+from eacf.train.eval_aldp import eval_and_plot_fn
 from eacf.flow.build_flow import build_flow
 from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
 
