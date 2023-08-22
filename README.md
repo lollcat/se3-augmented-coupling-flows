@@ -1,5 +1,5 @@
 # SE(3) Equivariant Augmented Coupling Flows
-Code for the paper # TODO add arxiv link. 
+Code for the paper https://arxiv.org/abs/2308.10364. 
 Results can be obtained by running the commands in the [Experiments](#experiments) section.
 
 
@@ -51,7 +51,7 @@ If you use this code in your research, please cite it as:
 midgley2023se3couplingflow,
 title={SE(3) Equivariant Augmented Coupling Flows},
 author={Laurence Illing Midgley and Vincent Stimper and Javier Antor{\'a}n and Emile Mathieu and Bernhard Sch{\"o}lkopf and Jos{\'e} Miguel Hern{\'a}ndez-Lobato},,
-journal={arXiv preprint arXiv:TODO}
+journal={arXiv preprint arXiv:2308.10364}
 year={2023},
 }
 ```
