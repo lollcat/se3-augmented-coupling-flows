@@ -2,15 +2,15 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.testing import check_bijector_properties
+from eacf.utils.testing import check_bijector_properties
 from eacf.flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
-from utils.testing import get_minimal_nets_config
+from eacf.utils.testing import get_minimal_nets_config
 
-def tesst_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
+def test_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
                            n_nodes: int = 4, n_aux: int = 3):
     nets_config = get_minimal_nets_config(type=type)
 
-    graph_features = jnp.zeros((n_nodes, 1, 1))
+    graph_features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     def make_flow():
         bijectors = []
@@ -52,10 +52,10 @@ if __name__ == '__main__':
         config.update("jax_enable_x64", True)
 
 
-    tesst_along_vector_flow(dim=2)
+    test_along_vector_flow(dim=2)
     print('passed test in 2D')
 
-    tesst_along_vector_flow(dim=3)
+    test_along_vector_flow(dim=3)
     print('passed test in 3D')
 
 

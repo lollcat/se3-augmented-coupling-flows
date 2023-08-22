@@ -20,7 +20,7 @@ from eacf.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_
     setup_padded_reshaped_data
 from eacf.train.custom_step import training_step, training_step_with_masking
 from eacf.train.train import TrainConfig
-from eacf.eval.base import get_eval_and_plot_fn
+from eacf.train.eval_and_plot_fn import get_eval_and_plot_fn
 
 from eacf.flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams

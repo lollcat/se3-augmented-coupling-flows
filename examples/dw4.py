@@ -1,3 +1,5 @@
+from typing import Optional
+
 import hydra
 from omegaconf import DictConfig
 from functools import partial
@@ -10,7 +12,7 @@ from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
 from eacf.utils.data import positional_dataset_only_to_full_graph
 import jax
 
-def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool):
+def load_dataset_original(train_set_size: int, valid_set_size: Optional[int], final_run: bool):
     train, valid, test = load_dw4(train_set_size)
     if not final_run:
         return train, valid[:valid_set_size]

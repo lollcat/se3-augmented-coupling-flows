@@ -1,24 +1,23 @@
 import haiku as hk
 import distrax
 
-from utils.testing import check_bijector_properties
-from eacf.flow.bijectors.shrink import make_shrink_aug_layer
+from eacf.utils.testing import check_bijector_properties
+from eacf.flow.bijectors.shrink import build_shrink_layer
 import jax.numpy as jnp
 
 
 def test_bijector_shrink(dim: int = 3, n_layers: int = 4, n_nodes: int = 4, n_aux=3):
 
-    graph_features = jnp.zeros((n_nodes, 1, 1))
+    graph_features = jnp.zeros((n_nodes, 1, 1), dtype=int)
 
     def make_flow():
         bijectors = []
         for i in range(n_layers):
-            bijector = make_shrink_aug_layer(
+            bijector = build_shrink_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,
                 n_aug=n_aux,
-                swap=False,
                 identity_init=False)
             bijectors.append(bijector)
         flow = distrax.Chain(bijectors)

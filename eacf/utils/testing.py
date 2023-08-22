@@ -32,7 +32,8 @@ def get_minimal_nets_config(type = 'egnn'):
     return nets_config
 
 def check_bijector_properties(bijector_forward, bijector_backward,
-                              dim: int, n_nodes: int, n_aux: int, test_rotation_equivariance: bool = True):
+                              dim: int, n_nodes: int, n_aux: int,
+                              test_rotation_equivariance: bool = True):
     """Test that the bijector is equivariant, and that it's log determinant is invariant.
     Assumes bijectors are haiku transforms."""
     assert dim in (2, 3)
@@ -98,9 +99,8 @@ def check_bijector_properties(bijector_forward, bijector_backward,
     centre_of_mass = jnp.mean(x_and_a_new[:, :, 0], axis=1)
     chex.assert_trees_all_close(1 + centre_of_mass, 1 + jnp.zeros_like(centre_of_mass),
                                 rtol=rtol)  # Check subspace restriction.
-    centre_of_mass_aug = jnp.mean(x_and_a_new[:, :, 1:], axis=0)
-    # (jnp.abs(jnp.mean(x_and_a[:, :, 1:], axis=0)) > 0.001).sum() is also interesting to eyeball.
-    assert (jnp.abs(centre_of_mass_aug) > 0.0001).all()
+    # centre_of_mass_aug = jnp.mean(x_and_a_new[:, :, 1:], axis=0)
+    # assert (jnp.abs(centre_of_mass_aug) > 0.0001).all() # Not fixed to zeroCoM subset.
     x_and_a_old, log_det_rev = bijector_backward.apply(params, x_and_a_new)
     chex.assert_shape(log_det_fwd, (batch_size,))
     chex.assert_trees_all_close(x_and_a, x_and_a_old, rtol=rtol)

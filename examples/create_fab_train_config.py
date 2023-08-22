@@ -18,7 +18,7 @@ from examples.create_train_config import setup_logger, create_flow_config
 
 from eacf.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
 from eacf.train.train import TrainConfig
-from eacf.eval.base import get_eval_and_plot_fn
+from eacf.train.eval_and_plot_fn import get_eval_and_plot_fn
 from eacf.utils.loggers import WandbLogger
 from eacf.flow.build_flow import build_flow
 from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch_with_further, calculate_forward_ess
