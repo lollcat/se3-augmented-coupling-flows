@@ -1,16 +1,18 @@
+from typing import Optional
+
 import hydra
 from omegaconf import DictConfig
 from functools import partial
 
 
-from molboil.train.train import train
-from molboil.targets.data import load_dw4
+from eacf.train.train import train
+from eacf.targets.data import load_dw4
 from examples.create_train_config import create_train_config
-from target.double_well import make_dataset, log_prob_fn
-from utils.data import positional_dataset_only_to_full_graph
+from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
+from eacf.utils.data import positional_dataset_only_to_full_graph
 import jax
 
-def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
+def load_dataset_original(train_set_size: int, valid_set_size: Optional[int], final_run: bool):
     train, valid, test = load_dw4(train_set_size)
     if not final_run:
         return train, valid[:valid_set_size]
@@ -32,12 +34,12 @@ def load_dataset_custom(batch_size, train_set_size: int = 1000, test_set_size:in
 def to_local_config(cfg: DictConfig) -> DictConfig:
     """Change config to make it fast to run locally. Also remove saving."""
     # Training
-    cfg.training.train_set_size = 64
-    cfg.training.test_set_size = 64
+    cfg.training.train_set_size = 65
+    cfg.training.test_set_size = 65
     cfg.training.optimizer.init_lr = 1e-4
-    cfg.training.batch_size = 32
-    cfg.training.n_epoch = 200
-    cfg.training.save = False
+    cfg.training.batch_size = 5
+    cfg.training.eval_batch_size = 3
+    # cfg.training.save = False
     cfg.training.n_eval = 4
     cfg.training.plot_batch_size = 32
     cfg.training.K_marginal_log_lik = 10
@@ -46,20 +48,24 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['non_equivariant']
+    cfg.flow.type = 'non_equivariant'
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
     cfg.flow.scaling_layer = False
     cfg.flow.kwargs.spherical.spline_num_bins = 3
-    cfg.flow.kwargs.n_inner_transforms = 1
+    cfg.training.resume = False
+    cfg.training.save = False
+    cfg.training.n_epoch = 202
+    cfg.training.use_64_bit = True
+    cfg.training.use_scan = False
 
 
     # Configure NNs
-    cfg.flow.nets.mlp_head_config.mlp_units = (4,)
-    cfg.flow.nets.egnn.mlp_units = (4,)
+    cfg.flow.nets.mlp_head_config.mlp_units = (8,8)
+    cfg.flow.nets.egnn.mlp_units = (8,8)
     cfg.flow.nets.egnn.n_blocks = 2
     cfg.flow.nets.non_equivariant_transformer_config.output_dim = 3
-    cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,)
+    cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,4)
     cfg.flow.nets.non_equivariant_transformer_config.n_layers = 2
     cfg.flow.nets.non_equivariant_transformer_config.num_heads = 1
 
@@ -85,9 +91,9 @@ def run(cfg: DictConfig):
         print(f"loading custom dataset for temperature of {cfg.target.temperature}")
         load_dataset = partial(load_dataset_custom, temperature=cfg.target.temperature)
     else:
-        load_dataset = load_dataset_original
+        load_dataset = partial(load_dataset_original, final_run=cfg.training.final_run)
     experiment_config = create_train_config(cfg, dim=2, n_nodes=4, load_dataset=load_dataset,
-                                            target_log_prob_fn=log_prob_fn)
+                                            target_log_prob_fn=log_prob_fn, date_folder=False)
     train(experiment_config)
 
 

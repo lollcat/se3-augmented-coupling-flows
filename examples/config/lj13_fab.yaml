@@ -1,4 +1,10 @@
-#defaults:
+defaults:
+  - training: default
+  - training/optimizer: default_lr_schedule
+  - flow: default
+  - target: default
+  - fab: default
+  - _self_
 #  - override hydra/launcher: joblib
 
 hydra:
@@ -6,145 +12,32 @@ hydra:
     chdir: false
 
 fab:
-  with_buffer: true
-  buffer_max_length_batches: 512
-  buffer_min_length_batches: 64
-  n_updates_per_smc_forward_pass: 8
-  w_adjust_clip: 10.
-  use_resampling: false
-  use_hmc: true
-  transition_operator:
-    hmc:
-      n_outer_steps: 1
-      n_inner_steps: 5
-      init_step_size: 1.
-      target_p_accept: 0.65
-      adapt_step_size: true
-    metropolis:
-      n_steps: 1
-      init_step_size: 1.
-      target_p_accept: 0.65
-      tune_step_size: true
-  alpha: 2.  # alpha-divergence param
   n_intermediate_distributions: 8
-  spacing_type: linear
-  eval_inner_batch_size: 200
-  eval_total_batch_size: 10000
-
-
-target:
-  aux:
-    conditioned_on_x: true
-    scale_init: 0.1
 
 flow:
   n_aug: 1
-  scaling_layer: false
-  scaling_layer_conditioned: true
-  base:
-    x_dist:
-      type: centre_gravity_gaussian
-    aux:
-      conditioned_on_x: ${target.aux.conditioned_on_x}
-      scale_init: ${target.aux.scale_init}
-  dim: 3
   nodes: 13
-  n_layers: 12
-  identity_init: true
-  type: spherical #  nice proj spherical along_vector non_equivariant
-  kwargs:
-    n_inner_transforms: 3
-    non_equivariant:
-      transform_type: real_nvp # spline or real_nvp
-      spline_num_bins: 8
-      spline_max_abs_min: 10.
-      n_inner_transforms: 1
-    along_vector:
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
-      spline_num_bins: 8
-    spherical:
-      reflection_invariant: false
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      dist_spline_max: 10.
-      spline_num_bins: 8
-    proj:
-      transform_type: real_nvp # spline or real_nvp
-      n_inner_transforms: ${flow.kwargs.n_inner_transforms}
-      origin_on_coupled_pair: false
-      num_bins: 8
-      lower: -10.
-      upper: 10.
-      orthogonalization_method: gram-schmidt #  gram-schmidt or loewdin
-  nets:
-    type: egnn
-    egnn:
-      name: egnn
-      n_blocks: 3 # number of layers
-      mlp_units: [ 32, 32 ]
-      n_invariant_feat_hidden: 32
-      cross_multiplicity_shifts: true
-      centre_mass: false
-      norm_wrt_centre_feat: true
-    e3gnn:
-      name: e3gnn
-      n_blocks: 3 # number of layers
-      mlp_units: [32, 32]
-      n_vectors_hidden_per_vec_in: 4
-      n_invariant_feat_hidden: 32
-      get_shifts_via_tensor_product: false
-    mlp_head_config:
-      mlp_units: [32, 32]
-      stable: true
-    non_equivariant_transformer_config:
-      output_dim: 32
-      key_size_per_node_dim_in: 4  # key_size = multiplicity * dim * key_size_per_node_dim_in
-      n_layers: 3
-      mlp_units: [ 32, 32 ]
-      num_heads: 4
-
 
 training:
-  optimizer:
-    init_lr: 2e-4
-    optimizer_name: adam
-    use_schedule: false
-    peak_lr: 3e-4
-    end_lr: 1e-4 # can be null
-    warmup_n_epoch: 10 # can be null
-    max_global_norm: null
-    max_param_grad: null
-    dynamic_grad_ignore_and_clip: true
-  use_64_bit: false
-  n_epoch: 7000
-  batch_size: 512
-  eval_batch_size: 128
-  plot_batch_size: 128
+  n_epoch: 14000 # approx how many iter we can do in the training time
+  batch_size: 128 # Note per device if multiple devices used.
+  use_multiple_devices: true
+  eval_batch_size: 16 # Will be timez by K during eval.
+  plot_batch_size: 32
   seed: 0
   train_set_size: 1000
   test_set_size: 1000
-  n_checkpoints: 10
-  n_eval: 20
-  K_marginal_log_lik: 20
-  save: true
-  save_dir: lj13_results
-  resume: false
-  runtime_limit: 30.
-  use_flow_aux_loss: true
   aux_loss_weight: 1.0
-  last_iter_info_only: true
-  debug: false
-  verbose_info: false
-  data_augmentation_for_non_eq: false
-  factor_to_train_non_eq_flow: 4
+  data_augmentation_for_non_eq: false # Only use for training by maximum likelihood.
+
 
 logger:
 #  list_logger: null
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_fab_${flow.type}_ndist${fab.n_intermediate_distributions}_layers${flow.n_layers}_step_per_ais${fab.n_updates_per_smc_forward_pass}_${training.optimizer.init_lr}_bs${training.batch_size}
+    name: lj13_fab_${flow.type}
     project: fab
     entity: flow-ais-bootstrap
-    tags: [lj13,fab,final_run,v2]
+    tags: [lj13,fab,Leucadendron]
 

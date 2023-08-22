@@ -4,11 +4,11 @@ from functools import partial
 
 
 
-from molboil.train.train import train
-from molboil.targets.data import load_dw4
+from eacf.train.train import train
+from eacf.targets.data import load_dw4
 from examples.create_fab_train_config import create_train_config
-from target.double_well import make_dataset, log_prob_fn
-from utils.data import positional_dataset_only_to_full_graph
+from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
+from eacf.utils.data import positional_dataset_only_to_full_graph
 
 def load_dataset_original(train_set_size: int, valid_set_size: int, final_run: bool = True):
     train, valid, test = load_dw4(train_set_size)
@@ -34,7 +34,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # Training
     cfg.training.optimizer.init_lr = 1e-4
     cfg.training.batch_size = 16
-    cfg.training.n_epoch = int(1e3)
+    cfg.training.n_epoch = int(1e3) + 23
     cfg.training.save = True
     cfg.training.n_eval = 10
     cfg.training.plot_batch_size = 32
@@ -47,9 +47,10 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     # cfg.logger = DictConfig({"pandas_logger": {'save_period': 50}})
 
     # Flow
-    cfg.flow.type = ['non_equivariant']
+    cfg.flow.type = 'spherical'
     cfg.flow.n_aug = 1
     cfg.flow.n_layers = 1
+    cfg.training.resume = False
 
 
     # Configure NNs
@@ -60,6 +61,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.nets.non_equivariant_transformer_config.mlp_units = (4,)
     cfg.flow.nets.non_equivariant_transformer_config.n_layers = 2
     cfg.flow.nets.non_equivariant_transformer_config.num_heads = 1
+    cfg.training.use_multiple_devices = True
 
     debug = False
     if debug:
@@ -71,8 +73,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4_fab.yaml")
 def run(cfg: DictConfig):
-    # assert cfg.flow.nets.type == 'egnn'  # 2D doesn't work with e3nn library.
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
@@ -83,7 +84,8 @@ def run(cfg: DictConfig):
     else:
         load_dataset = load_dataset_original
     experiment_config = create_train_config(cfg, target_log_p_x_fn=log_prob_fn,
-                                            dim=2, n_nodes=4, load_dataset=load_dataset)
+                                            dim=2, n_nodes=4, load_dataset=load_dataset,
+                                            date_folder=True)
     train(experiment_config)
 
 

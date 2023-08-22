@@ -1,32 +1,32 @@
 from typing import Tuple, Optional, Union
 
 import chex
-import wandb
 import os
 import pathlib
 import jax
+import wandb
 import jax.numpy as jnp
 from datetime import datetime
 from omegaconf import DictConfig
 from functools import partial
 
-from molboil.train.base import eval_fn
-from molboil.train.train import TrainConfig
-from molboil.eval.base import get_eval_and_plot_fn
-
-
-from flow.build_flow import build_flow
-from examples.default_plotter_fab import make_default_plotter
-from train.max_lik_train_and_eval import get_eval_on_test_batch
-from examples.create_train_config import setup_logger, create_flow_config
-from utils.optimize import get_optimizer, OptimizerConfig
-
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
 from fabjax.buffer import build_prioritised_buffer
-from train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
-from train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
-from train.fab_eval import fab_eval_function
-from utils.pmap import get_from_first_device
+
+from examples.default_plotter_fab import make_default_plotter
+from examples.create_train_config import setup_logger, create_flow_config
+
+from eacf.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
+from eacf.train.train import TrainConfig
+from eacf.train.eval_and_plot_fn import get_eval_and_plot_fn
+from eacf.utils.loggers import WandbLogger
+from eacf.flow.build_flow import build_flow
+from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch_with_further, calculate_forward_ess
+from eacf.utils.optimize import get_optimizer, OptimizerConfig
+from eacf.train.fab_train_no_buffer import build_fab_no_buffer_init_step_fns, TrainStateNoBuffer
+from eacf.train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns, TrainStateWithBuffer
+from eacf.train.fab_eval import fab_eval_function
+from eacf.utils.pmap import get_from_first_device
 
 
 def create_train_config(cfg: DictConfig,
@@ -37,7 +37,7 @@ def create_train_config(cfg: DictConfig,
                         eval_and_plot_fn: Optional = None,
                         date_folder: bool = True) -> TrainConfig:
     devices = jax.devices()
-    if len(devices) > 1:
+    if len(devices) > 1 and cfg.training.use_multiple_devices:
         print(f"Running with pmap using {len(devices)} devices.")
         return create_train_config_pmap(cfg, target_log_p_x_fn,
                                         load_dataset, dim, n_nodes, plotter, evaluation_fn, eval_and_plot_fn,
@@ -67,19 +67,17 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
@@ -136,6 +134,8 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
             batch_size=cfg.training.batch_size,
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
+            use_aux_loss=cfg.training.use_flow_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             equivariance_regularisation=data_augmentation
         )
     else:
@@ -148,20 +148,23 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+        eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True,
+                                        target_log_prob=target_log_p_x_fn)
 
-        # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+        # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
 
         @jax.jit
         def evaluation_fn(state: Union[TrainStateNoBuffer, TrainStateWithBuffer], key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
+            eval_info, log_w_test_data, flat_mask = eval_fn(test_data, key, state.params,
                     eval_on_test_batch_fn=eval_on_test_batch_fn,
                     eval_batch_free_fn=None,
                     batch_size=cfg.training.eval_batch_size)
+            further_info = calculate_forward_ess(log_w_test_data, flat_mask)
+            eval_info.update(further_info)
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
                 smc=smc_eval,
@@ -217,26 +220,24 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
     assert cfg.flow.nodes == n_nodes
     assert (plotter is None or evaluation_fn is None) or (eval_and_plot_fn is None)
 
-    logger = setup_logger(cfg)
     training_config = dict(cfg.training)
+    logger = setup_logger(cfg)
     if date_folder:
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save:
-        if hasattr(cfg.logger, "wandb"):
-            # if using wandb then save to wandb path
-            save_path = os.path.join(wandb.run.dir, save_path)
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-    else:
-        save_path = ''
+    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+        save_path = os.path.join(wandb.run.dir, save_path)
+
+    pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
+
     train_data, test_data = load_dataset(cfg.training.train_set_size, cfg.training.test_set_size)
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
 
     n_epoch = cfg.training.n_epoch
     if cfg.flow.type == 'non_equivariant' or 'non_equivariant' in cfg.flow.type:
-        n_epoch = n_epoch * cfg.training.factor_to_train_non_eq_flow
+        n_epoch = int(n_epoch * cfg.training.factor_to_train_non_eq_flow)
 
 
     opt_cfg = dict(training_config.pop("optimizer"))
@@ -287,6 +288,8 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
             n_updates_per_smc_forward_pass=cfg.fab.n_updates_per_smc_forward_pass,
             buffer=buffer,
             equivariance_regularisation=data_augmentation,
+            use_aux_loss=cfg.training.use_flow_aux_loss,
+            aux_loss_weight=cfg.training.aux_loss_weight,
             use_pmap=True, pmap_axis_name=pmap_axis_name
         )
     else:
@@ -310,20 +313,23 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
-        eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True)
+        eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                        flow=flow, K=cfg.training.K_marginal_log_lik, test_invariances=True,
+                                        target_log_prob=target_log_p_x_fn)
 
-        # AIS with p as the target. Note that step size params will have been tuned for alpha=2.
+        # AIS with p as the target_energy. Note that step size params will have been tuned for alpha=2.
         smc_eval = build_smc(transition_operator=transition_operator,
                         n_intermediate_distributions=n_intermediate_distributions, spacing_type=spacing_type,
                         alpha=1., use_resampling=False)
 
-
-        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
-            eval_info = eval_fn(test_data, key, state.params,
-                    eval_on_test_batch_fn=eval_on_test_batch_fn,
-                    eval_batch_free_fn=None,
-                    batch_size=cfg.training.eval_batch_size)
+        def evaluation_fn_single_device(state: TrainStateWithBuffer, key: chex.PRNGKey,
+                                        x_test: FullGraphSample, test_mask: chex.Array) -> \
+                Tuple[dict, chex.Array, chex.Array]:
+            eval_info, log_w_test, flat_mask = eval_fn(x_test, key, state.params,
+                                eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                eval_batch_free_fn=None,
+                                batch_size=cfg.training.eval_batch_size,
+                                mask=test_mask)
             eval_info_fab = fab_eval_function(
                 state=state, key=key, flow=flow,
                 smc=smc_eval,
@@ -333,12 +339,19 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
                 inner_batch_size=cfg.fab.eval_inner_batch_size
             )
             eval_info.update(eval_info_fab)
-            return eval_info
+            eval_info = jax.lax.pmean(eval_info, axis_name=pmap_axis_name)
+            return eval_info, log_w_test, flat_mask
+
+        test_data_per_device, test_mask = setup_padded_reshaped_data(test_data, n_devices)
 
         def evaluation_fn(state: TrainStateWithBuffer, key: chex.PRNGKey) -> dict:
             keys = jax.random.split(key, n_devices)
-            info = jax.pmap(evaluation_fn_single_device)(state, keys)
-            return get_from_first_device(info, as_numpy=True)
+            info, log_w_test, mask = jax.pmap(evaluation_fn_single_device, axis_name=pmap_axis_name)(
+                state, keys, test_data_per_device, test_mask)
+            info = get_from_first_device(info, as_numpy=True)
+            further_info = calculate_forward_ess(log_w_test.flatten(), mask=mask.flatten())
+            info.update(further_info)
+            return info
 
     # Plot single device.
     plotter_single_device = plotter
@@ -365,4 +378,4 @@ def create_train_config_pmap(cfg: DictConfig, target_log_p_x_fn, load_dataset, d
         use_64_bit=cfg.training.use_64_bit,
         runtime_limit=cfg.training.runtime_limit,
         save_state_all_devices=True
-                       )
+    )

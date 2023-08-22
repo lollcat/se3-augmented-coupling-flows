@@ -1,0 +1,53 @@
+dim: 3
+n_aug: 1
+scaling_layer: false
+scaling_layer_conditioned: false
+base:
+  x_dist:
+    type: centre_gravity_gaussian
+  aux:
+    conditioned_on_x: ${target.aux.conditioned_on_x}
+    scale_init: ${target.aux.scale_init}
+nodes: null # problem specific
+n_layers: 12
+identity_init: true
+type: spherical #  nice proj spherical along_vector non_equivariant
+kwargs:
+  non_equivariant:
+    transform_type: real_nvp # spline or real_nvp
+    spline_num_bins: 8
+    spline_max_abs_min: 20.
+    n_inner_transforms: 1
+  along_vector:
+    n_inner_transforms: ${flow.dim}
+    dist_spline_max: 10.
+    spline_num_bins: 8
+  spherical:
+    reflection_invariant: false
+    n_inner_transforms: 1
+    dist_spline_max: 10.
+    spline_num_bins: 8
+  proj:
+    transform_type: real_nvp # spline or real_nvp
+    n_inner_transforms: 1
+    origin_on_coupled_pair: false
+    num_bins: 8
+    lower: -10.
+    upper: 10.
+nets:
+  type: egnn
+  egnn:
+    name: egnn
+    n_blocks: 3 # number of layers
+    mlp_units: [ 64, 64 ]
+    n_invariant_feat_hidden: 128
+    cross_multiplicity_shifts: true
+  mlp_head_config:
+    mlp_units: [64, 64]
+    stable: true
+  non_equivariant_transformer_config:
+    output_dim: 128
+    key_size_per_node_dim_in: 8 # key_size = multiplicity * dim * key_size_per_node_dim_in
+    n_layers: 3
+    mlp_units: [ 64, 64 ]
+    num_heads: 4

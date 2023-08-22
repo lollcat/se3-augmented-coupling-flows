@@ -1,0 +1,24 @@
+with_buffer: true
+buffer_max_length_batches: 512
+buffer_min_length_batches: 64
+n_updates_per_smc_forward_pass: 8
+w_adjust_clip: 10.
+use_resampling: false
+use_hmc: true
+transition_operator:
+  hmc:
+    n_outer_steps: 1
+    n_inner_steps: 5
+    init_step_size: 1.
+    target_p_accept: 0.65
+    adapt_step_size: true
+  metropolis:
+    n_steps: 1
+    init_step_size: 1.
+    target_p_accept: 0.65
+    tune_step_size: true
+alpha: 2.  # alpha-divergence param
+n_intermediate_distributions: 8
+spacing_type: linear
+eval_inner_batch_size: 128
+eval_total_batch_size: 10000
