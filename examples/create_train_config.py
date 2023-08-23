@@ -298,7 +298,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+    if isinstance(logger, WandbLogger) and cfg.training.save_in_wandb_dir:
         save_path = os.path.join(wandb.run.dir, save_path)
 
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
