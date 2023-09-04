@@ -15,7 +15,7 @@ from eacf.train.base import eval_fn
 
 from eacf.flow.build_flow import build_flow
 from examples.create_train_config import create_flow_config
-from train.max_lik_train_and_eval import get_eval_on_test_batch
+from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
