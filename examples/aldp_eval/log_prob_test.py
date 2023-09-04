@@ -9,9 +9,9 @@ from omegaconf import DictConfig, open_dict
 import jax
 
 from eacf.utils.base import FullGraphSample
-from eacf.targets import load_aldp
+from eacf.targets.data import load_aldp
 from eacf.utils.checkpoints import get_latest_checkpoint
-from eacf.train import eval_fn
+from eacf.train.base import eval_fn
 
 from eacf.flow.build_flow import build_flow
 from examples.create_train_config import create_flow_config
@@ -78,7 +78,7 @@ def run(cfg: DictConfig):
 
     # Run eval fn
     key = jax.random.PRNGKey(seed)
-    eval_info = eval_fn_(test_data, key, state.params)
+    eval_info, _, _ = eval_fn_(test_data, key, state.params)
 
     # Save results
     sample_dir = os.path.join(cfg.training.save_dir, f"log_prob")
