@@ -244,7 +244,7 @@ def eval_and_plot_fn(state: TrainingState,
 
     # Get eval like log-likelihood on test set
     if eval_fn is not None and iteration >= 0:
-        eval_info = eval_fn(test_data, key, state.params)
+        eval_info, _, _ = eval_fn(test_data, key, state.params)
         info.update(eval_info)
 
     return info

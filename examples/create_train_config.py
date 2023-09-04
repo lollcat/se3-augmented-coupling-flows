@@ -20,7 +20,7 @@ from eacf.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_
     setup_padded_reshaped_data
 from eacf.train.custom_step import training_step, training_step_with_masking
 from eacf.train.train import TrainConfig
-from eacf.eval.base import get_eval_and_plot_fn
+from eacf.train.eval_and_plot_fn import get_eval_and_plot_fn
 
 from eacf.flow.build_flow import build_flow, FlowDistConfig, ConditionalAuxDistConfig, BaseConfig
 from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
@@ -135,7 +135,7 @@ def create_train_config_non_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+    if isinstance(logger, WandbLogger) and cfg.training.save_in_wandb_dir:
         save_path = os.path.join(wandb.run.dir, save_path)
 
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)
@@ -298,7 +298,7 @@ def create_train_config_pmap(cfg: DictConfig, load_dataset, dim, n_nodes,
         save_path = os.path.join(training_config.pop("save_dir"), str(datetime.now().isoformat()))
     else:
         save_path = training_config.pop("save_dir")
-    if cfg.training.save_in_wandb_dir and isinstance(logger, WandbLogger):
+    if isinstance(logger, WandbLogger) and cfg.training.save_in_wandb_dir:
         save_path = os.path.join(wandb.run.dir, save_path)
 
     pathlib.Path(save_path).mkdir(exist_ok=True, parents=True)

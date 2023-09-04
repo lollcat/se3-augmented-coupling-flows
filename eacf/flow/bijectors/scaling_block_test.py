@@ -1,7 +1,7 @@
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.testing import check_bijector_properties
+from eacf.utils.testing import check_bijector_properties
 from eacf.flow.bijectors.scaling_block import make_scaling_block
 from eacf.flow.distrax_with_extra import ChainWithExtra
 
@@ -19,6 +19,7 @@ def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
                 dim=dim,
                 n_aug=n_aux,
                 identity_init=False,
+                condition=True
             )
             bijectors.append(bijector)
         flow = ChainWithExtra(bijectors)
@@ -39,8 +40,6 @@ def test_bijector_pseudo_act_norm(dim: int = 3, n_layers: int = 5,
     check_bijector_properties(bijector_forward, bijector_backward, dim=dim, n_nodes=n_nodes, n_aux=n_aux)
 
 
-
-
 if __name__ == '__main__':
     USE_64_BIT = True
     if USE_64_BIT:
@@ -53,10 +52,3 @@ if __name__ == '__main__':
 
     test_bijector_pseudo_act_norm(dim=3)
     print('passed test in 3D')
-
-
-
-
-
-
-

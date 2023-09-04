@@ -1,5 +1,5 @@
 # SE(3) Equivariant Augmented Coupling Flows
-Code for the paper # TODO add arxiv link. 
+Code for the paper https://arxiv.org/abs/2308.10364. 
 Results can be obtained by running the commands in the [Experiments](#experiments) section.
 
 
@@ -23,9 +23,15 @@ pip install -e .
 ```
 
 ## Experiments
-Experiments may be run with the following commands. The flow type may be set as shown in the first line.
+Experiments may be run with the following commands. 
+We use hydra to configure all experiments. 
+The flow type may be set as shown in the first line.
 For Alanine Dipeptide the data must first be downloaded from [Zenodo](https://zenodo.org/record/6993124/) which may be 
 done with the script `eacf/targets/aldp.sh`.
+
+Note: `lj13_fab.py` was run on a TPU with 8 devices. If running on a single device, then the batch size needs 
+to be multiplied by 8 (i.e. set to 1024) in the config (`examples/config/lj13_fab.yaml`) to obtain an equivalent setup. 
+
 ```shell
 python examples/dw4.py flow.type=spherical # Flow types: spherical,proj,along_vector,non_equivariant
 python examples/lj13.py
@@ -34,6 +40,11 @@ python examples/aldp.py
 python examples/dw4_fab.py
 python examples/lj13_fab.py
 ```
+
+## Upcoming additions
+- Add diffusion training/results
+- Further cleaning
+- Quickstart notebook
 
 ## Citation
 
@@ -44,7 +55,7 @@ If you use this code in your research, please cite it as:
 midgley2023se3couplingflow,
 title={SE(3) Equivariant Augmented Coupling Flows},
 author={Laurence Illing Midgley and Vincent Stimper and Javier Antor{\'a}n and Emile Mathieu and Bernhard Sch{\"o}lkopf and Jos{\'e} Miguel Hern{\'a}ndez-Lobato},,
-journal={arXiv preprint arXiv:TODO}
+journal={arXiv preprint arXiv:2308.10364}
 year={2023},
 }
 ```

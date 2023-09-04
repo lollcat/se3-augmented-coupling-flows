@@ -21,7 +21,7 @@ def test_base_distribution():
     edges = list(zip(range(n_nodes - 1), range(1, n_nodes)))
     x_dists = [CentreGravityGaussian(dim=dim, n_nodes=n_nodes),
                HarmonicPotential(dim=dim, n_nodes=n_nodes, edges=edges),
-               AldpTransformedInternals(data_path='../eacf/targets/target_energy/data/aldp_500K_train_mini.h5')]
+               AldpTransformedInternals(data_path='eacf/targets/data/aldp_500K_train_mini.h5')]
 
     for x_dist in x_dists:
         dist = JointBaseDistribution(dim=dim, n_nodes=n_nodes, n_aux=n_aux,

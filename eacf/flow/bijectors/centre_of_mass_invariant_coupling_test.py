@@ -2,9 +2,9 @@ import distrax
 import haiku as hk
 import jax.numpy as jnp
 
-from utils.testing import check_bijector_properties
+from eacf.utils.testing import check_bijector_properties
 from eacf.flow.bijectors.build_centre_of_mass_invariant_coupling import make_centre_of_mass_invariant_coupling_layer
-from utils.testing import get_minimal_nets_config
+from eacf.utils.testing import get_minimal_nets_config
 
 def test_bijector_centre_of_mass_only(dim: int = 3, n_layers: int = 1, n_nodes: int = 4, n_aux: int = 1,
                                       n_inner_transformer: int = 1):
