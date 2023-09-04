@@ -28,6 +28,10 @@ We use hydra to configure all experiments.
 The flow type may be set as shown in the first line.
 For Alanine Dipeptide the data must first be downloaded from [Zenodo](https://zenodo.org/record/6993124/) which may be 
 done with the script `eacf/targets/aldp.sh`.
+
+Note: `lj13_fab.py` was run on a TPU with 8 devices. If running on a single device, then the batch size needs 
+to be multiplied by 8 (i.e. set to 1024) in the config (`examples/config/lj13_fab.yaml`) to obtain an equivalent setup. 
+
 ```shell
 python examples/dw4.py flow.type=spherical # Flow types: spherical,proj,along_vector,non_equivariant
 python examples/lj13.py
