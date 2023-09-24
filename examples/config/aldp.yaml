@@ -31,8 +31,7 @@ flow:
   identity_init: true
   type: spherical # nice proj spherical along_vector
   kwargs:
-    n_inner_transforms: 4
-    along_vector:
+    radial:
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
       dist_spline_max: 10.
       spline_num_bins: 8
@@ -41,9 +40,16 @@ flow:
       dist_spline_max: 10.
       spline_num_bins: 8
       reflection_invariant: false
-    proj:
+    cartesian:
       transform_type: real_nvp # spline or real_nvp
       n_inner_transforms: ${flow.kwargs.n_inner_transforms}
+      num_bins: 8
+      lower: -10.
+      upper: 10.
+    line:
+      transform_type: real_nvp # spline or real_nvp
+      n_inner_transforms: ${flow.dim}
+      origin_on_coupled_pair: false
       num_bins: 8
       lower: -10.
       upper: 10.

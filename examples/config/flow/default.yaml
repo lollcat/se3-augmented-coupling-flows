@@ -11,23 +11,30 @@ base:
 nodes: null # problem specific
 n_layers: 12
 identity_init: true
-type: spherical #  nice proj spherical along_vector non_equivariant
+type: spherical #  nice cartesian spherical radial line non_equivariant
 kwargs:
   non_equivariant:
     transform_type: real_nvp # spline or real_nvp
     spline_num_bins: 8
     spline_max_abs_min: 20.
     n_inner_transforms: 1
-  along_vector:
+  radial:
     n_inner_transforms: ${flow.dim}
     dist_spline_max: 10.
     spline_num_bins: 8
+  line:
+    transform_type: real_nvp # spline or real_nvp
+    n_inner_transforms: ${flow.dim}
+    origin_on_coupled_pair: false
+    num_bins: 8
+    lower: -10.
+    upper: 10.
   spherical:
     reflection_invariant: false
     n_inner_transforms: 1
     dist_spline_max: 10.
     spline_num_bins: 8
-  proj:
+  cartesian:
     transform_type: real_nvp # spline or real_nvp
     n_inner_transforms: 1
     origin_on_coupled_pair: false

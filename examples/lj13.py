@@ -25,7 +25,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.flow.n_layers = 1
     cfg.flow.nets.egnn.n_blocks = 1
     cfg.training.batch_size = 2
-    cfg.flow.type = 'along_vector'  # 'spherical'
+    cfg.flow.type = 'line'  # 'spherical'
     cfg.flow.kwargs.spherical.spline_num_bins = 3
     cfg.flow.n_aug = 1
 

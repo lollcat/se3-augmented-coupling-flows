@@ -13,12 +13,11 @@ from eacf.flow.bijectors.equi_nice import make_se_equivariant_nice
 from eacf.flow.bijectors.scaling_block import make_scaling_block
 from eacf.flow.bijectors.spherical_coupling_build import make_spherical_coupling_layer
 from eacf.flow.bijectors.radius_coupling_build import make_radial_coupling_layer
+from eacf.flow.bijectors.line_proj_coupling_build import make_line_proj_coupling_layer
 from eacf.flow.bijectors.centre_of_mass_invariant_coupling_build import make_centre_of_mass_invariant_coupling_layer
 from eacf.flow.distrax_with_extra import ChainWithExtra
 
 from eacf.nets.make_egnn import NetsConfig
-
-
 
 
 class ConditionalAuxDistConfig(NamedTuple):
@@ -63,7 +62,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'proj', 'spherical', 'along_vector', 'non_equivariant']
+        assert flow in ['nice', 'cartesian', 'spherical', 'radius', 'line', 'non_equivariant']
         if 'non_equivariant' in flow:
             assert len(flow_type) == 1
 
@@ -122,9 +121,22 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 )
                 bijectors.append(bijector)
 
-            if 'along_vector' in flow_type:
-                kwargs_along_vector = config.kwargs['along_vector'] if 'along_vector' in config.kwargs.keys() else {}
+            if 'radial' in flow_type:
+                kwargs_along_vector = config.kwargs['radial'] if 'radial' in config.kwargs.keys() else {}
                 bijector = make_radial_coupling_layer(
+                    graph_features=graph_features,
+                    n_aug=config.n_aug,
+                    layer_number=layer_number,
+                    dim=config.dim,
+                    swap=swap,
+                    identity_init=config.identity_init,
+                    nets_config=config.nets_config,
+                    **kwargs_along_vector
+                )
+                bijectors.append(bijector)
+            if 'line' in flow_type:
+                kwargs_along_vector = config.kwargs['line'] if 'line' in config.kwargs.keys() else {}
+                bijector = make_line_proj_coupling_layer(
                     graph_features=graph_features,
                     n_aug=config.n_aug,
                     layer_number=layer_number,
@@ -149,8 +161,8 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
                 )
                 bijectors.append(bijector)
 
-            if "proj" in flow_type:
-                kwargs_proj = config.kwargs["proj"] if "proj" in config.kwargs.keys() else {}
+            if "cartesian" in flow_type:
+                kwargs_proj = config.kwargs["cartesian"] if "cartesian" in config.kwargs.keys() else {}
                 bijector = make_cartesian_proj_coupling_layer(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
