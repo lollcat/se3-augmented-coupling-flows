@@ -19,7 +19,6 @@ def make_radial_coupling_layer(
         identity_init: bool = True,
         spline_num_bins: int = 4,
         dist_spline_max: float = 10.,
-        use_aux_loss: bool = True,
         n_inner_transforms: int = 1,
         ) -> RadialSplitCoupling:
     assert n_aug % 2 == 1
@@ -80,7 +79,6 @@ def make_radial_coupling_layer(
         graph_features=graph_features,
         bijector=bijector_fn,
         swap=swap,
-        use_aux_loss=use_aux_loss,
         n_inner_transforms=n_inner_transforms,
         event_ndims=3,  # [nodes, n_aug+1, dim]
         split_axis=-2,

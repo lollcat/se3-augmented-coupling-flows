@@ -17,7 +17,7 @@ class LineSplitCoupling(BijectorWithExtra):
                  graph_features: chex.Array,
                  get_basis_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams, int], Union[BijectorWithExtra, distrax.Bijector]],
-                 origin_on_coupled_pair: bool = True,
+                 origin_on_coupled_pair: bool = False,
                  swap: bool = False,
                  n_inner_transforms: int = 1,
                  event_ndims: int = 3,

@@ -8,7 +8,7 @@ from eacf.utils.numerical import safe_norm
 from eacf.flow.distrax_with_extra import Extra, BijectorWithExtra
 
 
-class AlongVectorFlow(BijectorWithExtra):
+class RadiusFlow(BijectorWithExtra):
     def __init__(self,
                  inner_bijector: distrax.Bijector,
                  reference: chex.Array

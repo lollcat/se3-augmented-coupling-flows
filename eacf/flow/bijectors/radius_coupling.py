@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from eacf.flow.distrax_with_extra import BijectorWithExtra, Array, Extra
-from eacf.flow.bijectors.radius_flow_layer import AlongVectorFlow
+from eacf.flow.bijectors.radius_flow_layer import RadiusFlow
 
 BijectorParams = chex.Array
 
@@ -18,7 +18,6 @@ class RadialSplitCoupling(BijectorWithExtra):
                  get_reference_vectors_and_invariant_vals: Callable,
                  bijector: Callable[[BijectorParams], Union[BijectorWithExtra, distrax.Bijector]],
                  swap: bool = False,
-                 use_aux_loss: bool = True,
                  n_inner_transforms: int = 1,
                  event_ndims: int = 3,
                  split_axis: int = -2,
@@ -47,7 +46,6 @@ class RadialSplitCoupling(BijectorWithExtra):
         self._split_axis = split_axis
         self._get_reference_points_and_invariant_vals = get_reference_vectors_and_invariant_vals
         self._graph_features = graph_features
-        self.use_aux_loss = use_aux_loss
         self.n_inner_transforms = n_inner_transforms
         super().__init__(event_ndims_in=event_ndims)
 
@@ -87,7 +85,7 @@ class RadialSplitCoupling(BijectorWithExtra):
                         vector_index: int) -> Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
       inner_bijector = self._bijector(params, vector_index)
-      difference_bijector = AlongVectorFlow(inner_bijector, reference)
+      difference_bijector = RadiusFlow(inner_bijector, reference)
       return difference_bijector
 
     def get_reference_points_and_h(self, x: chex.Array, graph_features: chex.Array) ->\

@@ -21,9 +21,9 @@ def make_line_proj_coupling_layer(
         identity_init: bool = True,
         origin_on_coupled_pair: bool = False,
         transform_type: str = 'real_nvp',
-        num_bins: int = 10,
-        lower: float = -10.,
-        upper: float = 10.,
+        num_bins: int = 8,
+        lower: float = -5.,
+        upper: float = 5.,
         n_inner_transforms: int = 1
         ) -> LineSplitCoupling:
     assert n_aug % 2 == 1
