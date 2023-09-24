@@ -62,7 +62,7 @@ def build_flow(config: FlowDistConfig) -> AugmentedFlow:
 def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
     flow_type = [config.type] if isinstance(config.type, str) else config.type
     for flow in flow_type:
-        assert flow in ['nice', 'cartesian', 'spherical', 'radius', 'line', 'non_equivariant']
+        assert flow in ['nice', 'cartesian', 'spherical', 'radial', 'line', 'non_equivariant']
         if 'non_equivariant' in flow:
             assert len(flow_type) == 1
 
