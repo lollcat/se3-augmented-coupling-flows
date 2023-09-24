@@ -9,7 +9,7 @@ from eacf.utils.numerical import rotate_2d
 
 from eacf.utils.numerical import vector_rejection, safe_norm
 from eacf.flow.distrax_with_extra import BijectorWithExtra, Array, Extra
-from eacf.flow.bijectors.proj_flow_layer import ProjFlow
+from eacf.flow.bijectors.cartesian_proj_flow_layer import CartesianProjFlow
 
 BijectorParams = chex.Array
 
@@ -50,7 +50,7 @@ def get_equivariant_orthonormal_basis(vectors: chex.Array, add_small_identity: b
     return change_of_basis_matrix
 
 
-class ProjSplitCoupling(BijectorWithExtra):
+class CartesianProjSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
                  graph_features: chex.Array,
@@ -130,8 +130,8 @@ class ProjSplitCoupling(BijectorWithExtra):
             Union[BijectorWithExtra, distrax.Bijector]:
       """Returns an inner bijector for the passed params."""
       inner_inner_bijector = self._bijector(params, transform_index)  # e.g. spline or rnvp
-      bijector = ProjFlow(inner_bijector=inner_inner_bijector, origin=origin,
-                          change_of_basis_matrix=change_of_basis_matrix)
+      bijector = CartesianProjFlow(inner_bijector=inner_inner_bijector, origin=origin,
+                                   change_of_basis_matrix=change_of_basis_matrix)
       return bijector
 
     def get_basis_and_h(self, x: chex.Array, graph_features: chex.Array) ->\

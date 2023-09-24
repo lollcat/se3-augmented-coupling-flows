@@ -19,7 +19,7 @@ def unproject(x: chex.Array, origin: chex.Array, change_of_basis_matrix: chex.Ar
     return change_of_basis_matrix @ x + origin
 
 
-class ProjFlow(distrax.Bijector):
+class CartesianProjFlow(distrax.Bijector):
     def __init__(self,
                  inner_bijector: distrax.Bijector,
                  origin: chex.Array,

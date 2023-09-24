@@ -24,7 +24,7 @@ class TrainingState(NamedTuple):
     key: chex.PRNGKey
 
 
-InitStateFn = Callable[[TrainingState], TrainingState]
+InitStateFn = Callable[[chex.PRNGKey], TrainingState]
 UpdateStateFn = Callable[[TrainingState], Tuple[TrainingState, dict]]
 EvalAndPlotFn = Callable[[TrainingState, chex.PRNGKey, int, bool, str], dict]
 

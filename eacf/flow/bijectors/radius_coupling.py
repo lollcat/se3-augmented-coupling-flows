@@ -6,12 +6,12 @@ import jax
 import jax.numpy as jnp
 
 from eacf.flow.distrax_with_extra import BijectorWithExtra, Array, Extra
-from eacf.flow.bijectors.along_vector_flow_layer import AlongVectorFlow
+from eacf.flow.bijectors.radius_flow_layer import AlongVectorFlow
 
 BijectorParams = chex.Array
 
 
-class AlongVectorSplitCoupling(BijectorWithExtra):
+class RadialSplitCoupling(BijectorWithExtra):
     def __init__(self,
                  split_index: int,
                  graph_features: chex.Array,

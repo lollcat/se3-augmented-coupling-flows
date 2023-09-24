@@ -9,7 +9,7 @@ if USE_64_BIT:
 
 
 from eacf.utils.testing import check_bijector_properties
-from eacf.flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
+from eacf.flow.bijectors.spherical_coupling_build import make_spherical_coupling_layer
 from eacf.utils.testing import get_minimal_nets_config
 
 def test_bijector_spherical(dim: int = 3, n_layers: int = 1, type='egnn',

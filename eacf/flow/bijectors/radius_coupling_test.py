@@ -3,7 +3,7 @@ import haiku as hk
 import jax.numpy as jnp
 
 from eacf.utils.testing import check_bijector_properties
-from eacf.flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
+from eacf.flow.bijectors.radius_coupling_build import make_radial_coupling_layer
 from eacf.utils.testing import get_minimal_nets_config
 
 def test_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
@@ -16,7 +16,7 @@ def test_along_vector_flow(dim: int = 3, n_layers: int = 1, type='egnn',
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 != 0
-            bijector = make_along_vector_coupling_layer(
+            bijector = make_radial_coupling_layer(
                 graph_features=graph_features,
                 layer_number=i,
                 dim=dim,

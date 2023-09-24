@@ -7,13 +7,11 @@ import jax
 
 from eacf.nets.make_egnn import NetsConfig, EGNN
 from eacf.nets.conditioner_mlp import ConditionerHead
-from eacf.flow.bijectors.proj_coupling import ProjSplitCoupling
+from eacf.flow.bijectors.cartesian_proj_coupling import CartesianProjSplitCoupling
 from eacf.utils.numerical import inverse_softplus
 
 
-_N_ADDITIONAL_BASIS_VECTORS_LOEWDIN = 1
-
-def make_proj_coupling_layer(
+def make_cartesian_proj_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -28,7 +26,7 @@ def make_proj_coupling_layer(
         lower: float = -10.,
         upper: float = 10.,
         n_inner_transforms: int = 1
-        ) -> ProjSplitCoupling:
+        ) -> CartesianProjSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
     base_name = f"layer_{layer_number}_swap{swap}"
@@ -99,7 +97,7 @@ def make_proj_coupling_layer(
         return vectors, h
 
 
-    return ProjSplitCoupling(
+    return CartesianProjSplitCoupling(
         split_index=(n_aug + 1) // 2,
         origin_on_coupled_pair=origin_on_coupled_pair,
         get_basis_vectors_and_invariant_vals=equivariant_fn,

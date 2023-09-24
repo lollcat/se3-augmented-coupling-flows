@@ -6,10 +6,10 @@ import jax.numpy as jnp
 
 from eacf.nets.make_egnn import NetsConfig, EGNN
 from eacf.nets.conditioner_mlp import ConditionerHead
-from eacf.flow.bijectors.along_vector_coupling import AlongVectorSplitCoupling
+from eacf.flow.bijectors.radius_coupling import RadialSplitCoupling
 
 
-def make_along_vector_coupling_layer(
+def make_radial_coupling_layer(
         graph_features: chex.Array,
         layer_number: int,
         dim: int,
@@ -21,7 +21,7 @@ def make_along_vector_coupling_layer(
         dist_spline_max: float = 10.,
         use_aux_loss: bool = True,
         n_inner_transforms: int = 1,
-        ) -> AlongVectorSplitCoupling:
+        ) -> RadialSplitCoupling:
     assert n_aug % 2 == 1
     assert dim in (2, 3)  # Currently just written for 2D and 3D
     base_name = f"layer_{layer_number}_swap{swap}"
@@ -74,7 +74,7 @@ def make_along_vector_coupling_layer(
         return vectors, h
 
 
-    return AlongVectorSplitCoupling(
+    return RadialSplitCoupling(
         split_index=(n_aug + 1) // 2,
         get_reference_vectors_and_invariant_vals=equivariant_fn,
         graph_features=graph_features,

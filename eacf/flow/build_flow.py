@@ -8,12 +8,12 @@ import distrax
 from eacf.flow.base_dist import JointBaseDistribution
 from eacf.flow.x_base_dist import CentreGravityGaussian, HarmonicPotential, AldpTransformedInternals
 from eacf.flow.conditional_dist import build_aux_target_dist
-from eacf.flow.bijectors.build_proj_coupling import make_proj_coupling_layer
+from eacf.flow.bijectors.cartesian_proj_coupling_build import make_cartesian_proj_coupling_layer
 from eacf.flow.bijectors.equi_nice import make_se_equivariant_nice
 from eacf.flow.bijectors.scaling_block import make_scaling_block
-from eacf.flow.bijectors.build_spherical_coupling import make_spherical_coupling_layer
-from eacf.flow.bijectors.build_along_vector_coupling import make_along_vector_coupling_layer
-from eacf.flow.bijectors.build_centre_of_mass_invariant_coupling import make_centre_of_mass_invariant_coupling_layer
+from eacf.flow.bijectors.spherical_coupling_build import make_spherical_coupling_layer
+from eacf.flow.bijectors.radius_coupling_build import make_radial_coupling_layer
+from eacf.flow.bijectors.centre_of_mass_invariant_coupling_build import make_centre_of_mass_invariant_coupling_layer
 from eacf.flow.distrax_with_extra import ChainWithExtra
 
 from eacf.nets.make_egnn import NetsConfig
@@ -124,7 +124,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
             if 'along_vector' in flow_type:
                 kwargs_along_vector = config.kwargs['along_vector'] if 'along_vector' in config.kwargs.keys() else {}
-                bijector = make_along_vector_coupling_layer(
+                bijector = make_radial_coupling_layer(
                     graph_features=graph_features,
                     n_aug=config.n_aug,
                     layer_number=layer_number,
@@ -151,7 +151,7 @@ def create_flow_recipe(config: FlowDistConfig) -> AugmentedFlowRecipe:
 
             if "proj" in flow_type:
                 kwargs_proj = config.kwargs["proj"] if "proj" in config.kwargs.keys() else {}
-                bijector = make_proj_coupling_layer(
+                bijector = make_cartesian_proj_coupling_layer(
                     graph_features=graph_features, n_aug=config.n_aug,
                     layer_number=layer_number, dim=config.dim,
                     swap=swap,

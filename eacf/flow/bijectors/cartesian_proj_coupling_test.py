@@ -3,7 +3,7 @@ import haiku as hk
 import jax.numpy as jnp
 
 from eacf.utils.testing import check_bijector_properties
-from eacf.flow.bijectors.build_proj_coupling import make_proj_coupling_layer
+from eacf.flow.bijectors.cartesian_proj_coupling_build import make_cartesian_proj_coupling_layer
 from eacf.utils.testing import get_minimal_nets_config
 
 
@@ -19,7 +19,7 @@ def test_bijector_with_proj(
         bijectors = []
         for i in range(n_layers):
             swap = i % 2 == 0
-            bijector = make_proj_coupling_layer(
+            bijector = make_cartesian_proj_coupling_layer(
                 transform_type=transform_type,
                 graph_features=graph_features,
                 layer_number=i,
