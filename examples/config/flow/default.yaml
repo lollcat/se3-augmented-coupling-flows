@@ -27,8 +27,8 @@ kwargs:
     n_inner_transforms: ${flow.dim}
     origin_on_coupled_pair: false
     num_bins: 8
-    lower: -10.
-    upper: 10.
+    lower: -5.
+    upper: 5.
   spherical:
     reflection_invariant: false
     n_inner_transforms: 1
