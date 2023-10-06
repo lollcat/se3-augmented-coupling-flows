@@ -1,6 +1,3 @@
-#defaults:
-#  - override hydra/launcher: joblib
-
 hydra:
   job:
     chdir: false
