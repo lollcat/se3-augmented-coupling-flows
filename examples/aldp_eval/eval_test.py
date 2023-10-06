@@ -15,7 +15,9 @@ from eacf.train.base import eval_fn
 
 from eacf.flow.build_flow import build_flow
 from examples.create_train_config import create_flow_config
-from eacf.train.max_lik_train_and_eval import get_eval_on_test_batch
+from eacf.train.max_lik_train_and_eval import (get_eval_on_test_batch_with_further, calculate_forward_ess,
+                                               eval_non_batched)
+from eacf.targets.target_energy.aldp import get_log_prob_fn
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")
@@ -55,15 +57,14 @@ def run(cfg: DictConfig):
                 cfg.flow.base.x_dist.edges = edges
     except:
         pass
+    if 'centre_mass' in cfg['flow']['nets']['egnn']:
+        del cfg.flow.nets.egnn.centre_mass
+    if 'norm_wrt_centre_feat' in cfg['flow']['nets']['egnn']:
+        del cfg.flow.nets.egnn.norm_wrt_centre_feat
+    if 'embedding_for_non_positional_feat' in cfg['flow']['nets']:
+        del cfg.flow.nets.embedding_for_non_positional_feat
     flow_config = create_flow_config(cfg)
     flow = build_flow(flow_config)
-
-    # Eval function
-    eval_on_test_batch_fn = partial(get_eval_on_test_batch,
-                                    flow=flow, K=K,
-                                    test_invariances=False)
-    eval_fn_ = partial(eval_fn, eval_on_test_batch_fn=eval_on_test_batch_fn,
-                       eval_batch_free_fn=None, batch_size=batch_size)
 
     # Load checkpoint
     checkpoints_dir = os.path.join(cfg.training.save_dir, f"model_checkpoints")
@@ -76,14 +77,33 @@ def run(cfg: DictConfig):
     test_data = FullGraphSample(positions=test_data.positions[(ind * n_points):((ind + 1) * n_points)],
                                 features=test_data.features[(ind * n_points):((ind + 1) * n_points)])
 
+    # Eval function
+    target_log_p_x_fn = get_log_prob_fn(scale=0.16626292)
+    eval_on_test_batch_fn = partial(get_eval_on_test_batch_with_further,
+                                    flow=flow, K=K, test_invariances=True,
+                                    target_log_prob=None)
+    eval_batch_free_fn = partial(eval_non_batched,
+                                 single_feature=test_data.features[0],
+                                 flow=flow,
+                                 n_samples=n_points,
+                                 inner_batch_size=batch_size,
+                                 target_log_prob=target_log_p_x_fn,
+                                 target_log_prob_traceable=False)
+
     # Run eval fn
     key = jax.random.PRNGKey(seed)
-    eval_info, _, _ = eval_fn_(test_data, key, state.params)
+    eval_info, log_w, flat_mask = eval_fn(test_data, key, state.params,
+                                          eval_on_test_batch_fn=eval_on_test_batch_fn,
+                                          eval_batch_free_fn=eval_batch_free_fn,
+                                          batch_size=batch_size)
+    log_w_test_data = target_log_p_x_fn(test_data.positions) - log_w
+    further_info = calculate_forward_ess(log_w_test_data, flat_mask)
+    eval_info.update(further_info)
 
     # Save results
-    sample_dir = os.path.join(cfg.training.save_dir, f"log_prob")
+    sample_dir = os.path.join(cfg.training.save_dir, f"eval")
     pathlib.Path(sample_dir).mkdir(exist_ok=True)
-    np.savez(os.path.join(sample_dir, f"log_prob_%04i_%04i.npz" % (seed, ind)),
+    np.savez(os.path.join(sample_dir, f"eval_%04i_%04i.npz" % (seed, ind)),
              **eval_info)
 
 
