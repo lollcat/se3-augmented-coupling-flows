@@ -1,6 +1,7 @@
 from typing import Optional
 
 import chex
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -82,7 +83,7 @@ def openmm_energy_multi_proc(x: np.ndarray):
         return energy
 
 
-def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 800.):
+def openmm_energy_batched(x: np.ndarray, openmm_context, temperature: float = 800.):
     """Compute the energy of a batch of configurations using OpenMM.
 
     Args:
@@ -98,15 +99,13 @@ def openmm_energy_batched(x: chex.Array, openmm_context, temperature: float = 80
     energies = []
     for i in range(n_batch):
         # Get numpy array as input for OpenMM
-        x_np = np.array(x[i, ...])
-        energies.append(openmm_energy(x_np, openmm_context, temperature))
-    return jnp.array(energies)
+        energies.append(openmm_energy(x[i, ...], openmm_context, temperature))
+    return np.array(energies, dtype=x.dtype)
 
 
-def openmm_energy_multi_proc_batched(x: chex.Array, pool):
-    x_np = np.asarray(x)
-    energies_out = pool.map(openmm_energy_multi_proc, x_np)
-    energies = jnp.array(energies_out)
+def openmm_energy_multi_proc_batched(x: np.ndarray, pool):
+    energies_out = pool.map(openmm_energy_multi_proc, x)
+    energies = np.array(energies_out, dtype=x.dtype)
     return energies
 
 
@@ -139,7 +138,7 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
                                                           1. * openmm.unit.femtosecond),
                                 openmm.Platform.getPlatformByName(platform))
 
-    def log_prob_fn(x: chex.Array):
+    def log_prob_fn_np(x: np.ndarray):
         if scale is not None:
             x = x * scale
         if len(x.shape) == 2:
@@ -150,6 +149,11 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
             return -energies
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
+
+    def log_prob_fn(x: chex.Array):
+        result_shape = jax.ShapedArray(x.shape[:-2], x.dtype)
+        logp = jax.pure_callback(log_prob_fn_np, result_shape, x)
+        return logp
 
     return log_prob_fn
 
@@ -176,7 +180,7 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature, platform))
 
     # Define function
-    def log_prob_fn(x: chex.Array):
+    def log_prob_fn_np(x: np.ndarray):
         if len(x.shape) == 2:
             energy = openmm_energy_multi_proc_batched(x[None, ...], pool)
             return -energy[0, ...]
@@ -185,5 +189,10 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
             return -energies
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
+
+    def log_prob_fn(x: chex.Array):
+        result_shape = jax.ShapedArray(x.shape[:-2], x.dtype)
+        logp = jax.pure_callback(log_prob_fn_np, result_shape, x)
+        return logp
 
     return log_prob_fn
