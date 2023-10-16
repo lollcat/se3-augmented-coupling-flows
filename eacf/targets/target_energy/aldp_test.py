@@ -21,10 +21,14 @@ def test_aldp_log_prob():
     log_prob_vmap_jit = jax.jit(jax.vmap(log_prob_fn))
     log_prob_ = log_prob_vmap_jit(aldp_data.positions)
 
+    # Compute gradient
+    log_prob_grad = jax.vmap(jax.grad(log_prob_fn))(aldp_data.positions)
+
     # Check log prob
     assert jnp.shape(log_prob) == (100,)
     assert jnp.all(jnp.isfinite(log_prob))
     assert jnp.allclose(log_prob, log_prob_)
+    assert log_prob_grad.shape == aldp_data.positions.shape
 
 
 def test_aldp_multi_proc_log_prob():
@@ -45,6 +49,9 @@ def test_aldp_multi_proc_log_prob():
     log_prob_vmap_jit = jax.jit(jax.vmap(log_prob_mp_fn))
     log_prob_ = log_prob_vmap_jit(aldp_data.positions)
 
+    # Compute gradient
+    log_prob_grad = jax.vmap(jax.grad(log_prob_fn))(aldp_data.positions)
+
     # Check log prob
     assert jnp.shape(log_prob_mp) == (n_data,)
     assert jnp.shape(log_prob) == (n_data,)
@@ -52,6 +59,7 @@ def test_aldp_multi_proc_log_prob():
     assert jnp.all(jnp.isfinite(log_prob))
     assert jnp.allclose(log_prob_mp, log_prob)
     assert jnp.allclose(log_prob_mp, log_prob_)
+    assert log_prob_grad.shape == aldp_data.positions.shape
 
 
 if __name__ == "__main__":

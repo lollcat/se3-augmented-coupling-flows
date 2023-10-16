@@ -29,12 +29,17 @@ def openmm_energy(x: np.ndarray, openmm_context, temperature: float = 800.):
         return np.nan
     else:
         openmm_context.setPositions(x)
-        state = openmm_context.getState(getForces=False, getEnergy=True)
+        state = openmm_context.getState(getForces=True, getEnergy=True)
 
-        # get energy
+        # Get energy
         energy = state.getPotentialEnergy().value_in_unit(
             openmm.unit.kilojoule / openmm.unit.mole) / kBT
-        return energy
+
+        # Get forces
+        force = state.getForces(asNumpy=True).value_in_unit(
+            openmm.unit.kilojoule / openmm.unit.mole / openmm.unit.nanometer) / kBT
+
+        return energy, force
 
 
 def openmm_multi_proc_init(env, temp, plat):
@@ -75,12 +80,17 @@ def openmm_energy_multi_proc(x: np.ndarray):
         return np.nan
     else:
         openmm_context_g.setPositions(x)
-        state = openmm_context_g.getState(getForces=False, getEnergy=True)
+        state = openmm_context_g.getState(getForces=True, getEnergy=True)
 
-        # get energy
+        # Get energy
         energy = state.getPotentialEnergy().value_in_unit(
             openmm.unit.kilojoule / openmm.unit.mole) / kBT
-        return energy
+
+        # Get force
+        force = state.getForces(asNumpy=True).value_in_unit(
+            openmm.unit.kilojoule / openmm.unit.mole / openmm.unit.nanometer) / kBT
+
+        return energy, force
 
 
 def openmm_energy_batched(x: np.ndarray, openmm_context, temperature: float = 800.):
@@ -97,16 +107,20 @@ def openmm_energy_batched(x: np.ndarray, openmm_context, temperature: float = 80
     n_batch = x.shape[0]
 
     energies = []
+    forces = []
     for i in range(n_batch):
-        # Get numpy array as input for OpenMM
-        energies.append(openmm_energy(x[i, ...], openmm_context, temperature))
-    return np.array(energies, dtype=x.dtype)
+        energy, force = openmm_energy(x[i, ...], openmm_context, temperature)
+        energies.append(energy)
+        forces.append(force)
+    return np.array(energies, dtype=x.dtype), np.array(forces, dtype=x.dtype)
 
 
 def openmm_energy_multi_proc_batched(x: np.ndarray, pool):
-    energies_out = pool.map(openmm_energy_multi_proc, x)
+    out = pool.map(openmm_energy_multi_proc, x)
+    energies_out, forces_out = zip(*out)
     energies = np.array(energies_out, dtype=x.dtype)
-    return energies
+    forces = np.array(forces_out, dtype=x.dtype)
+    return energies, forces
 
 
 def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', platform: str = 'Reference',
@@ -138,22 +152,32 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
                                                           1. * openmm.unit.femtosecond),
                                 openmm.Platform.getPlatformByName(platform))
 
-    def log_prob_fn_np(x: np.ndarray):
+    def energies_and_forces(x: np.ndarray):
         if scale is not None:
             x = x * scale
         if len(x.shape) == 2:
-            energy = openmm_energy_batched(x[None, ...], sim.context, temperature=temperature)
-            return -energy[0, ...]
+            energy, force = openmm_energy_batched(x[None, ...], sim.context, temperature=temperature)
+            return -energy[0, ...], force[0, ...]
         elif len(x.shape) == 3:
-            energies = openmm_energy_batched(x, sim.context, temperature=temperature)
-            return -energies
+            energies, forces = openmm_energy_batched(x, sim.context, temperature=temperature)
+            return -energies, forces
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
 
+    def log_prob_fwd(x: chex.Array):
+        result_shapes = (jax.ShapedArray(x.shape[:-2], x.dtype),
+                         jax.ShapedArray(x.shape, x.dtype))
+        return jax.pure_callback(energies_and_forces, result_shapes, x)
+
+    def log_prob_bwd(res, g):
+        return (g * res,)
+
+    @jax.custom_vjp
     def log_prob_fn(x: chex.Array):
-        result_shape = jax.ShapedArray(x.shape[:-2], x.dtype)
-        logp = jax.pure_callback(log_prob_fn_np, result_shape, x)
+        logp, _ = log_prob_fwd(x)
         return logp
+
+    log_prob_fn.defvjp(log_prob_fwd, log_prob_bwd)
 
     return log_prob_fn
 
@@ -180,19 +204,29 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature, platform))
 
     # Define function
-    def log_prob_fn_np(x: np.ndarray):
+    def energies_and_forces(x: np.ndarray):
         if len(x.shape) == 2:
-            energy = openmm_energy_multi_proc_batched(x[None, ...], pool)
-            return -energy[0, ...]
+            energy, force = openmm_energy_multi_proc_batched(x[None, ...], pool)
+            return -energy[0, ...], force[0, ...]
         elif len(x.shape) == 3:
-            energies = openmm_energy_multi_proc_batched(x, pool)
-            return -energies
+            energies, forces = openmm_energy_multi_proc_batched(x, pool)
+            return -energies, forces
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
 
+    def log_prob_fwd(x: chex.Array):
+        result_shapes = (jax.ShapedArray(x.shape[:-2], x.dtype),
+                         jax.ShapedArray(x.shape, x.dtype))
+        return jax.pure_callback(energies_and_forces, result_shapes, x)
+
+    def log_prob_bwd(res, g):
+        return (g * res,)
+
+    @jax.custom_vjp
     def log_prob_fn(x: chex.Array):
-        result_shape = jax.ShapedArray(x.shape[:-2], x.dtype)
-        logp = jax.pure_callback(log_prob_fn_np, result_shape, x)
+        logp, _ = log_prob_fwd(x)
         return logp
+
+    log_prob_fn.defvjp(log_prob_fwd, log_prob_bwd)
 
     return log_prob_fn
