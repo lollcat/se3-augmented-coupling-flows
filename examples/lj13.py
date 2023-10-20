@@ -6,7 +6,7 @@ from functools import partial
 from eacf.train.train import train
 from eacf.targets.data import load_lj13
 from eacf.targets.target_energy.leonard_jones import log_prob_fn
-from examples.create_train_config import create_train_config
+from eacf.setup_run.create_train_config import create_train_config
 
 
 def load_dataset(train_set_size: int, valid_set_size: int, final_run: bool):

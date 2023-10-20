@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 
-from examples.create_fab_train_config import create_train_config
+from eacf.setup_run.create_fab_train_config import create_train_config
 
 from eacf.train.train import train
 from eacf.targets.data import load_lj13

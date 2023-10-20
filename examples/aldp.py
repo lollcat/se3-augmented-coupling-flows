@@ -6,7 +6,7 @@ from omegaconf import DictConfig, open_dict
 import jax.numpy as jnp
 import jax
 
-from examples.create_train_config import create_train_config, create_flow_config
+from eacf.setup_run.create_train_config import create_train_config, create_flow_config
 
 from eacf.targets.data import load_aldp
 from eacf.train.train import train
