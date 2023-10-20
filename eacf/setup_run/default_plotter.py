@@ -8,7 +8,7 @@ import matplotlib as mpl
 
 from eacf.utils.plotting import bin_samples_by_dist, get_counts, get_pairwise_distances_for_plotting
 
-from examples.configs import TrainingState
+from eacf.setup_run.configs import TrainingState
 from eacf.flow.aug_flow_dist import FullGraphSample, AugmentedFlow, AugmentedFlowParams
 
 

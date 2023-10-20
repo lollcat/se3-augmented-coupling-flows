@@ -5,7 +5,7 @@ from functools import partial
 
 from eacf.targets.data import load_qm9
 from eacf.train.train import train
-from examples.create_train_config import create_train_config
+from eacf.setup_run.create_train_config import create_train_config
 from examples.lj13 import to_local_config
 
 

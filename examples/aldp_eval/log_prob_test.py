@@ -14,7 +14,7 @@ from eacf.utils.checkpoints import get_latest_checkpoint
 from eacf.train import eval_fn
 
 from eacf.flow.build_flow import build_flow
-from examples.create_train_config import create_flow_config
+from eacf.setup_run.create_train_config import create_flow_config
 from train.max_lik_train_and_eval import get_eval_on_test_batch
 
 

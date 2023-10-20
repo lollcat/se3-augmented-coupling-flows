@@ -13,8 +13,8 @@ from functools import partial
 from fabjax.sampling import build_smc, build_blackjax_hmc, build_metropolis
 from fabjax.buffer import build_prioritised_buffer
 
-from examples.default_plotter_fab import make_default_plotter
-from examples.create_train_config import setup_logger, create_flow_config
+from eacf.setup_run.default_plotter_fab import make_default_plotter
+from eacf.setup_run.create_train_config import setup_logger, create_flow_config
 
 from eacf.train.base import eval_fn, FullGraphSample, setup_padded_reshaped_data
 from eacf.train.train import TrainConfig

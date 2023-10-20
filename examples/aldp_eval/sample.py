@@ -13,7 +13,7 @@ import haiku as hk
 from eacf.utils.checkpoints import get_latest_checkpoint
 
 from eacf.flow.build_flow import build_flow
-from examples.create_train_config import create_flow_config
+from eacf.setup_run.create_train_config import create_flow_config
 
 
 @hydra.main(config_path="./config", config_name="aldp.yaml")

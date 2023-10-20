@@ -6,7 +6,7 @@ from functools import partial
 
 from eacf.train.train import train
 from eacf.targets.data import load_dw4
-from examples.create_fab_train_config import create_train_config
+from eacf.setup_run.create_fab_train_config import create_train_config
 from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
 from eacf.utils.data import positional_dataset_only_to_full_graph
 

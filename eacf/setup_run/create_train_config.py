@@ -13,8 +13,8 @@ import matplotlib as mpl
 from functools import partial
 import jax.numpy as jnp
 
-from examples.default_plotter import make_default_plotter
-from examples.configs import TrainingState
+from eacf.setup_run.default_plotter import make_default_plotter
+from eacf.setup_run.configs import TrainingState
 
 from eacf.train.base import get_shuffle_and_batchify_data_fn, create_scan_epoch_fn, eval_fn, \
     setup_padded_reshaped_data

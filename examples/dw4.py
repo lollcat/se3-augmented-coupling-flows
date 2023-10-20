@@ -1,16 +1,17 @@
 from typing import Optional
 
-import hydra
-from omegaconf import DictConfig
 from functools import partial
 
+import hydra
+from omegaconf import DictConfig
+import jax
 
 from eacf.train.train import train
 from eacf.targets.data import load_dw4
-from examples.create_train_config import create_train_config
+from eacf.setup_run.create_train_config import create_train_config
 from eacf.targets.target_energy.double_well import make_dataset, log_prob_fn
 from eacf.utils.data import positional_dataset_only_to_full_graph
-import jax
+
 
 def load_dataset_original(train_set_size: int, valid_set_size: Optional[int], final_run: bool):
     train, valid, test = load_dw4(train_set_size)
@@ -79,7 +80,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
 
 @hydra.main(config_path="./config", config_name="dw4.yaml")
 def run(cfg: DictConfig):
-    local_config = False
+    local_config = True
     if local_config:
         print("running locally")
         cfg = to_local_config(cfg)
