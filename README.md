@@ -41,8 +41,10 @@ python examples/dw4_fab.py
 python examples/lj13_fab.py
 ```
 
+The code for the equivariant CNF baseline can be found in the [ecnf-baseline-neurips-2023](https://github.com/lollcat/ecnf-baseline-neurips-2023) repo. 
+
 ## Upcoming additions
-- Add diffusion training/results
+- Add diffusion code
 - Further cleaning
 - Quickstart notebook
 

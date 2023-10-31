@@ -163,8 +163,6 @@ def get_eval_on_test_batch_with_further(
     info.update(lower_bound_marginal_gap=lower_bound_marginal_gap)
 
     info.update(var_log_w=maybe_masked_mean(jnp.var(log_w, axis=0), mask=mask))
-    info.update(ess_aug_conditional=maybe_masked_mean(
-        1 / jnp.sum(jax.nn.softmax(log_w, axis=0) ** 2, axis=0) / log_w.shape[0], mask=mask))
 
     if test_invariances:
         key, subkey = jax.random.split(key)
@@ -208,12 +206,12 @@ def eval_non_batched(params: AugmentedFlowParams, single_feature: chex.Array,
     if target_log_prob is not None:
         if not target_log_prob_traceable:
             log_p_x = target_log_prob(x_positions)
-        # Calculate ESS
+        # Calculate reverse ESS.
         log_w = log_p_x + log_p_a_given_x - log_prob_flow
         ess = 1 / jnp.sum(jax.nn.softmax(log_w) ** 2) / log_w.shape[0]
         info.update(
             {
-             "ess": ess}
+             "rv_ess": ess}
         )
     return info
 
