@@ -157,10 +157,10 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
             x = x * scale
         if len(x.shape) == 2:
             energy, force = openmm_energy_batched(x[None, ...], sim.context, temperature=temperature)
-            return -energy[0, ...], force[0, ...]
+            return -energy[0, ...], -force[0, ...]
         elif len(x.shape) == 3:
             energies, forces = openmm_energy_batched(x, sim.context, temperature=temperature)
-            return -energies, forces
+            return -energies, -forces
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
 
@@ -207,10 +207,10 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     def energies_and_forces(x: np.ndarray):
         if len(x.shape) == 2:
             energy, force = openmm_energy_multi_proc_batched(x[None, ...], pool)
-            return -energy[0, ...], force[0, ...]
+            return -energy[0, ...], -force[0, ...]
         elif len(x.shape) == 3:
             energies, forces = openmm_energy_multi_proc_batched(x, pool)
-            return -energies, forces
+            return -energies, -forces
         else:
             raise NotImplementedError('The OpenMM energy function only supports 2D and 3D inputs')
 
