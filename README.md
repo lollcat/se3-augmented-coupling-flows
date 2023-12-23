@@ -53,11 +53,12 @@ The code for the equivariant CNF baseline can be found in the [ecnf-baseline-neu
 If you use this code in your research, please cite it as:
 
 ```
-@article{
-midgley2023se3couplingflow,
-title={SE(3) Equivariant Augmented Coupling Flows},
-author={Laurence Illing Midgley and Vincent Stimper and Javier Antor{\'a}n and Emile Mathieu and Bernhard Sch{\"o}lkopf and Jos{\'e} Miguel Hern{\'a}ndez-Lobato},,
-journal={arXiv preprint arXiv:2308.10364}
+@inproceedings{
+midgley2023eacf,
+title={{SE}(3) Equivariant Augmented Coupling Flows},
+author={Laurence Illing Midgley and Vincent Stimper and Javier Antoran and Emile Mathieu and Bernhard Sch{\"o}lkopf and Jos{\'e} Miguel Hern{\'a}ndez-Lobato},
+booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
 year={2023},
+url={https://openreview.net/forum?id=KKxO6wwx8p}
 }
 ```
