@@ -152,7 +152,7 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
                                                           1. * openmm.unit.femtosecond),
                                 openmm.Platform.getPlatformByName(platform))
 
-    def energies_and_forces(x: np.ndarray):
+    def log_prob_and_grad(x: np.ndarray):
         if scale is not None:
             x = x * scale
         if len(x.shape) == 2:
@@ -167,7 +167,7 @@ def get_log_prob_fn(temperature: float = 800, environment: str = 'implicit', pla
     def log_prob_fwd(x: chex.Array):
         result_shapes = (jax.ShapedArray(x.shape[:-2], x.dtype),
                          jax.ShapedArray(x.shape, x.dtype))
-        return jax.pure_callback(energies_and_forces, result_shapes, x)
+        return jax.pure_callback(log_prob_and_grad, result_shapes, x)
 
     def log_prob_bwd(res, g):
         return (g * res,)
@@ -204,7 +204,7 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     pool = mp.Pool(n_threads, initializer=openmm_multi_proc_init, initargs=(environment, temperature, platform))
 
     # Define function
-    def energies_and_forces(x: np.ndarray):
+    def log_prob_and_grad(x: np.ndarray):
         if len(x.shape) == 2:
             energy, force = openmm_energy_multi_proc_batched(x[None, ...], pool)
             return -energy[0, ...], force[0, ...]
@@ -217,7 +217,7 @@ def get_multi_proc_log_prob_fn(temperature: float = 800, environment: str = 'imp
     def log_prob_fwd(x: chex.Array):
         result_shapes = (jax.ShapedArray(x.shape[:-2], x.dtype),
                          jax.ShapedArray(x.shape, x.dtype))
-        return jax.pure_callback(energies_and_forces, result_shapes, x)
+        return jax.pure_callback(log_prob_and_grad, result_shapes, x)
 
     def log_prob_bwd(res, g):
         return (g * res,)
