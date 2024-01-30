@@ -2,10 +2,6 @@
 Code for the paper https://arxiv.org/abs/2308.10364. 
 Results can be obtained by running the commands in the [Experiments](#experiments) section.
 
-
-**Note**: This code is being currently being cleaned and documented further. 
-Additionally, we will add a Quickstart jupyter notebook. 
-
 # Install
 JAX needs to be installed independently following the instruction on the [JAX homepage](https://github.com/google/jax#installation).
 At time of publishing we used JAX 0.4.13 with python 3.10.
@@ -44,9 +40,7 @@ python examples/lj13_fab.py
 The code for the equivariant CNF baseline can be found in the [ecnf-baseline-neurips-2023](https://github.com/lollcat/ecnf-baseline-neurips-2023) repo. 
 
 ## Upcoming additions
-- Add diffusion code
-- Further cleaning
-- Quickstart notebook
+- Quickstart notebook with inference using model weights
 
 ## Citation
 
