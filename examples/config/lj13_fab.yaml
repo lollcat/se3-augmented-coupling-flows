@@ -19,8 +19,8 @@ flow:
   nodes: 13
 
 training:
-  n_epoch: 14000 # approx how many iter we can do in the training time
-  batch_size: 256 # Note per device if multiple devices used.
+  n_epoch: 20_000 # approx how many iter we can do in the training time
+  batch_size: 128 # Note per device if multiple devices used.
   use_multiple_devices: false
   eval_batch_size: 16 # Will be timez by K during eval.
   plot_batch_size: 32
