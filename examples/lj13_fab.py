@@ -31,7 +31,7 @@ def to_local_config(cfg: DictConfig) -> DictConfig:
     cfg.fab.buffer_min_length_batches = 4
     cfg.fab.buffer_max_length_batches = 10
 
-    cfg.training.n_epoch = 30
+    cfg.training.n_epoch = 100
     cfg.training.save = True
     cfg.training.resume = True
     cfg.training.plot_batch_size = 4

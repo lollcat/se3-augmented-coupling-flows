@@ -19,7 +19,7 @@ flow:
   nodes: 13
 
 training:
-  n_epoch: 20_000 # approx how many iter we can do in the training time
+  n_epoch: 15_000 # approx how many iter we can do in the training time
   batch_size: 128 # Note per device if multiple devices used.
   use_multiple_devices: false
   eval_batch_size: 16 # Will be timez by K during eval.
@@ -29,6 +29,8 @@ training:
   test_set_size: 1000
   aux_loss_weight: 1.0
   data_augmentation_for_non_eq: false # Only use for training by maximum likelihood.
+  load_wandb_checkpoint: true
+  checkpoint_wandb_run_id: 2dk755h3
 
 
 logger:
@@ -36,7 +38,7 @@ logger:
 #  pandas_logger:
 #    save_period: 1000 # how often to save the pandas dataframe as a csv
   wandb:
-    name: lj13_fab_${flow.type}
+    name: lj13_fab_${flow.type}_FROM_CHECKPOINT
     project: fab
     entity: flow-ais-bootstrap
     tags: [lj13,fab,Leucadendron]

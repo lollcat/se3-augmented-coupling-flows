@@ -28,6 +28,7 @@ from eacf.train.fab_train_with_buffer import build_fab_with_buffer_init_step_fns
 from eacf.train.fab_eval import fab_eval_function
 from eacf.utils.pmap import get_from_first_device
 
+from examples.load_checkpoint import load_checkpoint
 
 def create_train_config(cfg: DictConfig,
                         target_log_p_x_fn,
@@ -145,6 +146,13 @@ def create_train_config_non_pmap(cfg: DictConfig, target_log_p_x_fn, load_datase
             flow=flow, log_p_x=target_log_p_x_fn, features=features,
             smc=smc, optimizer=optimizer, batch_size=cfg.training.batch_size,
         )
+
+    if cfg.training.load_wandb_checkpoint:
+        def init_fn(key: chex.PRNGKey) -> TrainStateWithBuffer:
+            init_state, checkpoint_cfg = load_checkpoint(run_id=cfg.training.checkpoint_wandb_run_id)
+            print(f"Loaded initial state from wandb run {cfg.training.checkpoint_wandb_run_id}")
+            return init_state
+
 
     if evaluation_fn is None and eval_and_plot_fn is None:
         # Setup eval functions
