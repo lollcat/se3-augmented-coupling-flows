@@ -122,7 +122,7 @@ class EGCL(hk.Module):
         chex.assert_equal_shape((vectors_out, node_positions))
 
         if self.cross_multiplicity_shifts and n_vectors > 1:
-            phi_cross_in = e3nn.scatter_sum(m_ij, dst=senders, output_size=n_nodes)  # [n_nodes, feat]
+            phi_cross_in = e3nn.scatter_sum(m_ij, dst=receivers, output_size=n_nodes)  # [n_nodes, feat]
             phi_x_cross_out = self.phi_x_cross_torso(phi_cross_in)
             phi_x_cross_out = hk.Linear(
                 n_cross_vectors, w_init=hk.initializers.VarianceScaling(self.variance_scaling_init, "fan_avg", "uniform")
