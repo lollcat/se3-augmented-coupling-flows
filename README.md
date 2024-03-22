@@ -24,6 +24,7 @@ We use hydra to configure all experiments.
 The flow type may be set as shown in the first line.
 For Alanine Dipeptide the data must first be downloaded from [Zenodo](https://zenodo.org/record/6993124/) which may be 
 done with the script `eacf/targets/aldp.sh`.
+For running an experiment make sure to configure the WANDB logger in the config file to match your WANDB account (e.g. for dw4 see [experiments/config/dw4.yaml](https://github.com/lollcat/se3-augmented-coupling-flows/blob/5f719ec6b1cb5b0d00c5b42e6d755fc76ca9b0b4/examples/config/dw4.yaml#L34) ). 
 
 ```shell
 python examples/dw4.py flow.type=spherical # Flow types: spherical,proj,along_vector,non_equivariant
